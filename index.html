@@ -1419,18 +1419,42 @@ function createEngine(wasm) {
         stand = { tilt: p.tilt, ty, tz };
       }
 
-      // Cubicle hooks: two printed hooks clip over the plate's top edge and hang over the top of a cubicle panel (an upside-down J),
-      // or over the front lip of a cubicle's accessory rail. Built in sign coordinates; each prints on its side.
+      // Cubicle hooks: two printed hooks clip over the plate's top edge. 'cubicle' hangs over the top of the panel (an upside-down J).
+      // 'cubrail' hangs in a C-shaped rail: a slot (railOpen tall) between two lips (railLip deep), with a hollow behind them that
+      // reaches railExt above and below the slot and is railCav deep. Each hook ends in a thin tab that fits through the slot when
+      // the sign is held up by railExt; let go and the tab drops behind the lower lip and rests on the floor of the hollow.
+      // Built in sign coordinates; each hook prints on its side.
       let hooks = [], hookEnv = null;
       if (p.mount === 'cubicle' || p.mount === 'cubrail') {
         const cub = p.mount === 'cubicle', t = Math.max(3, 6 * NZ), lipF = Math.max(2, 4 * NZ), clipH = 7.5, g = 1;
-        const P = cub ? (p.cubP ?? 55) : (p.railLipT ?? 3), back = cub ? (p.hookBack ?? 25) : Math.max(3, (p.railLipH ?? 10) - 1);
-        const drop = p.hookDrop ?? 5, hw = lz(p.hookW ?? 20), zBk = -t - g - P;
+        const P = p.cubP ?? 55, back = p.hookBack ?? 25;
+        const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 20), zBk = -t - g - P;
         const R2 = (y0, y1, z0, z1) => rect(y1 - y0, z1 - z0, (y0 + y1) / 2, (z0 + z1) / 2);
         const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]);
-        // both hooks hang from the same panel top (or rail lip), set by the higher of the two clip points
+        // both hooks hang from the same panel top (or rail slot), set by the higher of the two clip points
         const yP = Math.max(...hookAt.map((h) => h.yT)) + drop, yU = yP + g / 2, yPanel = yP;
-        for (const { xf, yT } of hookAt) {
+        if (!cub) {
+          const open = p.railOpen ?? 10, lipD = p.railLip ?? 0.5, ext = p.railExt ?? 2, cav = p.railCav ?? 1;
+          const cy = 0.2, cz = 0.1; // clearances: up and down in the slot, front to back in the hollow
+          const zF = -t - 0.1, zLipB = zF - lipD, zCavB = zLipB - cav; // rail face, back of the lips, back of the hollow
+          const yo = yP, yc = yo + open / 2; // bottom edge of the slot, its centre
+          const fb = yc - open / 2 - ext + cy, ft = fb + open - 2 * cy; // the tab, seated: one slot height tall, resting on the floor
+          const flag = cav - 2 * cz;
+          if (open - 2 * cy < ext + 1) throw new UserError('The rail slot is too short for its hollow. Check the slot height and how far the hollow reaches past it.');
+          if (flag < 0.3) throw new UserError('The hollow behind the rail lips is too shallow for a tab. Check the hollow depth.');
+          if (flag < 2 * NZ - 0.01) warnings.push(`The tab that goes into the rail is only ${fmtMm(flag)} mm thick, less than two ${NZ} mm nozzle lines. Print the hooks with a finer nozzle, or check the hollow depth.`);
+          for (const { xf, yT } of hookAt) {
+            const body2 = union([
+              R2(yT - clipH, yT + 0.2 + t, -t, T + 0.2 + lipF), // clip around the plate's top edge
+              R2(yT, ft + 1.5, -t, 0), // front leg, up the face of the rail
+            ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
+            // neck through the slot and the tab behind the lips: sharp corners, so nothing rubs on the lips
+            const prof = union([body2, R2(yo + cy, ft, zLipB - cz - 0.01, -t + 0.01), R2(fb, ft, zCavB + cz, zLipB - cz)]);
+            hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot));
+          }
+          hookEnv = { kind: 'cubrail', yc, open, ext, lipD, cav, zF, yTop: yc + open / 2 + ext };
+        }
+        for (const { xf, yT } of cub ? hookAt : []) {
           const prof = union([
             R2(yT - clipH, yT + 0.2 + t, -t, T + 0.2 + lipF), // clip around the plate's top edge (the plate is cut out of it below)
             R2(yT, yU + t, -t, 0), // front leg, between the plate and the panel
@@ -1439,7 +1463,7 @@ function createEngine(wasm) {
           ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
           hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot));
         }
-        hookEnv = { kind: p.mount, yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2, back, lipH: p.railLipH ?? 10, t, g };
+        if (cub) hookEnv = { kind: 'cubicle', yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2, back, t, g };
       }
 
       const nz = p.nozzle || 0.4;
@@ -1616,7 +1640,7 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 6.5,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railLipT: 3, railLipH: 10, hookDrop: 5, hookW: 20, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 0.5, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 20, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8,
 };
@@ -1651,8 +1675,11 @@ const SLIDERS = {
   proud: { label: 'Frame extrusion', min: 0, max: 4, step: 0.1, layers: true, zero: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 100, step: 1, out: mm(0) },
   hookBack: { label: 'Hook length down the back', min: 8, max: 80, step: 1, out: mm(0) },
-  railLipT: { label: 'Rail lip thickness', min: 1, max: 12, step: 0.5, out: mm() },
-  railLipH: { label: 'Rail lip height', min: 4, max: 30, step: 0.5, out: mm() },
+  railOpen: { label: 'Rail slot height', min: 4, max: 30, step: 0.1, out: mm() },
+  railLip: { label: 'Lip depth (slot to hollow)', min: 0.2, max: 5, step: 0.1, out: mm() },
+  railExt: { label: 'Hollow past the slot, up and down', min: 0.5, max: 10, step: 0.1, out: mm() },
+  railCav: { label: 'Hollow depth behind the lips', min: 0.4, max: 10, step: 0.1, out: mm() },
+  railDrop: { label: 'Sign top below the rail slot', min: 0, max: 120, step: 1, out: mm(0) },
   hookDrop: { label: 'Sign top below the top of the panel', min: 0, max: 120, step: 1, out: mm(0) },
   hookW: { label: 'Hook width', min: 10, max: 40, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 20, step: 0.5, out: mm() },
@@ -1710,7 +1737,7 @@ const MOUNT_HINTS = {
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
   stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
   cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is.',
-  cubrail: 'Two hooks clip onto the top edge of the sign and hook over the front lip of the accessory rail on a cubicle panel. Measure how thick and how tall the lip is.',
+  cubrail: 'For a C-shaped rail: each hook ends in a thin tab. Hold the sign up a little, push the tabs into the slot and let go; the tabs drop behind the lower lip. It slides along the rail. Measure the slot and the hollow behind it.',
 };
 // Conditions for controls that only apply in some modes.
 const WHEN = {
@@ -1755,9 +1782,12 @@ const SECTIONS = [
       { seg: 'hangN', label: 'Loops', options: [[1, 'One'], [2, 'Two']], when: 'hang' },
       { slider: 'cubP', when: 'cubicle' },
       { slider: 'hookBack', when: 'cubicle' },
-      { slider: 'railLipT', when: 'cubrail' },
-      { slider: 'railLipH', when: 'cubrail' },
-      { slider: 'hookDrop', when: 'hooked' },
+      { slider: 'railOpen', when: 'cubrail' },
+      { slider: 'railLip', when: 'cubrail' },
+      { slider: 'railExt', when: 'cubrail' },
+      { slider: 'railCav', when: 'cubrail' },
+      { slider: 'railDrop', when: 'cubrail' },
+      { slider: 'hookDrop', when: 'cubicle' },
       { slider: 'hookW', when: 'hooked' },
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
     ] },
@@ -2054,10 +2084,12 @@ function updateScene(res, refit) {
     };
     if (e.kind === 'cubicle') box(e.yTop - 400, e.yTop, e.zBack, e.zFront);
     else {
-      const zPanel = e.zBack - e.t - e.g;
-      box(e.yTop - e.lipH, e.yTop, e.zBack, e.zFront); // the rail's front lip
-      box(e.yTop - e.lipH - 3, e.yTop - e.lipH, zPanel, e.zFront); // the bottom of the rail channel
-      box(e.yTop - 400, e.yTop + 40, zPanel - 30, zPanel); // the panel behind it
+      const zLipB = e.zF - e.lipD, zB = zLipB - e.cav, lo = e.yc - e.open / 2, hi = e.yc + e.open / 2;
+      box(e.yc - 400, e.yc + 60, zB - 25, zB); // the panel behind the hollow
+      box(hi + e.ext, e.yc + 60, zB, zLipB); // around the hollow, above and below it
+      box(e.yc - 400, lo - e.ext, zB, zLipB);
+      box(hi, e.yc + 60, zLipB, e.zF); // the two lips either side of the slot
+      box(e.yc - 400, lo, zLipB, e.zF);
     }
   }
   sliderMesh = null;
@@ -2998,7 +3030,7 @@ function renderExport() {
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     result.parts.slider ? `<b>Assemble:</b> slide the frame into the track from the right end, the open end. Nothing holds it there but the fit of the dovetail, so don't push it past the last status.` : null,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
-    result.parts.hooks.length ? `<b>Hooks:</b> push both hooks down onto the sign's top edge, then hang them over ${state.mount === 'cubicle' ? 'the top of the cubicle panel' : 'the lip of the cubicle rail'}. They print on their side, so the bend is as strong as it can be.` : null,
+    result.parts.hooks.length ? (state.mount === 'cubicle' ? `<b>Hooks:</b> push both hooks down onto the sign's top edge, then hang them over the top of the cubicle panel.` : `<b>Hooks:</b> push both hooks down onto the sign's top edge. Hold the sign about ${fmt(state.railExt)} mm higher than where it will hang, push both tabs into the rail's slot and let go: the tabs drop behind the lower lip. Lift and pull to take it off; slide it to move it along the rail.`) + ' The hooks print on their side, so the bend is as strong as it can be.' : null,
     state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
     result.parts.slider ? `<b>Fit:</b> clearance is ${state.tol.toFixed(2)} mm. If the frame binds, add 0.05 mm and reprint only the frame.` : null,
   ].filter(Boolean);
