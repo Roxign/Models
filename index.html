@@ -56,7 +56,10 @@ button { cursor: pointer; }
 .brand svg { flex: none; }
 .brand h1 { margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 19px; letter-spacing: -0.01em; }
 .brand p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
-.printer { display: flex; gap: 8px; }
+.printer { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.printer input[type="number"] { width: 64px; padding: 5px 6px; border: 1px solid var(--line); background: var(--soft); border-radius: 8px; font-size: 12.5px; }
+.printer .chk { gap: 4px; }
+.printer .chk input { accent-color: var(--accent); margin: 0; }
 .printer label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .printer select { width: auto; padding: 5px 8px; font-size: 12.5px; color: var(--ink); }
 .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -138,13 +141,16 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .st-head .hint { flex: 1 1 200px; min-width: 0; }
 .st-actions { display: flex; gap: 6px; align-items: center; }
 .st-head select { width: auto; max-width: 100%; padding-block: 5px; font-size: 12.5px; }
-.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.st-cards { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
 .st-card {
   border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 8px 8px 4px; min-width: 0;
   display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
 }
 .st-card:hover { border-color: var(--muted); }
 .st-card.is-current { border-color: var(--hue); background: var(--hue-soft); box-shadow: inset 0 0 0 1px var(--hue); }
+.st-card.dragging { position: relative; z-index: 6; cursor: grabbing; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28); }
+body.dragging-card { user-select: none; cursor: grabbing; }
+.st-row .pick { touch-action: none; }
 .st-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .st-row .pick { flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); color: var(--muted); display: grid; place-items: center; padding: 0; }
 .st-row .pick svg { width: 20px; height: 20px; fill: currentColor; }
@@ -309,8 +315,12 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   </div>
   <div class="top-actions">
     <div class="printer" role="group" aria-label="Printer settings">
+      <label>Machine<select id="bed" data-key="bed" title="Print bed size"><option value="180">180 × 180 · A1 mini, Prusa MINI</option><option value="220">220 × 220 · Ender 3</option><option value="250">250 × 210 · Prusa MK4</option><option value="256">256 × 256 · Bambu X1, P1, A1</option><option value="300">300 × 300</option><option value="350">350 × 350</option></select></label>
       <label>Nozzle<select id="nozzle" data-key="nozzle" title="Nozzle diameter"><option value="0.2">0.2 mm</option><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option></select></label>
-      <label>Layer<select id="layerH" data-key="layerH" title="Layer height"></select></label>
+      <label>Layer<input id="layerH" data-key="layerH" data-commit="change" type="number" inputmode="decimal" step="0.01" list="layerList" title="Layer height in mm. Pick a common value or type your own."></label>
+      <label class="chk" title="Variable layer height: thicker layers for the plate, finer layers for labels and frame details"><input type="checkbox" id="dyn" data-key="dyn">Variable</label>
+      <label data-when="dyn">Fine<input id="layerF" data-key="layerF" data-commit="change" type="number" inputmode="decimal" step="0.01" list="layerFList" title="Layer height used from the top of the plate upward"></label>
+      <datalist id="layerList"></datalist><datalist id="layerFList"></datalist>
     </div>
     <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
     <button class="btn" id="printOpen" type="button">Print guide</button>
@@ -753,7 +763,7 @@ function createEngine(wasm) {
     const c = p.cap;
     const s = p.layout === 'side' ? c * 2.8 : p.layout === 'icon' ? c * 4.2 : c * 3.2;
     const gap = p.layout === 'side' ? Math.max(1.8, c * 0.5) : Math.max(1.6, c * 0.45);
-    return { cap: c, s, gap, hdrCap: clamp(c * 1.3, 4, 12) };
+    return { cap: c, s, gap, hdrCap: p.hcap || clamp(c * 1.3, 4, 12) };
   }
   const labelText = (st) => (st.text || '').trim();
   const hasText = (t) => t.replace(/\|/g, '').trim().length > 0;
@@ -959,7 +969,7 @@ function createEngine(wasm) {
       let hdrCap = 0;
       if (headerText) {
         const [h0, h1] = hdrZone, zh = h1 - h0, my = (h0 + h1) / 2;
-        const hdrMax = auto ? Math.min(autoMetrics(p).hdrCap, zh * 0.62) : Math.min(10, zh * 0.62);
+        const hdrMax = Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), zh * 0.62);
         const tb = fitText(font, headerText, Math.min(2 * X0, W * 0.86), zh * 0.72, hdrMax, true);
         if (tb.cs) {
           let k = 1, hcs = tb.cs.translate([0, my]);
@@ -1210,7 +1220,7 @@ const DEFAULTS = {
   current: 0, view: 'assembled', page: 'plate', dims: true,
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
-  nozzle: 0.4, layerH: 0.2,
+  nozzle: 0.4, layerH: 0.2, dyn: false, layerF: 0.1, hcap: 6.5,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, arrows: true, chamfer: true,
   mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
@@ -1220,14 +1230,15 @@ const DEFAULTS = {
 const mm = (d = 1) => (v) => `${fmt(v, d)} mm`;
 // nozzleMin: smallest value as a multiple of the nozzle diameter; layers: values stay whole numbers of layers.
 const SLIDERS = {
-  cap: { label: 'Letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
+  cap: { label: 'Status letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
+  hcap: { label: 'Header letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
   width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
   height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
   thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, layers: true, out: mm() },
-  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
+  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, fine: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
-  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
+  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, fine: true, out: mm() },
   tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
   magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, out: mm() },
@@ -1237,10 +1248,19 @@ const SLIDERS = {
 const NOZZLES = [0.2, 0.4, 0.6, 0.8];
 const LAYERS = [0.05, 0.08, 0.1, 0.12, 0.15, 0.16, 0.2, 0.24, 0.25, 0.28, 0.3, 0.32, 0.36, 0.4, 0.45, 0.5, 0.6];
 const layerOptions = (n) => LAYERS.filter((l) => l >= n * 0.25 - 1e-9 && l <= n * 0.75 + 1e-9);
+// Typed layer heights are allowed anywhere from 25% to 75% of the nozzle; the fine layer is anything up to the main layer.
+const layerRange = (n) => ({ lo: Math.max(0.04, rnd(n * 0.25)), hi: rnd(n * 0.75) });
+function normalizePrinter(s) {
+  const { lo, hi } = layerRange(s.nozzle);
+  s.layerH = Math.min(hi, Math.max(lo, Math.round((+s.layerH || 0.2) * 100) / 100));
+  s.layerF = Math.min(s.layerH, Math.max(0.04, Math.round((+s.layerF || 0.1) * 100) / 100));
+}
+// Heights that sit on the fine layers (relief, rail) use the fine layer when variable layers are on.
+const layerFor = (f, s) => (f.fine && s.dyn ? s.layerF : s.layerH);
 const nearest = (list, v) => list.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
 const rnd = (v) => Math.round(v * 1000) / 1000;
 function limits(k, s = state) {
-  const f = SLIDERS[k], L = s.layerH;
+  const f = SLIDERS[k], L = layerFor(f, s);
   let { min, max, step } = f;
   if (f.nozzleMin) min = Math.max(min, f.nozzleMin * s.nozzle);
   if (f.layers) { step = L; min = Math.ceil(min / L - 1e-9) * L; max = Math.floor(max / L + 1e-9) * L; }
@@ -1271,6 +1291,8 @@ const WHEN = {
   manual: (s) => s.sizeMode !== 'auto',
   magnet: (s) => s.mount === 'magnet',
   stand: (s) => s.mount === 'stand',
+  header: (s) => !!(s.header || '').trim(),
+  dyn: (s) => !!s.dyn,
 };
 
 // The settings panel. Sections with tab: true become pages behind Plate | Labels | Frame tabs;
@@ -1284,7 +1306,6 @@ const SECTIONS = [
     { hint: 'The plate grows or shrinks to the smallest size that fits every status. Set the letter height on the Labels tab.', when: 'auto' },
     { slider: 'width', when: 'manual' },
     { slider: 'height', when: 'manual' },
-    { select: 'bed', label: 'Printer bed', options: BEDS },
     { html: 'spec' },
     { sub: 'Mounting' },
     { seg: 'mount', aria: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand']] },
@@ -1304,6 +1325,7 @@ const SECTIONS = [
       { text: 'header', label: 'Header text', placeholder: 'Optional, e.g. Room 4B' },
     ] },
     { slider: 'cap', when: 'auto' },
+    { slider: 'hcap', when: 'header' },
     { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
     { sub: 'Relief' },
     { row: [{ seg: 'relief', label: 'Labels are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
@@ -1323,7 +1345,10 @@ function sanitize(s) {
   const out = structuredClone(DEFAULTS);
   if (!s || typeof s !== 'object') return out;
   for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
-  out.layerH = nearest(layerOptions(out.nozzle), Number.isFinite(+s.layerH) ? +s.layerH : out.layerH);
+  if (Number.isFinite(+s.layerH)) out.layerH = +s.layerH;
+  if (Number.isFinite(+s.layerF)) out.layerF = +s.layerF;
+  if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
+  normalizePrinter(out);
   for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = clampSnap(k, +s[k], out);
   for (const k of ['uniform', 'arrows', 'chamfer', 'dims']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
@@ -1810,6 +1835,7 @@ function saveBlob(blob, name) {
 }
 
 // Files in print orientation. Base body and labels share one offset so they line up as a two-part object.
+const layerFine = () => (state.dyn ? state.layerF : state.layerH);
 function exportFiles() {
   if (!result) return [];
   const { parts, info } = result;
@@ -1859,7 +1885,7 @@ function readmeText() {
     state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
     '',
     'Two colors on a single nozzle',
-    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + state.layerH).toFixed(2)} mm layer with ${state.layerH} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
+    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
     i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
     '',
     'Assembly',
@@ -1951,6 +1977,22 @@ const TOOL_SVG = {
 const statusName = (st, i) => (st.text || '').replace(/\|/g, ' ').trim() || `status ${i + 1}`;
 
 // One card per status, in the sign's left-to-right order. Clicking a card shows it on the sign; its fields edit it.
+// Moving cards animates: measure every card, change the DOM, then slide each card from its old spot to its new one.
+const uids = new WeakMap();
+let uidN = 0;
+const uidOf = (st) => { if (!uids.has(st)) uids.set(st, ++uidN); return uids.get(st); };
+function flip(mutate, skip) {
+  const first = new Map();
+  $$('#statusCards .st-card').forEach((c) => first.set(c.dataset.uid, c.getBoundingClientRect()));
+  mutate();
+  if (reduceMotion) return;
+  $$('#statusCards .st-card').forEach((c) => {
+    const a = first.get(c.dataset.uid);
+    if (!a || c === skip) return;
+    const b = c.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+    if (dx || dy) c.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 240, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  });
+}
 function renderStatuses(focusTarget) {
   const wrap = $('#statusCards');
   const a = document.activeElement;
@@ -1961,6 +2003,7 @@ function renderStatuses(focusTarget) {
     const card = document.createElement('div');
     card.className = 'st-card';
     card.dataset.idx = i;
+    card.dataset.uid = uidOf(st);
     card.innerHTML = `
       <div class="st-row">
         <button type="button" class="pick" data-role="show" data-idx="${i}" title="Show on the sign">${svgIcon(st.icon)}</button>
@@ -2006,9 +2049,54 @@ function setCurrent(i, focus) {
 }
 
 const cardsEl = $('#statusCards');
+let cardDrag = null, suppressClick = false;
+// Drag a card by its icon or background; text, the dropdown and the move buttons keep their own behavior.
+cardsEl.addEventListener('pointerdown', (e) => {
+  const card = e.target.closest('.st-card');
+  if (!card || e.button !== 0 || e.target.closest('input, .combo button, .st-tools')) return;
+  if (e.pointerType === 'touch' && !e.target.closest('.pick')) return;
+  const c = cardsEl.getBoundingClientRect(), r = card.getBoundingClientRect();
+  cardDrag = { card, id: e.pointerId, x0: e.clientX, y0: e.clientY, gx: e.clientX - r.left, gy: e.clientY - r.top, cx: c.left, cy: c.top, active: false };
+});
+cardsEl.addEventListener('pointermove', (e) => {
+  if (!cardDrag || e.pointerId !== cardDrag.id) return;
+  if (!cardDrag.active) {
+    if (Math.hypot(e.clientX - cardDrag.x0, e.clientY - cardDrag.y0) < 6) return;
+    cardDrag.active = true;
+    cardDrag.card.setPointerCapture(e.pointerId);
+    cardDrag.card.classList.add('dragging');
+    document.body.classList.add('dragging-card');
+  }
+  const { card } = cardDrag, px = e.clientX - cardDrag.cx, py = e.clientY - cardDrag.cy;
+  // layout positions (offsetLeft and so on) ignore transforms, so cards that are mid-slide do not confuse the hit test
+  const cards = $$('.st-card', cardsEl);
+  const over = cards.find((o) => o !== card && px >= o.offsetLeft && px <= o.offsetLeft + o.offsetWidth && py >= o.offsetTop && py <= o.offsetTop + o.offsetHeight);
+  if (over) flip(() => { if (cards.indexOf(over) > cards.indexOf(card)) over.after(card); else over.before(card); }, card);
+  card.style.transform = `translate(${px - cardDrag.gx - card.offsetLeft}px, ${py - cardDrag.gy - card.offsetTop}px) scale(1.03)`;
+});
+function endCardDrag(e) {
+  if (!cardDrag || e.pointerId !== cardDrag.id) return;
+  const { card, active } = cardDrag;
+  cardDrag = null;
+  if (!active) return;
+  suppressClick = true;
+  setTimeout(() => { suppressClick = false; }, 0);
+  document.body.classList.remove('dragging-card');
+  const order = $$('.st-card', cardsEl).map((c) => +c.dataset.idx);
+  flip(() => {
+    const old = state.statuses, cur = old[state.current];
+    state.statuses = order.map((i) => old[i]);
+    state.current = Math.max(0, state.statuses.indexOf(cur));
+    renderStatuses();
+  });
+  if (order.some((v, i) => v !== i)) changed();
+}
+cardsEl.addEventListener('pointerup', endCardDrag);
+cardsEl.addEventListener('pointercancel', endCardDrag);
 cardsEl.addEventListener('click', (e) => {
   const b = e.target.closest('button');
   const card = e.target.closest('.st-card');
+  if (suppressClick) return;
   if (!b) { if (card) setCurrent(+card.dataset.idx); return; }
   const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
   if (role === 'show') { setCurrent(i); return; }
@@ -2027,7 +2115,7 @@ cardsEl.addEventListener('click', (e) => {
     if (state.current > i || state.current >= s.length) state.current = Math.max(0, state.current - 1);
     focusTo = { role: 'show', idx: Math.min(i, s.length - 1) };
   } else return;
-  renderStatuses(focusTo);
+  flip(() => renderStatuses(focusTo));
   changed();
 });
 $('#addStatus').addEventListener('click', () => {
@@ -2151,11 +2239,14 @@ function renderPalettes() {
 // Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
 function syncControls() {
-  const layers = layerOptions(state.nozzle), sel = $('#layerH');
-  if (sel.dataset.for !== String(state.nozzle)) {
-    sel.innerHTML = layers.map((l) => `<option value="${l}">${l} mm</option>`).join('');
-    sel.dataset.for = String(state.nozzle);
+  const common = layerOptions(state.nozzle), { lo, hi } = layerRange(state.nozzle);
+  if ($('#layerList').dataset.for !== String(state.nozzle) + '|' + state.layerH) {
+    $('#layerList').innerHTML = common.map((l) => `<option value="${l}"></option>`).join('');
+    $('#layerFList').innerHTML = common.filter((l) => l <= state.layerH).map((l) => `<option value="${l}"></option>`).join('');
+    $('#layerList').dataset.for = String(state.nozzle) + '|' + state.layerH;
   }
+  Object.assign($('#layerH'), { min: lo, max: hi });
+  Object.assign($('#layerF'), { min: 0.04, max: state.layerH });
   for (const k of Object.keys(SLIDERS)) {
     const el = $(`#${k}`);
     if (el) { const l = limits(k); el.min = l.min; el.max = l.max; el.step = l.step; }
@@ -2177,15 +2268,15 @@ function syncControls() {
 function setKey(k, raw) {
   let v = raw;
   if (SLIDERS[k]) { v = +raw; if (!Number.isFinite(v)) return; v = clampSnap(k, v); }
-  else if (k === 'layerH' || typeof CHOICES[k]?.[0] === 'number') v = +raw;
+  else if (k === 'layerH' || k === 'layerF' || typeof CHOICES[k]?.[0] === 'number') { v = +raw; if (!Number.isFinite(v)) { syncControls(); return; } }
   // switching to manual starts from the size the auto-fit last produced
   if (k === 'sizeMode' && v === 'manual' && result && result.info.auto) {
     state.width = clampSnap('width', result.info.plateW);
     state.height = clampSnap('height', result.info.plateH);
   }
   state[k] = v;
-  if (k === 'nozzle' || k === 'layerH') {
-    state.layerH = nearest(layerOptions(state.nozzle), state.layerH);
+  if (k === 'nozzle' || k === 'layerH' || k === 'layerF' || k === 'dyn') {
+    normalizePrinter(state);
     for (const key of Object.keys(SLIDERS)) state[key] = clampSnap(key, state[key]);
   }
   syncControls();
@@ -2203,7 +2294,7 @@ function bindControls() {
         const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
         if (d) { e.preventDefault(); const nb = btns[(i + d + btns.length) % btns.length]; setKey(k, nb.dataset.value); nb.focus(); }
       });
-    } else el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', () => setKey(k, el.type === 'checkbox' ? el.checked : el.value));
+    } else el.addEventListener(el.type === 'checkbox' || el.dataset.commit === 'change' ? 'change' : 'input', () => setKey(k, el.type === 'checkbox' ? el.checked : el.value));
   }
 }
 $('#viewSeg').addEventListener('click', (e) => {
@@ -2282,8 +2373,9 @@ function renderExport() {
   const steps = [
     `<b>Print</b> every part as exported. They are already oriented for printing and need no supports; the frame prints face-down.`,
     i.raised
-      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + state.layerH).toFixed(2)} mm</span> layer at ${state.layerH} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
+      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
+    state.dyn ? `<b>Variable layer height:</b> use <span class="mono">${state.layerH} mm</span> layers up to <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the plate) and <span class="mono">${state.layerF} mm</span> layers above it (labels and rails). In your slicer add a height range modifier, or use adaptive layers with these limits.` : null,
     `<b>Assemble:</b> slide the frame into the track from the left end (the end with the small hole), then press in the stop pin.`,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
     state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
