@@ -220,6 +220,8 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .shape-btn svg path { fill: color-mix(in srgb, var(--plate) 18%, transparent); stroke: var(--plate); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .shape-btn .chev { margin-left: auto; color: var(--muted); }
 .set-pop { grid-template-columns: 1fr; width: 220px; max-height: min(60vh, 360px); overflow-y: auto; gap: 2px; }
+.set-pop .set-group { padding: 8px 8px 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.set-pop .set-group:first-child { padding-top: 2px; }
 .set-pop button { width: 100%; height: 36px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 8px; font-family: var(--font-display); font-stretch: 85%; font-weight: 650; font-size: 13px; text-align: left; }
 .set-pop button svg { width: 20px; height: 20px; flex: none; }
 .popover .none-label { font-size: 10.5px; color: var(--muted); }
@@ -1677,7 +1679,7 @@ const PRESETS_RAW = [
   { name: 'Clinic', list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
   { name: 'Home office', list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
   { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
+  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   { name: '日本語', list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
@@ -1698,14 +1700,27 @@ const EXTRA_STATUSES = [
   ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
 ];
+// Icons by how available the person is, most available first; the ready-made list follows this order under these headings.
+const AVAILABILITY = [
+  { name: 'Available', icons: ['check', 'pin'] },
+  { name: 'In, but busy', icons: ['code', 'flask', 'target', 'hourglass', 'headset', 'people', 'mic', 'dnd'] },
+  { name: 'Stepped away', icons: ['cup', 'forkknife', 'clock', 'exit'] },
+  { name: 'Out today', icons: ['car', 'factory', 'house'] },
+  { name: 'Away', icons: ['briefcase', 'plane', 'palm'] },
+  { name: 'Off', icons: ['thermo', 'moon'] },
+];
 const STATUS_SETS = (() => {
   const seen = new Set(), all = [];
   // English only here; the presets keep their own languages
   for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES.map(([t, i]) => [withBreak(t), i])].filter(([t]) => /^[ -~]+$/.test(t))) {
     if (!seen.has(text + '|' + icon)) { seen.add(text + '|' + icon); all.push({ text, icon }); }
   }
-  const order = [...new Set(all.map((x) => x.icon))];
-  return order.flatMap((ic) => all.filter((x) => x.icon === ic));
+  // most available first: in and free, in but busy, stepped away, out for the day, away, off; a few texts mean something
+  // other than their icon's group
+  const rank = AVAILABILITY.flatMap((g) => g.icons), OVERRIDE = { 'OFFICE|HOURS': 'Available', 'LAB|CLOSED': 'Off' };
+  const groupOf = (x) => OVERRIDE[x.text] || (AVAILABILITY.find((g) => g.icons.includes(x.icon)) || { name: 'Off' }).name;
+  const key = (x) => AVAILABILITY.findIndex((g) => g.name === groupOf(x)) * 100 + (rank.includes(x.icon) ? rank.indexOf(x.icon) : 99);
+  return all.map((x, i) => ({ ...x, i })).sort((a, b) => key(a) - key(b) || a.i - b.i).map((x) => ({ text: x.text, icon: x.icon, group: groupOf(x) }));
 })();
 const PALETTES = [
   { name: 'Charcoal & orange', base: '#2E3237', label: '#F3F1EA', slider: '#F06A28' },
@@ -2844,7 +2859,7 @@ let setFor = null;
 function openSetPicker(btn, idx) {
   setFor = { btn, idx };
   const st = state.statuses[idx];
-  setPop.innerHTML = STATUS_SETS.map((x, k) => `<button type="button" role="option" data-k="${k}" aria-selected="${x.text === st.text && x.icon === st.icon}">${svgIcon(x.icon)}<span></span></button>`).join('');
+  setPop.innerHTML = STATUS_SETS.map((x, k) => `${k === 0 || STATUS_SETS[k - 1].group !== x.group ? `<div class="set-group" role="presentation">${x.group}</div>` : ''}<button type="button" role="option" data-k="${k}" aria-selected="${x.text === st.text && x.icon === st.icon}">${svgIcon(x.icon)}<span></span></button>`).join('');
   $$('button span', setPop).forEach((sp, k) => { sp.textContent = STATUS_SETS[k].text.replace(/\|/g, ' '); });
   setPop.hidden = false;
   const r = btn.getBoundingClientRect(), pw = setPop.offsetWidth, ph = setPop.offsetHeight;
