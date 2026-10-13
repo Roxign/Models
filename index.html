@@ -138,28 +138,41 @@ button { cursor: pointer; }
 }
 .icon-btn:hover { border-color: var(--muted); }
 
-/* status bar = the live indicator */
-.statusbar-wrap { display: flex; flex-direction: column; gap: 6px; }
-.eyebrow {
-  font-family: var(--font-display); font-stretch: 118%; font-weight: 700; font-size: 11px;
-  letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
+/* statuses: one card per label, in the same left-to-right order as the printed sign */
+.statuses { display: flex; flex-direction: column; gap: 10px; }
+.st-head { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
+.st-head h2 {
+  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px;
+  letter-spacing: 0.06em; text-transform: uppercase;
 }
-.statusbar { display: flex; gap: 6px; flex-wrap: wrap; }
-.statusbar button {
-  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 10px;
-  border: 1px solid var(--line); background: var(--panel); border-radius: 9px;
-  font-family: var(--font-display); font-stretch: 105%; font-weight: 650; font-size: 12.5px; letter-spacing: 0.02em;
+.st-head .hint { flex: 1 1 200px; min-width: 0; }
+.st-actions { display: flex; gap: 6px; align-items: center; }
+.st-head select { width: auto; max-width: 100%; padding-block: 5px; font-size: 12.5px; }
+.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.st-card {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px 8px 8px;
+  display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0;
+  transition: border-color 0.15s, background-color 0.15s;
 }
-.statusbar button svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
-.statusbar button[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-
-/* readout */
-.readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
-.readout > div { background: var(--panel); padding: 9px 12px; min-width: 0; }
-.readout dt { font-size: 11px; color: var(--muted); margin: 0 0 2px; }
-.readout dd { margin: 0; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-.readout dd.bad { color: var(--danger); }
-.readout dd.good { color: var(--good); }
+.st-card:hover { border-color: var(--muted); }
+.st-card.is-current { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.st-top { display: flex; align-items: center; gap: 4px; }
+.st-show { width: 26px; height: 32px; border: 0; background: transparent; padding: 0; border-radius: 6px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.st-show .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; }
+.st-card.is-current .st-show { color: var(--accent); }
+.st-card.is-current .st-show .dot { background: currentColor; box-shadow: inset 0 0 0 2.5px var(--panel); }
+.st-top .pick {
+  flex: none; width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft);
+  display: grid; place-items: center; padding: 0;
+}
+.st-top .pick svg { width: 19px; height: 19px; fill: currentColor; }
+.st-top .pick:hover { border-color: var(--muted); }
+.st-tools { margin-left: auto; display: flex; }
+.st-tools button { width: 22px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.st-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
+.st-tools button:disabled { opacity: 0.28; cursor: default; }
+.st-tools svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.st-card input { font-family: var(--font-display); font-weight: 650; font-size: 13px; letter-spacing: 0.01em; padding: 7px 8px; }
 .warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .warnings li { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
 
@@ -189,25 +202,6 @@ select, input[type="text"] {
 }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
-
-/* statuses list */
-.status-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.status-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
-.status-row .pick {
-  width: 38px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft);
-  display: grid; place-items: center; padding: 0;
-}
-.status-row .pick svg { width: 20px; height: 20px; fill: currentColor; }
-.status-row .pick:hover { border-color: var(--muted); }
-.row-tools { display: flex; gap: 2px; }
-.row-tools button { width: 28px; height: 30px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
-.row-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
-.row-tools button:disabled { opacity: 0.3; cursor: default; }
-.row-tools svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.list-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 12px; }
-.chip:hover { border-color: var(--accent); color: var(--accent); }
 
 .popover {
   position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
@@ -248,7 +242,27 @@ select, input[type="text"] {
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12.5px; }
 .steps b { color: var(--ink); font-weight: 600; }
 .mono { font-family: var(--font-mono); font-size: 0.95em; }
-.foot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.foot-actions { display: flex; gap: 16px; flex-wrap: wrap; }
+.btn.wide { width: 100%; padding-block: 10px; }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 600; }
+.linkish:hover { text-decoration: underline; }
+.spec { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spec b { font-weight: 500; color: var(--ink); }
+.spec .good { color: var(--good); }
+.spec .bad { color: var(--danger); }
+details.section { display: block; }
+details.section > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+details.section > summary::-webkit-details-marker { display: none; }
+details.section > summary h2 { display: inline-flex; align-items: center; gap: 10px; }
+details.section > summary h2::before {
+  content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform 0.15s;
+}
+details.section[open] > summary h2::before { transform: rotate(45deg); }
+details.section > summary small { font-family: var(--font-mono); color: var(--muted); font-size: 11.5px; }
+.more-body { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
+.files > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
+.files[open] > summary { margin-bottom: 8px; }
 
 @media (max-width: 980px) {
   .app { grid-template-columns: minmax(0, 1fr); }
@@ -256,7 +270,6 @@ select, input[type="text"] {
   .viewport { height: 56vh; min-height: 280px; }
 }
 @media (max-width: 560px) {
-  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .shape-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .brand p { display: none; }
@@ -268,8 +281,8 @@ select, input[type="text"] {
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
   }
 }
 </script>
@@ -298,7 +311,7 @@ select, input[type="text"] {
 </header>
 
 <main class="app">
-  <section class="stage-col" aria-label="Preview">
+  <section class="stage-col" aria-label="Preview and statuses">
     <div class="viewport" id="viewport">
       <div class="vp-top">
         <div class="seg" role="radiogroup" aria-label="Preview mode" id="viewSeg">
@@ -317,48 +330,35 @@ select, input[type="text"] {
       <div class="overlay" id="overlay"><div><strong>Loading the 3D engine</strong>three.js and Manifold load from jsDelivr on first visit.</div></div>
     </div>
 
-    <div class="statusbar-wrap">
-      <span class="eyebrow" id="statusbarLabel">Current status</span>
-      <div class="statusbar" id="statusbar" role="radiogroup" aria-labelledby="statusbarLabel"></div>
-    </div>
-
-    <dl class="readout" id="readout">
-      <div><dt>Window per status</dt><dd id="roWindow">—</dd></div>
-      <div><dt>Smallest letters</dt><dd id="roText">—</dd></div>
-      <div><dt>Color change</dt><dd id="roColor">—</dd></div>
-      <div><dt>Print bed</dt><dd id="roBed">—</dd></div>
-    </dl>
+    <section class="statuses" aria-labelledby="statusesTitle">
+      <div class="st-head">
+        <h2 id="statusesTitle">Statuses</h2>
+        <p class="hint">Click one to show it on the sign. Type <span class="mono">|</span> for a line break.</p>
+        <div class="st-actions">
+          <select id="presetSel" aria-label="Replace the statuses with a preset set">
+            <option value="">Load a preset…</option>
+          </select>
+          <button class="btn small" id="addStatus" type="button">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            Add
+          </button>
+        </div>
+      </div>
+      <div class="st-cards" id="statusCards"></div>
+    </section>
     <ul class="warnings" id="warnings"></ul>
   </section>
 
   <aside class="panel" aria-label="Design options">
-    <!-- Statuses -->
-    <section class="section">
-      <h2>Statuses <small id="statusCount">4 of 6</small></h2>
-      <ul class="status-list" id="statusList"></ul>
-      <div class="list-actions">
-        <button class="btn small" id="addStatus">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          Add status
-        </button>
-        <span class="hint">Type <span class="mono">|</span> to force a line break.</span>
-      </div>
-      <div class="field">
-        <span class="lbl">Start from a set</span>
-        <div class="chips" id="presetChips"></div>
-      </div>
-    </section>
-
     <!-- Shape -->
     <section class="section">
-      <h2>Plate shape <small id="shapeName">Rounded</small></h2>
+      <h2>Shape <small id="shapeName">Rounded</small></h2>
       <div class="shape-grid" id="shapeGrid"></div>
-      <p class="hint">Cloud and Arch keep their top area for the header text.</p>
     </section>
 
     <!-- Size -->
     <section class="section">
-      <h2>Size <small id="sizeSummary">200 × 72 mm</small></h2>
+      <h2>Size</h2>
       <div class="field">
         <div class="field-row"><label for="width">Width</label><span><input class="num" type="number" id="widthNum" data-mirror="width" aria-label="Width in millimetres"><span class="unit">mm</span></span></div>
         <input type="range" id="width" data-key="width" min="100" max="320" step="1">
@@ -368,11 +368,7 @@ select, input[type="text"] {
         <input type="range" id="height" data-key="height" min="45" max="150" step="1">
       </div>
       <div class="field">
-        <div class="field-row"><label for="thick">Plate thickness</label><span><input class="num" type="number" id="thickNum" data-mirror="thick" aria-label="Plate thickness in millimetres"><span class="unit">mm</span></span></div>
-        <input type="range" id="thick" data-key="thick" min="2" max="6" step="0.2">
-      </div>
-      <div class="field">
-        <label for="bed">Your printer bed</label>
+        <label for="bed">Printer bed</label>
         <select id="bed" data-key="bed">
           <option value="180">180 × 180 mm (A1 mini, Prusa MINI)</option>
           <option value="220">220 × 220 mm (Ender 3)</option>
@@ -382,6 +378,7 @@ select, input[type="text"] {
           <option value="350">350 × 350 mm</option>
         </select>
       </div>
+      <p class="spec" id="spec">—</p>
     </section>
 
     <!-- Labels -->
@@ -407,49 +404,10 @@ select, input[type="text"] {
           </select>
         </div>
         <div class="field">
-          <span class="lbl" id="reliefLbl">Relief</span>
-          <div class="seg" role="radiogroup" aria-labelledby="reliefLbl" data-key="relief">
-            <button role="radio" data-value="raised">Raised</button>
-            <button role="radio" data-value="engraved">Engraved</button>
-          </div>
+          <label for="header">Header text</label>
+          <input type="text" id="header" data-key="header" maxlength="28" placeholder="Optional, e.g. Room 4B" autocomplete="off">
         </div>
       </div>
-      <div class="field">
-        <div class="field-row"><label for="reliefH">Relief depth</label><span><input class="num" type="number" id="reliefHNum" data-mirror="reliefH" aria-label="Relief depth in millimetres"><span class="unit">mm</span></span></div>
-        <input type="range" id="reliefH" data-key="reliefH" min="0.4" max="1.6" step="0.1">
-      </div>
-      <label class="check"><input type="checkbox" id="caps" data-key="caps"> All capitals</label>
-      <label class="check"><input type="checkbox" id="uniform" data-key="uniform"> Same letter size on every status</label>
-      <div class="field">
-        <label for="header">Header text <span class="hint">(optional, e.g. a name or room)</span></label>
-        <input type="text" id="header" data-key="header" maxlength="28" placeholder="e.g. Room 4B · Design Studio" autocomplete="off">
-      </div>
-    </section>
-
-    <!-- Frame & track -->
-    <section class="section">
-      <h2>Frame &amp; track</h2>
-      <div class="grid2">
-        <div class="field">
-          <div class="field-row"><label for="frame">Frame bars</label><span class="mono" id="frameOut"></span></div>
-          <input type="range" id="frame" data-key="frame" min="3" max="8" step="0.5">
-        </div>
-        <div class="field">
-          <div class="field-row"><label for="winR">Window corners</label><span class="mono" id="winROut"></span></div>
-          <input type="range" id="winR" data-key="winR" min="0" max="8" step="0.5">
-        </div>
-        <div class="field">
-          <div class="field-row"><label for="railH">Rail height</label><span class="mono" id="railHOut"></span></div>
-          <input type="range" id="railH" data-key="railH" min="2.5" max="6" step="0.5">
-        </div>
-        <div class="field">
-          <div class="field-row"><label for="tol">Slide clearance</label><span class="mono" id="tolOut"></span></div>
-          <input type="range" id="tol" data-key="tol" min="0.1" max="0.5" step="0.05">
-        </div>
-      </div>
-      <p class="hint">Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.</p>
-      <label class="check"><input type="checkbox" id="arrows" data-key="arrows"> Pointer arrows on the frame</label>
-      <label class="check"><input type="checkbox" id="chamfer" data-key="chamfer"> Chamfered plate edge</label>
     </section>
 
     <!-- Mounting -->
@@ -487,24 +445,72 @@ select, input[type="text"] {
 
     <!-- Colors -->
     <section class="section">
-      <h2>Filament colors <small>preview only</small></h2>
+      <h2>Colors <small>preview only</small></h2>
+      <div class="palette-row" id="palettes"></div>
       <div class="swatches">
         <label class="swatch">Plate<input type="color" id="colBase" data-key="colBase"></label>
         <label class="swatch">Labels<input type="color" id="colLabel" data-key="colLabel"></label>
         <label class="swatch">Frame<input type="color" id="colSlider" data-key="colSlider"></label>
       </div>
-      <div class="palette-row" id="palettes"></div>
     </section>
 
-    <!-- Export -->
+    <!-- Fine-tuning -->
+    <details class="section" id="fineTune">
+      <summary><h2>Fine-tuning</h2><small>thickness, relief, fit</small></summary>
+      <div class="more-body">
+        <div class="field">
+          <div class="field-row"><label for="thick">Plate thickness</label><span><input class="num" type="number" id="thickNum" data-mirror="thick" aria-label="Plate thickness in millimetres"><span class="unit">mm</span></span></div>
+          <input type="range" id="thick" data-key="thick" min="2" max="6" step="0.2">
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <span class="lbl" id="reliefLbl">Label relief</span>
+            <div class="seg" role="radiogroup" aria-labelledby="reliefLbl" data-key="relief">
+              <button role="radio" data-value="raised">Raised</button>
+              <button role="radio" data-value="engraved">Engraved</button>
+            </div>
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="reliefH">Depth</label><span class="mono" id="reliefHOut"></span></div>
+            <input type="range" id="reliefH" data-key="reliefH" min="0.4" max="1.6" step="0.1">
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="frame">Frame bars</label><span class="mono" id="frameOut"></span></div>
+            <input type="range" id="frame" data-key="frame" min="3" max="8" step="0.5">
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="winR">Window corners</label><span class="mono" id="winROut"></span></div>
+            <input type="range" id="winR" data-key="winR" min="0" max="8" step="0.5">
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="railH">Rail height</label><span class="mono" id="railHOut"></span></div>
+            <input type="range" id="railH" data-key="railH" min="2.5" max="6" step="0.5">
+          </div>
+          <div class="field">
+            <div class="field-row"><label for="tol">Slide clearance</label><span class="mono" id="tolOut"></span></div>
+            <input type="range" id="tol" data-key="tol" min="0.1" max="0.5" step="0.05">
+          </div>
+        </div>
+        <p class="hint">Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.</p>
+        <label class="check"><input type="checkbox" id="caps" data-key="caps"> All capitals</label>
+        <label class="check"><input type="checkbox" id="uniform" data-key="uniform"> Same letter size on every status</label>
+        <label class="check"><input type="checkbox" id="arrows" data-key="arrows"> Pointer arrows on the frame</label>
+        <label class="check"><input type="checkbox" id="chamfer" data-key="chamfer"> Chamfered plate edge</label>
+      </div>
+    </details>
+
+    <!-- Print -->
     <section class="section">
-      <h2>Print &amp; export</h2>
-      <ul class="parts" id="partsList"></ul>
+      <h2>Print</h2>
+      <button class="btn primary wide" id="dlZip2" disabled>Download all parts (.zip)</button>
       <ol class="steps" id="steps"></ol>
+      <details class="files">
+        <summary>Single STL files</summary>
+        <ul class="parts" id="partsList"></ul>
+      </details>
       <div class="foot-actions">
-        <button class="btn primary" id="dlZip2" disabled>Download all parts (.zip)</button>
-        <button class="btn" id="copyLink">Copy design link</button>
-        <button class="btn" id="resetAll">Reset design</button>
+        <button class="linkish" id="copyLink">Copy design link</button>
+        <button class="linkish" id="resetAll">Reset design</button>
       </div>
       <p class="hint" id="copyNote" role="status"></p>
     </section>
@@ -1118,7 +1124,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const STORE_KEY = 'office-status-slider:v1';
 const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js';
-const FONT_BASE = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/fonts/';
+const FONT_BASE = 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/fonts/';
 const FONT_FILES = { helvetiker: 'helvetiker_bold.typeface.json', optimer: 'optimer_bold.typeface.json', gentilis: 'gentilis_bold.typeface.json', droid: 'droid/droid_sans_bold.typeface.json' };
 
 const PRESETS = [
@@ -1415,8 +1421,12 @@ function fitCamera() {
   const halfW = size.x / 2, halfH = (assembled ? size.y : Math.max(size.z, size.y)) / 2;
   const dist = Math.max(halfW / Math.tan(hFov / 2), halfH / Math.tan(vFov / 2)) * 1.18 + size.z / 2;
   camera.position.copy(center).addScaledVector(dir, dist);
-  camera.near = Math.max(0.5, dist / 100);
-  camera.far = dist * 20;
+  // Keep zoom inside a range where the model stays between the clipping planes.
+  const maxDim = Math.max(size.x, size.y, size.z);
+  controls.minDistance = Math.max(10, maxDim * 0.12);
+  controls.maxDistance = dist * 3;
+  camera.near = Math.max(0.5, controls.minDistance * 0.1);
+  camera.far = controls.maxDistance + maxDim * 4;
   camera.updateProjectionMatrix();
   controls.target.copy(center);
   controls.update();
@@ -1441,6 +1451,14 @@ resize();
 function loop() {
   requestAnimationFrame(loop);
   let moving = controls.update();
+  // Recover if the camera ever ends up at a non-finite position instead of freezing on the last frame.
+  const p = camera.position;
+  if (!Number.isFinite(p.x + p.y + p.z) || !Number.isFinite(controls.target.x + controls.target.y + controls.target.z)) {
+    controls.target.set(0, 0, 0);
+    camera.position.set(0, 0, 500);
+    fitCamera();
+    moving = true;
+  }
   if (sliderMesh && !drag) {
     const dx = sliderTarget - sliderMesh.position.x;
     if (Math.abs(dx) > 0.01) { sliderMesh.position.x += reduceMotion ? dx : dx * 0.18; moving = true; }
@@ -1492,7 +1510,7 @@ renderer.domElement.addEventListener('pointermove', (e) => {
     if (x == null) return;
     const cells = result.info.cells;
     sliderMesh.position.x = Math.min(cells[cells.length - 1], Math.max(cells[0], drag.p0 + x - drag.x0));
-    markStatusbar(nearestCell(sliderMesh.position.x));
+    markCurrent(nearestCell(sliderMesh.position.x));
     requestRender();
     return;
   }
@@ -1652,91 +1670,120 @@ function svgIcon(name) {
   return `<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="${iconSvg[name]}"/></svg>`;
 }
 
-function renderStatuses() {
-  const list = $('#statusList');
-  const focusedIdx = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.idx : null;
-  const focusedRole = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.role : null;
-  list.innerHTML = '';
-  state.statuses.forEach((st, i) => {
-    const li = document.createElement('li');
-    li.className = 'status-row';
-    li.innerHTML = `
-      <button class="pick" type="button" data-role="pick" data-idx="${i}" aria-label="Icon for status ${i + 1}: ${engine.icons[st.icon] || 'none'}">${svgIcon(st.icon)}</button>
-      <input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" aria-label="Status ${i + 1} text" autocomplete="off">
-      <span class="row-tools">
-        <button type="button" data-role="up" data-idx="${i}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>
-        <button type="button" data-role="down" data-idx="${i}" aria-label="Move down" ${i === state.statuses.length - 1 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
-        <button type="button" data-role="del" data-idx="${i}" aria-label="Remove status" ${state.statuses.length <= 2 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
-      </span>`;
-    li.querySelector('input').value = st.text;
-    list.appendChild(li);
-  });
-  $('#statusCount').textContent = `${state.statuses.length} of 6`;
-  $('#addStatus').disabled = state.statuses.length >= 6;
-  if (focusedIdx != null && focusedRole) {
-    const el = list.querySelector(`[data-role="${focusedRole}"][data-idx="${focusedIdx}"]`);
-    if (el && !el.disabled) el.focus();
-  }
-  renderStatusbar();
-}
+const TOOL_SVG = {
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+  del: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+const statusName = (st, i) => (st.text || '').replace(/\|/g, ' ').trim() || `status ${i + 1}`;
 
-function renderStatusbar() {
-  const bar = $('#statusbar');
-  bar.innerHTML = '';
+// One card per status, in the sign's left-to-right order. Clicking a card shows it on the sign; its fields edit it.
+function renderStatuses(focusTarget) {
+  const wrap = $('#statusCards');
+  const a = document.activeElement;
+  const keep = focusTarget || (a && wrap.contains(a) && a.dataset.role ? { role: a.dataset.role, idx: +a.dataset.idx } : null);
+  const n = state.statuses.length;
+  wrap.innerHTML = '';
   state.statuses.forEach((st, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.setAttribute('role', 'radio');
-    b.dataset.idx = i;
-    b.tabIndex = i === state.current ? 0 : -1;
-    b.innerHTML = `${svgIcon(st.icon)}<span></span>`;
-    b.querySelector('span').textContent = (st.text || '—').replace(/\|/g, ' ');
-    bar.appendChild(b);
+    const card = document.createElement('div');
+    card.className = 'st-card';
+    card.dataset.idx = i;
+    card.innerHTML = `
+      <div class="st-top">
+        <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
+        <button type="button" class="pick" data-role="pick" data-idx="${i}" title="Change icon">${svgIcon(st.icon)}</button>
+        <span class="st-tools">
+          <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
+          <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
+          <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
+        </span>
+      </div>
+      <input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}">`;
+    card.querySelector('input').value = st.text;
+    labelCard(card, st, i);
+    wrap.appendChild(card);
   });
-  markStatusbar(state.current);
+  $('#addStatus').disabled = n >= 6;
+  markCurrent(state.current);
+  if (keep) {
+    let el = wrap.querySelector(`[data-role="${keep.role}"][data-idx="${keep.idx}"]`);
+    if (!el || el.disabled) el = wrap.querySelector(`[data-role="show"][data-idx="${Math.min(keep.idx, n - 1)}"]`);
+    if (el) el.focus();
+  }
 }
-function markStatusbar(idx) {
-  $$('#statusbar button').forEach((b, i) => { b.setAttribute('aria-checked', String(i === idx)); b.tabIndex = i === idx ? 0 : -1; });
+function labelCard(card, st, i) {
+  const name = statusName(st, i);
+  card.querySelector('[data-role="show"]').setAttribute('aria-label', `Show ${name} on the sign`);
+  card.querySelector('[data-role="pick"]').setAttribute('aria-label', `Icon for ${name}: ${engine.icons[st.icon] || 'none'}`);
+}
+function markCurrent(idx) {
+  $$('#statusCards .st-card').forEach((c, i) => {
+    const on = i === idx;
+    c.classList.toggle('is-current', on);
+    c.querySelector('[data-role="show"]').setAttribute('aria-pressed', String(on));
+  });
 }
 function setCurrent(i, focus) {
-  state.current = Math.max(0, Math.min(state.statuses.length - 1, i));
-  markStatusbar(state.current);
-  if (result) sliderTarget = result.info.cells[state.current] ?? 0;
-  if (focus) { const b = $$('#statusbar button')[state.current]; if (b) b.focus(); }
-  saveState();
+  i = Math.max(0, Math.min(state.statuses.length - 1, i));
+  const moved = i !== state.current;
+  state.current = i;
+  markCurrent(i);
+  if (result) sliderTarget = result.info.cells[i] ?? 0;
+  if (focus) { const b = $(`#statusCards [data-role="show"][data-idx="${i}"]`); if (b) b.focus(); }
+  if (moved) saveState();
   requestRender();
 }
-$('#statusbar').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setCurrent(+b.dataset.idx); });
-$('#statusbar').addEventListener('keydown', (e) => {
-  const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-  if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
-});
 
-$('#statusList').addEventListener('input', (e) => {
-  const el = e.target;
-  if (el.dataset.role !== 'text') return;
-  state.statuses[+el.dataset.idx].text = el.value;
-  renderStatusbar();
-  changed();
-});
-$('#statusList').addEventListener('click', (e) => {
+const cardsEl = $('#statusCards');
+cardsEl.addEventListener('click', (e) => {
   const b = e.target.closest('button');
-  if (!b) return;
-  const i = +b.dataset.idx, s = state.statuses;
-  if (b.dataset.role === 'pick') { openIconPicker(b, i); return; }
-  if (b.dataset.role === 'up' && i > 0) { [s[i - 1], s[i]] = [s[i], s[i - 1]]; if (state.current === i) state.current--; else if (state.current === i - 1) state.current++; }
-  if (b.dataset.role === 'down' && i < s.length - 1) { [s[i + 1], s[i]] = [s[i], s[i + 1]]; if (state.current === i) state.current++; else if (state.current === i + 1) state.current--; }
-  if (b.dataset.role === 'del' && s.length > 2) { s.splice(i, 1); state.current = Math.min(state.current, s.length - 1); }
-  renderStatuses();
+  const card = e.target.closest('.st-card');
+  if (!b) { if (card) setCurrent(+card.dataset.idx); return; }
+  const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
+  if (role === 'show') { setCurrent(i); return; }
+  if (role === 'pick') { setCurrent(i); openIconPicker(b, i); return; }
+  let focusTo = null;
+  if (role === 'left' && i > 0) {
+    [s[i - 1], s[i]] = [s[i], s[i - 1]];
+    if (state.current === i) state.current = i - 1; else if (state.current === i - 1) state.current = i;
+    focusTo = { role: 'left', idx: i - 1 };
+  } else if (role === 'right' && i < s.length - 1) {
+    [s[i + 1], s[i]] = [s[i], s[i + 1]];
+    if (state.current === i) state.current = i + 1; else if (state.current === i + 1) state.current = i;
+    focusTo = { role: 'right', idx: i + 1 };
+  } else if (role === 'del' && s.length > 2) {
+    s.splice(i, 1);
+    if (state.current > i || state.current >= s.length) state.current = Math.max(0, state.current - 1);
+    focusTo = { role: 'show', idx: Math.min(i, s.length - 1) };
+  } else return;
+  renderStatuses(focusTo);
   changed();
 });
 $('#addStatus').addEventListener('click', () => {
-  if (state.statuses.length >= 6) return;
-  state.statuses.push({ text: 'BACK SOON', icon: 'clock' });
-  renderStatuses();
+  const s = state.statuses;
+  if (s.length >= 6) return;
+  s.push({ text: 'BACK SOON', icon: 'clock' });
+  state.current = s.length - 1;
+  renderStatuses({ role: 'text', idx: s.length - 1 });
+  const inp = $(`#status-text-${s.length - 1}`);
+  if (inp) inp.select();
   changed();
-  const inp = $(`#status-text-${state.statuses.length - 1}`);
-  if (inp) { inp.focus(); inp.select(); }
+});
+cardsEl.addEventListener('focusin', (e) => {
+  if (e.target.dataset.role === 'text') setCurrent(+e.target.dataset.idx);
+});
+cardsEl.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.dataset.role !== 'text') return;
+  const i = +el.dataset.idx;
+  state.statuses[i].text = el.value;
+  labelCard(el.closest('.st-card'), state.statuses[i], i);
+  changed();
+});
+cardsEl.addEventListener('keydown', (e) => {
+  if (e.target.dataset.role !== 'show') return;
+  const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+  if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
 });
 
 // icon picker
@@ -1769,9 +1816,7 @@ pop.addEventListener('click', (e) => {
   const idx = popFor.idx;
   state.statuses[idx].icon = b.dataset.icon;
   closeIconPicker(false);
-  renderStatuses();
-  const btn = $(`#statusList [data-role="pick"][data-idx="${idx}"]`);
-  if (btn) btn.focus();
+  renderStatuses({ role: 'pick', idx });
   changed();
 });
 pop.addEventListener('keydown', (e) => {
@@ -1784,18 +1829,21 @@ document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contai
 window.addEventListener('resize', () => closeIconPicker(false));
 
 function renderPresets() {
-  const wrap = $('#presetChips');
-  wrap.innerHTML = '';
-  PRESETS.forEach((p) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip'; b.textContent = p.name;
-    b.addEventListener('click', () => {
-      state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
-      state.current = 0;
-      renderStatuses();
-      changed();
-    });
-    wrap.appendChild(b);
+  const sel = $('#presetSel');
+  PRESETS.forEach((p, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = `${p.name} (${p.list.length})`;
+    sel.appendChild(o);
+  });
+  sel.addEventListener('change', () => {
+    const p = PRESETS[+sel.value];
+    sel.value = '';
+    if (!p) return;
+    state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
+    state.current = 0;
+    renderStatuses();
+    changed();
   });
 }
 function renderShapes() {
@@ -1852,7 +1900,7 @@ function syncControls() {
   $('#magDOut').textContent = fmt(state.magD) + ' mm';
   $('#magHOut').textContent = fmt(state.magH) + ' mm';
   $('#tiltOut').textContent = state.tilt + '°';
-  $('#sizeSummary').textContent = `${state.width} × ${state.height} mm`;
+  $('#reliefHOut').textContent = fmt(state.reliefH) + ' mm';
   $('#magnetOpts').hidden = state.mount !== 'magnet';
   $('#standOpts').hidden = state.mount !== 'stand';
   $('#mountHint').textContent = MOUNT_HINTS[state.mount];
@@ -1917,16 +1965,11 @@ function updateReadout() {
   if (!result) return;
   const i = result.info;
   $('#vpDims').textContent = `${fmt(i.W)} × ${fmt(i.H)} × ${fmt(i.zt)} mm`;
-  $('#roWindow').textContent = `${fmt(i.ww)} × ${fmt(i.wh)} mm`;
-  const ro = $('#roText');
-  ro.textContent = i.capMin ? `${fmt(i.capMin)} mm caps` : 'icons only';
-  ro.className = i.capMin && i.capMin < 3.5 ? 'bad' : '';
-  $('#roColor').textContent = i.raised ? `Z ${i.T.toFixed(2)} → ${(i.T + i.Lh).toFixed(2)} mm` : 'not needed';
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
   const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
-  const bed = $('#roBed');
-  bed.textContent = fitsBed ? `fits ${bedW} × ${bedD}` : `too big for ${bedW} × ${bedD}`;
-  bed.className = fitsBed ? 'good' : 'bad';
+  const small = i.capMin && i.capMin < 3.5;
+  $('#spec').innerHTML = `Window <b>${fmt(i.ww)} × ${fmt(i.wh)} mm</b> · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
+    + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
   const warns = [...i.warnings];
   if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the width or pick a larger bed.`);
   $('#warnings').innerHTML = '';
