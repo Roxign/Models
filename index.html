@@ -1677,7 +1677,7 @@ const PRESETS_RAW = [
   { name: 'Clinic', list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
   { name: 'Home office', list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
   { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['通話中', 'headset'], ['請勿打擾', 'dnd']] },
+  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   { name: '日本語', list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
@@ -1686,21 +1686,22 @@ const EXTRA_STATUSES = [
   ['STEP OUT', 'exit'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
   ['VIDEO CALL', 'headset'], ['ON THE PHONE', 'headset'], ['CLOSED', 'dnd'], ['PRIVATE', 'dnd'], ['DEADLINE', 'dnd'],
   ['BUSY', 'hourglass'], ['BE RIGHT BACK', 'hourglass'], ['FOCUS', 'target'], ['DEEP WORK', 'target'],
-  ['LAB', 'flask'], ['IN THE LAB', 'flask'], ['LAB IN USE', 'flask'], ['LAB CLOSED', 'flask'], ['SAMPLE RUNNING', 'flask'], ['實驗室', 'flask'], ['實驗中', 'flask'],
-  ['外出中', 'plane'], ['午休中', 'forkknife'], ['請敲門', 'check'], ['稍後回來', 'clock'], ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
+  ['LAB', 'flask'], ['IN THE LAB', 'flask'], ['LAB IN USE', 'flask'], ['LAB CLOSED', 'flask'], ['SAMPLE RUNNING', 'flask'],
+  ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
   ['AT LUNCH', 'forkknife'], ['OUT TO EAT', 'forkknife'], ['WORKING FROM HOME', 'house'], ['REMOTE', 'house'],
   ['ON A TRIP', 'plane'], ['OUT OF TOWN', 'plane'],
-  ['BUSINESS TRIP', 'briefcase'], ['ON A BUSINESS TRIP', 'briefcase'], ['出差中', 'briefcase'],
-  ['VISITING A CLIENT', 'car'], ['AT A CLIENT', 'car'], ['拜訪客戶', 'car'], ['外出拜訪', 'car'],
-  ['AT THE FACTORY', 'factory'], ['AT THE PLANT', 'factory'], ['在工廠', 'factory'], ['廠區支援', 'factory'],
-  ['STEPPED OUT', 'exit'], ['OUT OF THE OFFICE', 'exit'], ['暫時離開', 'exit'], ['離開辦公室', 'exit'],
-  ['ON VACATION', 'palm'], ['ON HOLIDAY', 'palm'], ['休假中', 'palm'], ['年假', 'palm'],
-  ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['病假中', 'thermo'], ['身體不適', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
+  ['BUSINESS TRIP', 'briefcase'], ['ON A BUSINESS TRIP', 'briefcase'],
+  ['VISITING A CLIENT', 'car'], ['AT A CLIENT', 'car'],
+  ['AT THE FACTORY', 'factory'], ['AT THE PLANT', 'factory'],
+  ['STEPPED OUT', 'exit'], ['OUT OF THE OFFICE', 'exit'],
+  ['ON VACATION', 'palm'], ['ON HOLIDAY', 'palm'],
+  ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
 ];
 const STATUS_SETS = (() => {
   const seen = new Set(), all = [];
-  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES.map(([t, i]) => [withBreak(t), i])]) {
+  // English only here; the presets keep their own languages
+  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES.map(([t, i]) => [withBreak(t), i])].filter(([t]) => /^[ -~]+$/.test(t))) {
     if (!seen.has(text + '|' + icon)) { seen.add(text + '|' + icon); all.push({ text, icon }); }
   }
   const order = [...new Set(all.map((x) => x.icon))];
