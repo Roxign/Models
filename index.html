@@ -206,7 +206,7 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .warnings li { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
 
-/* icon picker */
+/* popovers: the shape menu and the ready-made statuses */
 .popover {
   position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 8px; display: grid; grid-template-columns: repeat(5, 44px); gap: 4px;
@@ -326,6 +326,52 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 @media (max-width: 560px) {
   .brand p { display: none; }
 }
+/* phones, upright: a compact top bar, a preview that stays in view while the statuses and settings scroll under it,
+   and two status cards per row */
+@media (max-width: 700px) and (orientation: portrait) {
+  .topbar { padding: 10px 12px 8px; gap: 8px 10px; }
+  .top-actions { display: contents; }
+  .brand { flex: 1; gap: 8px; }
+  .brand svg { width: 30px; height: 30px; }
+  .brand h1 { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #printOpen { order: 1; }
+  .printer { order: 2; flex-basis: 100%; display: grid; grid-template-columns: auto auto 1fr; gap: 8px 14px; }
+  .printer label:first-child { grid-column: 1 / -1; }
+  .printer label:first-child select { flex: 1; min-width: 0; }
+  .app { padding-inline: 12px; gap: 12px; }
+  .stage-col { display: contents; }
+  .viewport { height: clamp(220px, 34vh, 320px); min-height: 0; border-radius: 12px; }
+  .vp-hint { display: none; }
+  .vp-bottom { justify-content: flex-end; }
+  .st-head .hint { display: none; }
+  .st-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .page { padding: 4px 14px 16px; }
+  .shape-pop .shape-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) and (orientation: portrait) and (min-height: 560px) {
+  .viewport { position: sticky; top: 0; z-index: 4; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14); }
+}
+/* phones held sideways: preview and statuses on the left, settings scrolling on the right */
+@media (max-width: 980px) and (orientation: landscape) and (max-height: 520px) and (min-width: 560px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  .topbar { padding: 6px 12px; flex: none; flex-wrap: nowrap; }
+  .brand h1, .brand p { display: none; }
+  .brand svg { width: 28px; height: 28px; }
+  .app { flex: 1; min-height: 0; width: 100%; padding: 0 12px 8px; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(300px, 44%); align-items: stretch; }
+  .stage-col { position: static; min-height: 0; gap: 8px; overflow-y: auto; }
+  .viewport { flex: none; height: max(170px, calc(100dvh - 110px)); min-height: 0; }
+  .vp-hint, .st-head .hint { display: none; }
+  .panel { overflow-y: auto; min-height: 0; }
+}
+/* touch screens: bigger targets, and 16 px text in fields so phones do not zoom in when one is tapped */
+@media (pointer: coarse) {
+  input[type="text"], input[type="number"], select, .printer input[type="number"], .printer select, .st-head select { font-size: 16px; }
+  .seg button { padding: 8px 12px; }
+  .icon-btn { width: 38px; height: 38px; }
+  .st-tools button { width: 34px; height: 30px; }
+  .check input { width: 20px; height: 20px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .build-state[data-state="busy"]::before { animation: none; }
 }
@@ -390,7 +436,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       <div class="pal-pop" id="palPop" hidden>
         <strong>Preview colors</strong>
         <div class="palette-row" id="palettes"></div>
-        <p class="hint">Set one part with the color dot at the bottom of its tab. Colors only change the preview; STL files have no color.</p>
+        <p class="hint">Set one part with the color dot at the top of its tab. Colors only change the preview; STL files have no color.</p>
       </div>
       <div class="vp-bottom">
         <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
@@ -672,11 +718,11 @@ function createEngine(wasm) {
         const rs = [0.25, 0.31, 0.27, 0.32, 0.26, 0.3, 0.25, 0.29];
         for (let i = 0; i < k; i++) {
           const t = i / (k - 1);
-          const r = H * rs[i % rs.length] * (i === 0 || i === k - 1 ? 0.84 : 1);
+          const r = H * rs[Math.min(i, k - 1 - i) % rs.length] * (i === 0 || i === k - 1 ? 0.84 : 1);
           parts.push(circle(r, -W / 2 + H * 0.3 + t * (W - H * 0.6), H / 2 - r, 96));
         }
         parts.push(circle(H * 0.26, -W / 2 + H * 0.26, -H / 2 + H * 0.31, 96), circle(H * 0.26, W / 2 - H * 0.26, -H / 2 + H * 0.31, 96));
-        return { cs: union(parts), body: [-H / 2, -H / 2 + bodyH], crown: [-H / 2 + bodyH, H / 2 - H * 0.04] };
+        return { cs: union(parts), body: [-H / 2, -H / 2 + bodyH], crown: [-H / 2 + bodyH, H / 2 - H * 0.04], bumpy: true };
       },
     },
     speech: {
@@ -719,7 +765,8 @@ function createEngine(wasm) {
     arrow: {
       label: 'Arrow', make: (W, H) => {
         const d = Math.min(H * 0.5, W * 0.18);
-        const cs = poly([[-W / 2, -H / 2], [W / 2 - d, -H / 2], [W / 2, 0], [W / 2 - d, H / 2], [-W / 2, H / 2]]).offset(-2, 'Round', 2, 24).offset(2, 'Round', 2, 24);
+        // shifted right by d/2 so the square part is centred on the track and only the point sticks out
+        const cs = poly([[-W / 2, -H / 2], [W / 2 - d, -H / 2], [W / 2, 0], [W / 2 - d, H / 2], [-W / 2, H / 2]]).offset(-2, 'Round', 2, 24).offset(2, 'Round', 2, 24).translate([d / 2, 0]);
         return { cs, body: [-H / 2, H / 2] };
       },
     },
@@ -778,6 +825,10 @@ function createEngine(wasm) {
     // Hexagonal perforations through the plate: light, quick to print, awkward to make any other way (added in build).
     honeycomb: { label: 'Honeycomb', make: (W, H) => ({ cs: rrect(W, H, Math.min(10, H * 0.2)), body: [-H / 2, H / 2] }) },
   };
+
+  // Shapes with a border or end features keep their rails to the track length. On the others the rails, and the name tag rail,
+  // run out to the edge and follow the outline.
+  const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb', 'puzzle', 'folder', 'wave']);
 
   // ---------- text ----------
   // Contours keep the font's own winding; CrossSection's NonZero fill rule resolves holes and overlaps.
@@ -882,31 +933,45 @@ function createEngine(wasm) {
   }
 
   // Vertical layout of the track inside a plate of height H. hh overrides the header band height.
-  // Name tag rail: two lipped rails along a header band; a separate flat tag slides in from the right.
+  // Name tag rail: two lipped rails along a header band; a separate flat tag slides in from the left.
   const TAG_RW = 2.4;
   const tagOv = (htag) => Math.min(1.2, htag * 0.4);
-  const nameBandH = (p) => (p.hcap || 6.5) + 2 * (1.2 + 0.3) + 2 * (TAG_RW + (p.tol ?? 0.25));
+  // band height: the letters with room for descenders (1.45 x the letter height), the lips, and the two rails with their clearance
+  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * (1.2 + 0.3) + 2 * (TAG_RW + (p.tol ?? 0.25));
+  // Where the tag sits in the header band: centre line, tag half-height, lip overhang and the channel half-width.
+  function tagDims(p, hdrZone) {
+    const [h0, h1] = hdrZone, tol = p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25);
+    const htag = zoneH / 2 - TAG_RW - tol;
+    return { ym: (h0 + h1) / 2, htag, ov: tagOv(htag), wb: htag + tol };
+  }
   function vLayout(p, sh, H, hh) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
     if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + 11);
     let hdrZone = null;
     if ((p.header || '').trim() || p.nameRail) {
-      if (sh.crown) hdrZone = sh.crown.slice();
+      if (sh.crown && !(p.nameRail && sh.bumpy)) hdrZone = sh.crown.slice();
       else { const z = hh || clamp(H * 0.17, 8, 16); hdrZone = [b1 - z, b1]; b1 -= z + 1; }
     }
     const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2, yR = hrTot - 6;
     return { hrTot, yc, yR, wh: 2 * (yR - p.tol - p.frame), hdrZone, clear: p.marginH ?? 1.5 };
   }
-  // Half-length of the widest rail span that stays inside the outline (0 if none fits).
-  function trackHalf(sh, v, W) {
-    const clear = v.clear, yLo = v.yc - v.hrTot - clear, yHi = v.yc + v.hrTot + clear;
-    const fits = (hx) => rect(2 * hx, yHi - yLo, 0, (yLo + yHi) / 2).subtract(sh.cs).area() < 0.05;
+  // Half-length of the widest span centred on x = 0, from y0 to y1, that stays inside cs (0 if none fits).
+  function bandHalf(cs, y0, y1, W) {
+    const fits = (hx) => rect(2 * hx, y1 - y0, 0, (y0 + y1) / 2).subtract(cs).area() < 0.05;
     if (!fits(5)) return 0;
     let lo = 5, hi = W / 2 + 1;
     for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
-    return lo - clear;
+    return lo;
   }
+  // Half-length of the widest rail span that stays inside the outline (0 if none fits), less the side margin.
+  // The side margin is measured sideways only; the top and bottom margin sets the vertical room.
+  function trackHalf(sh, v, W) {
+    const h = bandHalf(sh.cs, v.yc - v.hrTot, v.yc + v.hrTot, W);
+    return h > v.clear ? h - v.clear : 0;
+  }
+  // Shrink an outline sideways only: points that keep m of outline to their left and right.
+  const hErode = (cs, m) => (m > 0.01 ? cs.intersect(cs.translate([m, 0])).intersect(cs.translate([-m, 0])) : cs);
 
   // Smallest plate (W, H) whose windows hold every status at the chosen letter height.
   function autoSize(p, font) {
@@ -943,13 +1008,16 @@ function createEngine(wasm) {
     const wwReq = Math.max(best.CW + 2 * pad + 0.4, 14.2);
     const whReq = Math.max(best.CH + 2 * pad + 0.4, 12.2);
     const headerText = (p.header || '').trim();
-    let hh = 0, hdrW = 0;
+    let hh = 0, hdrW = 0, tagNeed = 0;
     if (headerText || p.nameRail) {
-      const m = headerText ? measureLines(font, [headerText]) : null;
+      const m = headerText ? measureLines(font, [headerText]) : null, textW = m ? m.w * A.hdrCap / capRef(font) : 0;
       hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62;
-      hdrW = (m ? m.w * A.hdrCap / capRef(font) : 0) + (p.nameRail ? 12 : 0);
+      hdrW = textW + (p.nameRail ? 12 : 0);
       if (p.nameRail) hdrW = Math.max(hdrW, 60);
+      // half-length the tag needs: the text, 3 mm each side, the 1.5 mm keep-out from its ends, the end gap and the wall
+      if (p.nameRail) tagNeed = Math.max(textW, 40) / 2 + 7.2;
     }
+    const keep = KEEP_RAILS.has(p.shape);
     // rail half-length needed for that window width (inverse of the window formula in build)
     const xNeed = wwReq * N / 2 + 5.6 + p.frame * (N + 1) / 2 + (p.mount === 'screw' ? 11 : 0);
     const make = (W, H) => SHAPES[p.shape].make(W, H);
@@ -961,7 +1029,16 @@ function createEngine(wasm) {
     };
     const findW = (H) => {
       const floorW = Math.max(40, hdrW / 0.86 + 4);
-      const short = (W) => { const sh = make(W, H); return xNeed - trackHalf(sh, vLayout(p, sh, H, hh), W); };
+      const short = (W) => {
+        const sh = make(W, H), v = vLayout(p, sh, H, hh), X0 = trackHalf(sh, v, W);
+        let s = xNeed - X0;
+        // the name tag runs along the track on bordered shapes and along its own band (to the edge) on the others
+        if (tagNeed) {
+          if (keep) s = Math.max(s, tagNeed + (p.mount === 'screw' ? 11 : 0) - X0);
+          else { const t = tagDims(p, v.hdrZone); s = Math.max(s, tagNeed + (p.marginH ?? 0) - bandHalf(sh.cs, t.ym - t.htag, t.ym + t.htag, W)); }
+        }
+        return s;
+      };
       let W = Math.max(floorW, 2 * xNeed + 12);
       for (let i = 0; i < 5; i++) {
         const s = short(W);
@@ -1086,7 +1163,17 @@ function createEngine(wasm) {
       const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, (xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-      let body = Manifold.union([sh.cs.extrude(T), extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block]);
+      // Bordered shapes keep the rails to the track. On the others the rails run out to the edge (less the side margin) and follow
+      // the outline; the right end is filled solid and the left end stays open for the frame.
+      const fillRails = !KEEP_RAILS.has(p.shape), mh = p.marginH ?? 0;
+      const edge = hErode(sh.cs, mh);
+      const xa = ob.min[0] - 1, xb = ob.max[0] + 1, inEdge = (h) => edge.extrude(h + 2).translate([0, 0, -1]);
+      const rails = [extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block];
+      if (fillRails) {
+        const endFill = rect(xb - xR, 2 * (yR + d) + 1, (xR + xb) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
+        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(z1)));
+      }
+      let body = Manifold.union([sh.cs.extrude(T), ...rails]);
       const xPin = -(xR + pinR + 0.4);
       body = body.subtract(Manifold.cylinder(T + 2, pinR + 0.08, pinR + 0.08, 40).translate([xPin, yc, -1]));
 
@@ -1103,7 +1190,7 @@ function createEngine(wasm) {
           const x = sx * (X + 5.5);
           body = body.subtract(Manifold.cylinder(T + 2, r, r, 32).translate([x, yc, -1]));
           body = body.subtract(Manifold.cylinder(cs + 0.01, r, r + cs, 40).translate([x, yc, T - cs]));
-          body = body.subtract(Manifold.cylinder(1, r + cs, r + cs, 40).translate([x, yc, T]));
+          body = body.subtract(Manifold.cylinder(Rh + 2, r + cs + 0.3, r + cs + 0.3, 40).translate([x, yc, T - 0.01]));
         }
       }
 
@@ -1114,9 +1201,11 @@ function createEngine(wasm) {
         else warnings.push('The plate is too thin for a tape recess.');
       }
       if (p.shape === 'classic') {
-        const zone = rect(2 * X + 3, 2 * hrTot + 3, 0, yc), off = (d) => sh.cs.offset(d, 'Round', 2, 24);
+        // the bead is left open from the left edge along the track (and the tag band), where the frame and the tag slide in
+        const toLeft = (x1, h, y) => rect(x1 - xa, h, (xa + x1) / 2, y), zone = toLeft(X + 1.5, 2 * hrTot + 3, yc), off = (d) => sh.cs.offset(d, 'Round', 2, 24);
         let bead = union([off(-2.2).subtract(off(-3.4)), off(-4.6).subtract(off(-5.4))]).subtract(zone);
-        if (hdrZone && (p.nameRail || headerText)) bead = bead.subtract(rect(W * 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
+        if (hdrZone && p.nameRail) bead = bead.subtract(toLeft(X + 1.5, hdrZone[1] - hdrZone[0] + 1, (hdrZone[0] + hdrZone[1]) / 2));
+        else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
         body = body.add(bead.extrude(0.82).translate([0, 0, T - 0.02]));
       }
       if (p.shape === 'honeycomb') {
@@ -1132,7 +1221,7 @@ function createEngine(wasm) {
           const dx = Math.max(Math.abs(x) - (hx - rc), 0), dy = Math.max(Math.abs(y) - (hy - rc), 0);
           if (dx * dx + dy * dy > rc * rc || Math.abs(x) > hx || Math.abs(y) > hy) return false;
           if (Math.abs(x) < X + g && Math.abs(y - yc) < hrTot + g) return false;
-          if (hdrZone && y > hdrZone[0] - g && y < hdrZone[1] + g) return false;
+          if (hdrZone && Math.abs(x) < X0 + g && y > hdrZone[0] - g && y < hdrZone[1] + g) return false;
           return !excl.some(([ex, ey, er]) => Math.hypot(x - ex, y - ey) < er + R);
         };
         const rings = [];
@@ -1145,36 +1234,46 @@ function createEngine(wasm) {
         }
         if (rings.length) body = body.subtract(CS(rings).extrude(T + 2).translate([0, 0, -1]));
       }
-      let tagAll = null, tagBody = null, tagText = null;
+      // Name tag rail: two lipped rails along the header band and a flat tag that slides in from the left, like the frame, and
+      // stops against a wall at the right end. The tag has the same gap at both ends, so it is symmetric whenever the plate is.
+      let tagAll = null, tagBody = null, tagText = null, tagT = 0;
       if (p.nameRail) {
-        const [h0, h1] = hdrZone, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.4), ym = (h0 + h1) / 2, rw = TAG_RW;
-        const htag = zoneH / 2 - rw - tol, ov = tagOv(htag), tt = Math.max(0.3, p.tagT ?? 1.6), lipH = 0.8, wb = htag + tol;
+        const { ym, htag, ov, wb } = tagDims(p, hdrZone), rw = TAG_RW;
+        const tt = Math.max(0.3, p.tagT ?? 1.6), lipH = 0.8, stop = 2.4, gap = 0.3;
         if (htag < ov + 2) throw new UserError('The header band is too short for the name tag rail. Increase the plate height.');
-        // measure the outline along the top, middle and bottom rows of the band
-        const rowsB = [ym - htag, ym, ym + htag].map((y) => { const c = rect(W * 3, 0.4, 0, y).intersect(sh.cs); return c.isEmpty() ? null : c.bounds(); }).filter(Boolean);
-        if (rowsB.length < 3) throw new UserError('The name tag rail needs a full-width band in the plate. Increase the height or pick another shape.');
-        const xOutL = Math.min(...rowsB.map((b) => b.min[0])), xOutR = Math.max(...rowsB.map((b) => b.max[0])), xCoreL = Math.max(...rowsB.map((b) => b.min[0]));
-        if (xOutR - xCoreL < 40) throw new UserError('The plate is too narrow for the name tag rail.');
-        const zS = T, zl = zS + tt + 0.2, stop = 2.4;
-        const up = poly([[ym + wb, zS - 0.02], [ym + wb + rw, zS - 0.02], [ym + wb + rw, zl + lipH], [ym + wb - ov, zl + lipH], [ym + wb - ov, zl], [ym + wb, zl]]);
-        const dn = poly([[ym - wb, zS - 0.02], [ym - wb, zl], [ym - wb + ov, zl], [ym - wb + ov, zl + lipH], [ym - wb - rw, zl + lipH], [ym - wb - rw, zS - 0.02]]);
-        const wall = rect(stop, 2 * (wb + rw), xCoreL + stop / 2, ym).extrude(zl + lipH - zS + 0.02).translate([0, 0, zS - 0.02]);
-        const prism = sh.cs.extrude(zl + lipH + 2).translate([0, 0, -1]);
-        body = body.add(Manifold.union([extrudeX(up, xOutL - 1, xOutR + 1), extrudeX(dn, xOutL - 1, xOutR + 1), wall]).intersect(prism));
-        const x0 = xCoreL + stop + 0.3;
-        const tagCS = rect(xOutR + 2 - x0, 2 * htag, (x0 + xOutR + 2) / 2, ym).intersect(sh.cs.offset(-0.2, 'Round', 2, 16));
-        if (tagCS.isEmpty()) throw new UserError('The name tag does not fit this shape. Increase the plate size.');
-        const tb0 = tagCS.bounds(), cx = (tb0.min[0] + tb0.max[0]) / 2, tl = tb0.max[0] - tb0.min[0];
+        tagT = tt;
+        const zS = T, zl = zS + tt + 0.2, zTop = zl + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
+        const up = poly([[ym + wb, zS - 0.02], [ym + wb + rw, zS - 0.02], [ym + wb + rw, zTop], [ym + wb - ov, zTop], [ym + wb - ov, zl], [ym + wb, zl]]);
+        const dn = poly([[ym - wb, zS - 0.02], [ym - wb, zl], [ym - wb + ov, zl], [ym - wb + ov, zTop], [ym - wb - rw, zTop], [ym - wb - rw, zS - 0.02]]);
+        const wallOf = (cs) => cs.extrude(zTop - zS + 0.02).translate([0, 0, zS - 0.02]);
+        const row = (cs, y) => cs.intersect(rect(xb - xa, 0.2, (xa + xb) / 2, y));
+        // following the outline only works where it crosses the whole band in one piece; otherwise keep to the track
+        const oneSpan = [yLo + 0.2, ym - htag, ym, ym + htag, yHi - 0.2].every((y) => row(edge, y).toPolygons().length === 1);
+        let tagCS;
+        if (fillRails && oneSpan) {
+          const mid = (ob.min[0] + ob.max[0]) / 2, band = rect(xb - xa, yHi - yLo, (xa + xb) / 2, ym);
+          const wall = band.intersect(edge.subtract(hErode(edge, stop))).intersect(rect(xb - mid, yHi - yLo, (mid + xb) / 2, ym));
+          body = body.add(Manifold.union([extrudeX(up, xa, xb), extrudeX(dn, xa, xb)]).intersect(inEdge(zTop)).add(wallOf(wall)));
+          tagCS = rect(xb - xa, 2 * htag, (xa + xb) / 2, ym).intersect(hErode(edge, stop + gap));
+        } else {
+          body = body.add(Manifold.union([extrudeX(up, -X, X), extrudeX(dn, -X, X), wallOf(rect(stop, yHi - yLo, X - stop / 2, ym))]));
+          tagCS = rrect(2 * (X - stop - gap), 2 * htag, 0.8, 0, ym);
+        }
+        // the straight middle of the tag, where the name is centred
+        const rowsT = [ym - htag + 0.3, ym, ym + htag - 0.3].map((y) => row(tagCS, y)).filter((c) => !c.isEmpty()).map((c) => c.bounds());
+        const cxL = rowsT.length === 3 ? Math.max(...rowsT.map((b) => b.min[0])) : 0, cxR = rowsT.length === 3 ? Math.min(...rowsT.map((b) => b.max[0])) : 0;
+        if (cxR - cxL < 30) throw new UserError('The plate is too narrow for the name tag rail. Make it wider.');
+        const cx = (cxL + cxR) / 2;
         tagBody = tagCS.extrude(tt).translate([0, 0, zS]);
         tagAll = tagBody;
         if (headerText) {
           const room = 2 * (htag - ov - 0.3);
-          const tb = fitText(font, headerText, tl - 6, room, Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), room * 0.8), true);
+          const tb = fitText(font, headerText, cxR - cxL - 6, room, auto ? autoMetrics(p).hdrCap : (p.hcap || 10), true);
           if (tb.cs) {
             // keep the letters inside the tag, away from slanted or curved ends
             const safe = tagCS.offset(-1.5, 'Round', 2, 16);
             let k = 1, tcs = tb.cs.translate([cx, ym]);
-            for (let i = 0; i < 14 && tcs.subtract(safe).area() > 0.05; i++) { k *= 0.92; tcs = tb.cs.scale(k).translate([cx, ym]); }
+            for (let i = 0; i < 30 && tcs.subtract(safe).area() > 0.05; i++) { k *= 0.97; tcs = tb.cs.scale(k).translate([cx, ym]); }
             hdrCap = tb.cap * k;
             capMin = Math.min(capMin, tb.cap * k);
             if (raised) {
@@ -1260,7 +1359,7 @@ function createEngine(wasm) {
         },
         info: {
           W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, xPin, pinH,
-          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, stand, warnings, pitch, plateW: W, plateH: H, auto,
+          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, warnings, pitch, plateW: W, plateH: H, auto,
         },
       };
       return out;
@@ -1278,7 +1377,7 @@ function createEngine(wasm) {
     icons: Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.label])),
     shapes: Object.fromEntries(Object.entries(SHAPES).map(([k, v]) => [k, v.label])),
     iconPath(name) { try { const cs = iconCS(name, 24); return cs ? svgPath(cs) : ''; } finally { free(); } },
-    shapePath(kind) { try { return svgPath(SHAPES[kind].make(200, 72).cs); } finally { free(); } },
+    shapePath(kind) { try { const cs = SHAPES[kind].make(200, 72).cs, b = cs.bounds(); return svgPath(cs.translate([-(b.min[0] + b.max[0]) / 2, -(b.min[1] + b.max[1]) / 2])); } finally { free(); } },
   };
 }
 // Text font: draws each character with the opentype.js font that covers it (charFonts: Map char -> Font).
@@ -1552,7 +1651,7 @@ const SECTIONS = [
       { slider: 'pad' },
       { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
     ] },
-    { group: 'Header text', items: [
+    { group: 'Header or name', items: [
       { text: 'header', label: 'Text', placeholder: 'Optional, e.g. Room 4B' },
       { slider: 'hcap', when: 'header' },
     ] },
@@ -1587,6 +1686,8 @@ function sanitize(s) {
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
   for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = freeClamp(k, +s[k]);
+  if (s.chamfer === true && s.bevel == null) out.bevel = 1.2;
+  if (Number.isFinite(+s.footD) && s.footF == null && s.footB == null) { out.footF = Math.round(+s.footD * 0.42); out.footB = Math.round(+s.footD * 0.58); }
   for (const k of ['uniform', 'dims', 'nameRail', 'tape']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
   for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
@@ -2156,17 +2257,21 @@ function readmeText() {
     i.raised ? '- base_body + base_labels: load both as ONE object with two parts for a multi-color printer (AMS, MMU). They share coordinates.' : '- Labels are engraved, so the base prints in one color.',
     '- frame_slider: printed face-down.',
     '- stop_pin: printed standing up.',
-    result.parts.tag ? '- name_tag: the slide-in name tag. Print a new one with another name for each person; it slides into the rail from the right-hand edge.' : null,
+    result.parts.tag ? '- name_tag: the slide-in name tag, printed flat. Print a new one with another name for each person.' : null,
     state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
     '',
     'Two colors on a single nozzle',
     i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
     i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
+    i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
     'Assembly',
-    '1. Slide the frame into the dovetail track from the LEFT end (the end with the small hole).',
-    '2. Press the stop pin into the hole. A drop of glue makes it permanent.',
-    state.mount === 'magnet' ? `3. Glue ${state.magN} magnets (${state.magD} x ${state.magH} mm) into the back pockets.` : null,
+    ...[
+      'Slide the frame into the dovetail track from the LEFT end (the end with the small hole).',
+      'Press the stop pin into the hole. A drop of glue makes it permanent.',
+      result.parts.tag ? 'Slide the name tag into its rail from the LEFT end until it stops at the right end.' : null,
+      state.mount === 'magnet' ? `Glue ${state.magN} magnets (${state.magD} x ${state.magH} mm) into the back pockets.` : null,
+    ].filter(Boolean).map((t, n) => `${n + 1}. ${t}`),
     '',
     `Slide clearance used: ${state.tol} mm. If the frame binds, regenerate with +0.05 mm.`,
     `Design link: ${shareUrl()}`,
@@ -2424,7 +2529,7 @@ cardsEl.addEventListener('keydown', (e) => {
   if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
 });
 
-// icon picker
+// ready-made status picker
 const setPop = $('#setPopover');
 let setFor = null;
 function openSetPicker(btn, idx) {
@@ -2572,6 +2677,10 @@ function syncControls() {
   for (const t of $$('#settings [role="tab"]')) { const on = t.dataset.page === state.page; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; }
   for (const p of $$('#settings [role="tabpanel"]')) p.hidden = p.id !== `page-${state.page}`;
   $('#mountHint').textContent = MOUNT_HINTS[state.mount];
+  // with the name tag rail on, the header text is the name printed on the tag
+  $('label[for="header"]').textContent = state.nameRail ? 'Name on the tag' : 'Text';
+  $('#header').placeholder = state.nameRail ? 'e.g. Alan Chien' : 'Optional, e.g. Room 4B';
+  $('label[for="hcap"]').textContent = state.nameRail ? 'Name letter height' : SLIDERS.hcap.label;
   $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
   $('#dimsToggle').setAttribute('aria-pressed', String(state.dims));
 }
@@ -2686,7 +2795,7 @@ function renderExport() {
       ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
-    result.parts.tag ? `<b>Name tag:</b> slides into the rail above the track from the right-hand edge. Change the header text and download again to print a tag for someone else.` : null,
+    result.parts.tag ? `<b>Name tag:</b> slides into its rail from the left end, like the frame, until it stops at the right end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     `<b>Assemble:</b> slide the frame into the track from the left end (the end with the small hole), then press in the stop pin.`,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
     state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
