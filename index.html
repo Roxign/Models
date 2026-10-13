@@ -168,6 +168,9 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .popover button svg { width: 24px; height: 24px; fill: currentColor; }
 .popover button:hover { background: var(--soft); }
 .popover button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.set-pop { grid-template-columns: 1fr; width: 220px; max-height: min(60vh, 360px); overflow-y: auto; gap: 2px; }
+.set-pop button { width: 100%; height: 36px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 8px; font-family: var(--font-display); font-stretch: 85%; font-weight: 650; font-size: 13px; text-align: left; }
+.set-pop button svg { width: 20px; height: 20px; flex: none; }
 .popover .none-label { font-size: 10.5px; color: var(--muted); }
 
 /* settings: one card per part of the sign, each with its own color */
@@ -373,6 +376,8 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
     <p class="hint" id="copyNote" role="status"></p>
   </div>
 </dialog>
+
+<div class="popover set-pop" id="setPopover" role="listbox" aria-label="Ready-made statuses" hidden></div>
 
 <div class="popover" id="iconPopover" role="dialog" aria-label="Choose an icon" hidden></div>
 
@@ -1102,6 +1107,12 @@ const PRESETS = [
   { name: 'Studio', list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
   { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
 ];
+const EXTRA_STATUSES = [['STEP OUT', 'pin'], ['IN CLASS', 'people'], ['ON BREAK', 'cup'], ['OFFLINE', 'moon'], ['PLEASE KNOCK', 'check'], ['CLOSED', 'dnd']];
+const STATUS_SETS = (() => {
+  const seen = new Set(), out = [];
+  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES]) { if (!seen.has(text)) { seen.add(text); out.push({ text, icon }); } }
+  return out;
+})();
 const PALETTES = [
   { name: 'Charcoal & orange', base: '#2E3237', label: '#F3F1EA', slider: '#F06A28' },
   { name: 'White & blue', base: '#F2F2EE', label: '#1F2A44', slider: '#2F6BFF' },
@@ -1825,6 +1836,7 @@ $('#settings').addEventListener('keydown', (e) => {
 });
 
 const TOOL_SVG = {
+  sets: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
   del: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
@@ -1847,6 +1859,7 @@ function renderStatuses(focusTarget) {
         <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
         <button type="button" class="pick" data-role="pick" data-idx="${i}" title="Change icon">${svgIcon(st.icon)}</button>
         <span class="st-tools">
+          <button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button>
           <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
           <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
           <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
@@ -1896,6 +1909,7 @@ cardsEl.addEventListener('click', (e) => {
   const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
   if (role === 'show') { setCurrent(i); return; }
   if (role === 'pick') { setCurrent(i); openIconPicker(b, i); return; }
+  if (role === 'sets') { setCurrent(i); openSetPicker(b, i); return; }
   let focusTo = null;
   if (role === 'left' && i > 0) {
     [s[i - 1], s[i]] = [s[i], s[i - 1]];
@@ -1979,6 +1993,43 @@ pop.addEventListener('keydown', (e) => {
   if (step && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + step))].focus(); }
   if (e.key === 'Escape') closeIconPicker(true);
 });
+const setPop = $('#setPopover');
+let setFor = null;
+function openSetPicker(btn, idx) {
+  closeIconPicker(false);
+  setFor = { btn, idx };
+  const st = state.statuses[idx];
+  setPop.innerHTML = STATUS_SETS.map((x, k) => `<button type="button" role="option" data-k="${k}" aria-selected="${x.text === st.text && x.icon === st.icon}">${svgIcon(x.icon)}<span></span></button>`).join('');
+  $$('button span', setPop).forEach((sp, k) => { sp.textContent = STATUS_SETS[k].text; });
+  setPop.hidden = false;
+  const r = btn.getBoundingClientRect(), pw = setPop.offsetWidth, ph = setPop.offsetHeight;
+  setPop.style.left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.right - pw)) + 'px';
+  setPop.style.top = (r.bottom + 6 + ph > window.innerHeight - 12 ? Math.max(12, r.top - ph - 6) : r.bottom + 6) + 'px';
+  (setPop.querySelector('[aria-selected="true"]') || setPop.querySelector('button')).focus();
+}
+function closeSetPicker(refocus) {
+  if (setPop.hidden) return;
+  setPop.hidden = true;
+  if (refocus && setFor) setFor.btn.focus();
+  setFor = null;
+}
+setPop.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !setFor) return;
+  const idx = setFor.idx, x = STATUS_SETS[+b.dataset.k];
+  state.statuses[idx] = { text: x.text, icon: x.icon };
+  closeSetPicker(false);
+  renderStatuses({ role: 'sets', idx });
+  changed();
+});
+setPop.addEventListener('keydown', (e) => {
+  const btns = $$('button', setPop), i = btns.indexOf(document.activeElement);
+  const d = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+  if (d && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + d))].focus(); }
+  if (e.key === 'Escape') closeSetPicker(true);
+});
+document.addEventListener('pointerdown', (e) => { if (!setPop.hidden && !setPop.contains(e.target) && !(setFor && setFor.btn.contains(e.target))) closeSetPicker(false); });
+window.addEventListener('resize', () => closeSetPicker(false));
 document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !(popFor && popFor.btn.contains(e.target))) closeIconPicker(false); });
 window.addEventListener('resize', () => closeIconPicker(false));
 
