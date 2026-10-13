@@ -497,7 +497,8 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   <div class="dlg-head"><h2 id="printTitle">Download &amp; print</h2><button type="button" class="icon-btn" id="printClose" aria-label="Close">✕</button></div>
   <div class="dlg-body">
     <button class="btn primary wide" id="dlZip2" disabled>Download all parts (.zip)</button>
-    <button class="btn wide" id="dl3mf" disabled title="One file with the parts laid out on the bed and the preview colors, for Bambu Studio, Orca Slicer and PrusaSlicer">Download as 3MF (one file, with colors)</button>
+    <button class="btn wide" id="dl3mf" disabled title="One file with the parts laid out on the bed, named, and each given a filament slot by its preview color. Bambu Studio, Orca Slicer and PrusaSlicer">Download as 3MF (one file, with colors)</button>
+    <p class="hint" id="slotList"></p>
     <ol class="steps" id="steps"></ol>
     <details class="files"><summary>Single STL files</summary><ul class="parts" id="partsList"></ul></details>
     <div class="foot-actions"><button class="linkish" id="copyLink">Copy design link</button><button class="linkish" id="resetAll">Reset design</button></div>
@@ -2523,12 +2524,12 @@ function exportFiles() {
   return files;
 }
 function downloadOne(f) { saveBlob(new Blob([stlBlob(f.pos, f.mesh.idx, f.name)], { type: 'model/stl' }), f.name); }
-// 3MF: one file with every part laid out on the bed, the label part grouped with the base, and the preview colors as materials.
+// 3MF: one file with every part laid out on the bed, each part given a filament slot by its preview color.
 function download3mf() {
   const files = exportFiles();
   if (!files.length) return;
   const by = Object.fromEntries(files.map((x) => [x.key, x]));
-  const mats = [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag], ['Name text', state.colName]];
+  const mats = MAT_LIST();
   const baseParts = by.body ? [['Base body', by.body, 0], ...(by.labels ? [['Status labels', by.labels, 1]] : []), ...(by.nameText ? [['Name text', by.nameText, 4]] : [])] : [['Base', by.base, 0]];
   const groups = [{ name: 'Base', parts: baseParts },
     ...(by.slider ? [{ name: 'Frame', parts: [['Frame', by.slider, 2]] }] : []),
@@ -2542,30 +2543,55 @@ function download3mf() {
   let rowTop = -(base[1] / 2) - gap;
   if (tagG) { const [, th] = size(tagG); tagG.at = [0, rowTop - th / 2]; rowTop -= th + gap; }
   for (const g of rest) { const [w, h] = size(g); g.at = [x + w / 2, rowTop - h / 2]; x += w + gap; }
-  const esc = (t) => String(t).replace(/[<>&"]/g, '');
-  let id = 1;
-  const res = [`<basematerials id="1">${mats.map(([n, c]) => `<base name="${n}" displaycolor="${c.toUpperCase()}FF"/>`).join('')}</basematerials>`], items = [];
-  for (const g of groups) {
-    const ids = g.parts.map(([name, file, mat]) => {
-      const oid = ++id, p = file.pos, ix = file.mesh.idx, v = [], t = [];
-      for (let i = 0; i < p.length; i += 3) v.push(`<vertex x="${p[i].toFixed(4)}" y="${p[i + 1].toFixed(4)}" z="${p[i + 2].toFixed(4)}"/>`);
-      for (let i = 0; i < ix.length; i += 3) t.push(`<triangle v1="${ix[i]}" v2="${ix[i + 1]}" v3="${ix[i + 2]}"/>`);
-      res.push(`<object id="${oid}" name="${esc(name)}" type="model" pid="1" pindex="${mat}"><mesh><vertices>${v.join('')}</vertices><triangles>${t.join('')}</triangles></mesh></object>`);
-      return oid;
-    });
-    let top = ids[0];
-    if (ids.length > 1) { top = ++id; res.push(`<object id="${top}" name="${esc(g.name)}" type="model"><components>${ids.map((o) => `<component objectid="${o}"/>`).join('')}</components></object>`); }
-    items.push(`<item objectid="${top}" transform="1 0 0 0 1 0 0 0 1 ${(bedW / 2 + g.at[0]).toFixed(3)} ${(bedD / 2 + g.at[1]).toFixed(3)} 0"/>`);
-  }
-  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Title">Office Status Slider</metadata><resources>${res.join('')}</resources><build>${items.join('')}</build></model>`;
-  const enc = new TextEncoder();
-  const zip = zipBlob([
-    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
-    { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
-    { name: '3D/3dmodel.model', data: enc.encode(model) },
-  ]);
   const i = result.info;
-  saveBlob(new Blob([zip], { type: 'model/3mf' }), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.3mf`);
+  saveBlob(make3mf(groups, mats, bedW, bedD), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.3mf`);
+}
+// Writes a standard 3MF that every slicer reads (one model file, meshes inline, the preview colors as base materials) plus
+// Bambu Studio's Metadata/model_settings.config, which names every object and part and gives each part a filament slot.
+// Bambu Studio and Orca Slicer read that file and keep the names and slots (checked by loading and re-saving the file in
+// Bambu Studio 2.8). Parts that share a color share a slot, numbered from the plate. The file does not claim to come from
+// Bambu Studio and carries no printer or filament settings: a Bambu file without them is not loaded, and with them it
+// would replace the user's own printer and filament presets.
+// groups: [{ name, at: [x, y] from the bed centre, parts: [[name, { pos, mesh: { idx } }, material index]] }]
+function make3mf(groups, mats, bedW, bedD) {
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const colorOf = (m) => mats[m][1].toUpperCase();
+  const colors = [...new Set(groups.flatMap((g) => g.parts.map((p) => p[2])).sort((a, b) => a - b).map(colorOf))];
+  const slot = (m) => colors.indexOf(colorOf(m)) + 1;
+  const enc = new TextEncoder(), res = [], items = [], cfgObjects = [], plateItems = [];
+  res.push('<basematerials id="1">' + mats.map(([n, c]) => '<base name="' + esc(n) + '" displaycolor="' + c.toUpperCase() + 'FF"/>').join('') + '</basematerials>');
+  let id = 1;
+  groups.forEach((g, gi) => {
+    const comps = [], cfgParts = [];
+    for (const [name, file, mat] of g.parts) {
+      const oid = ++id, p = file.pos, ix = file.mesh.idx, v = [], t = [];
+      for (let k = 0; k < p.length; k += 3) v.push('<vertex x="' + p[k].toFixed(4) + '" y="' + p[k + 1].toFixed(4) + '" z="' + p[k + 2].toFixed(4) + '"/>');
+      for (let k = 0; k < ix.length; k += 3) t.push('<triangle v1="' + ix[k] + '" v2="' + ix[k + 1] + '" v3="' + ix[k + 2] + '"/>');
+      res.push('<object id="' + oid + '" name="' + esc(name) + '" type="model" pid="1" pindex="' + mat + '"><mesh><vertices>' + v.join('') + '</vertices><triangles>' + t.join('') + '</triangles></mesh></object>');
+      comps.push('<component objectid="' + oid + '"/>');
+      cfgParts.push('    <part id="' + oid + '" subtype="normal_part">\n      <metadata key="name" value="' + esc(name) + '"/>\n      <metadata key="matrix" value="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"/>\n      <metadata key="extruder" value="' + slot(mat) + '"/>\n    </part>');
+    }
+    const top = ++id, tf = '1 0 0 0 1 0 0 0 1 ' + (bedW / 2 + g.at[0]).toFixed(3) + ' ' + (bedD / 2 + g.at[1]).toFixed(3) + ' 0';
+    res.push('<object id="' + top + '" name="' + esc(g.name) + '" type="model"><components>' + comps.join('') + '</components></object>');
+    items.push('<item objectid="' + top + '" transform="' + tf + '" printable="1"/>');
+    cfgObjects.push('  <object id="' + top + '">\n    <metadata key="name" value="' + esc(g.name) + '"/>\n    <metadata key="extruder" value="' + slot(g.parts[0][2]) + '"/>\n' + cfgParts.join('\n') + '\n  </object>');
+    plateItems.push('    <model_instance>\n      <metadata key="object_id" value="' + top + '"/>\n      <metadata key="instance_id" value="0"/>\n      <metadata key="identify_id" value="' + (100 + gi) + '"/>\n    </model_instance>');
+  });
+  const slots = colors.map((c, k) => (k + 1) + ' = ' + c + ' (' + [...new Set(mats.filter(([, mc]) => mc.toUpperCase() === c).map(([n]) => n))].join(', ') + ')').join('; ');
+  const model = '<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n <metadata name="Title">Office Status Slider</metadata>\n <metadata name="Application">Office Status Slider</metadata>\n <metadata name="Description">Filament slots: ' + esc(slots) + '</metadata>\n <resources>\n  ' + res.join('\n  ') + '\n </resources>\n <build>\n  ' + items.join('\n  ') + '\n </build>\n</model>\n';
+  const settings = '<?xml version="1.0" encoding="UTF-8"?>\n<config>\n' + cfgObjects.join('\n') + '\n  <plate>\n    <metadata key="plater_id" value="1"/>\n    <metadata key="plater_name" value=""/>\n    <metadata key="locked" value="false"/>\n' + plateItems.join('\n') + '\n  </plate>\n</config>\n';
+  const zip = zipBlob([
+    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>\n <Default Extension="config" ContentType="text/xml"/>\n</Types>\n') },
+    { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n <Relationship Target="/3D/3dmodel.model" Id="rel-1" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>\n</Relationships>\n') },
+    { name: '3D/3dmodel.model', data: enc.encode(model) },
+    { name: 'Metadata/model_settings.config', data: enc.encode(settings) },
+  ]);
+  return new Blob([zip], { type: 'model/3mf' });
+}
+// filament slot list for the download dialog: [slot, color, part names]
+function filamentSlots(mats, usedIdx) {
+  const colors = [...new Set(usedIdx.sort((a, b) => a - b).map((m) => mats[m][1].toUpperCase()))];
+  return colors.map((c, k) => [k + 1, c, [...new Set(usedIdx.filter((m) => mats[m][1].toUpperCase() === c).map((m) => mats[m][0]))]]);
 }
 function downloadZip() {
   const files = exportFiles();
@@ -3118,7 +3144,12 @@ function updateReadout() {
   renderExport();
 }
 
+// the 3MF's materials, in slot-numbering order
+const MAT_LIST = () => [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag], ['Name text', state.colName]];
 function renderExport() {
+  // which filament goes in which slot when the 3MF is opened in Bambu Studio or Orca Slicer
+  const P = result.parts, used = [0, ...(P.labels ? [1] : []), ...(P.slider ? [2] : []), ...(P.tag ? [3] : []), ...(P.nameText || P.tagText ? [4] : [])];
+  $('#slotList').innerHTML = 'Filament slots in the 3MF: ' + filamentSlots(MAT_LIST(), used).map(([n, c, names]) => `<b>${n}</b> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};border:1px solid var(--line);vertical-align:-1px"></span> ${names.join(' + ')}`).join(' · ') + '. Set your filaments in that order, or pick a slot per part in the slicer.';
   const ul = $('#partsList');
   ul.innerHTML = '';
   for (const f of exportFiles()) {
