@@ -126,12 +126,17 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
 .viewport canvas { display: block; width: 100%; height: 100%; }
 .vp-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
 .vp-top > * { pointer-events: auto; }
-.vp-bottom { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; flex-wrap: wrap; }
-.vp-right { display: flex; gap: 6px; align-items: center; }
-.vp-right .build-state { width: 136px; box-sizing: border-box; white-space: nowrap; background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; }
-.viewport .warnings { position: absolute; left: 12px; right: 12px; bottom: 46px; z-index: 3; max-height: 40%; overflow-y: auto; pointer-events: none; }
-.viewport .warnings li { background: var(--warn-bg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15); }
-.vp-hint, .vp-dims { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; }
+/* the build time, beside the view buttons; a fixed width so the buttons never shift */
+.vp-tools { align-items: center; }
+.vp-tools .build-state { width: 118px; justify-content: flex-end; white-space: nowrap; overflow: hidden; font-size: 11px; padding: 0 4px; text-shadow: 0 0 6px var(--stage); }
+/* size and warnings in the top bar, always in view */
+.fit-status { position: relative; display: flex; align-items: center; gap: 6px; }
+.size-chip { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); white-space: nowrap; }
+.size-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; }
+.size-chip.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); background: color-mix(in srgb, var(--danger) 9%, var(--soft)); }
+.size-chip.bad::before { background: var(--danger); }
+.warn-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; padding: 5px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-bg); color: var(--warn); }
+.warn-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: min(380px, calc(100vw - 24px)); max-height: min(60vh, 420px); overflow-y: auto; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2); }
 .vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
 .vp-tools { display: flex; gap: 6px; }
 .icon-btn[aria-pressed="true"] { color: var(--plate); border-color: color-mix(in srgb, var(--plate) 55%, transparent); background: color-mix(in srgb, var(--plate-soft) 60%, var(--panel)); }
@@ -349,8 +354,11 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   .app { padding-inline: 12px; gap: 12px; }
   .stage-col { display: contents; }
   .viewport { height: clamp(220px, 34vh, 320px); min-height: 0; border-radius: 12px; }
-  .vp-hint { display: none; }
-  .vp-bottom { justify-content: flex-end; }
+  .fit-status { order: 3; }
+  .warn-pop { left: 0; right: auto; }
+  .vp-tools .build-state { width: 14px; font-size: 0; padding: 0; } /* just the dot on phones */
+  .vp-top .seg { flex-wrap: nowrap; }
+  .vp-top .seg button { padding: 7px 9px; white-space: nowrap; }
   .st-head .hint { display: none; }
   .st-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .page { padding: 4px 14px 16px; }
@@ -369,7 +377,8 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   .app { flex: 1; min-height: 0; width: 100%; padding: 0 12px 8px; gap: 12px; grid-template-columns: minmax(0, 1fr) minmax(300px, 44%); align-items: stretch; }
   .stage-col { position: static; min-height: 0; gap: 8px; overflow-y: auto; }
   .viewport { flex: none; height: max(170px, calc(100dvh - 110px)); min-height: 0; }
-  .vp-hint, .st-head .hint { display: none; }
+  .st-head .hint { display: none; }
+  .fit-status .size-chip span { display: none; }
   .panel { overflow-y: auto; min-height: 0; }
 }
 /* touch screens: bigger targets, and 16 px text in fields so phones do not zoom in when one is tapped */
@@ -408,6 +417,11 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
     </div>
   </div>
   <div class="top-actions">
+    <div class="fit-status">
+      <span class="size-chip" id="sizeChip" role="status" title="Plate size, and whether it fits the bed of the machine you picked">—</span>
+      <button class="warn-chip" id="warnBtn" type="button" hidden aria-expanded="false" aria-controls="warnPop"><span aria-hidden="true">⚠</span><span id="warnCount"></span></button>
+      <div class="warn-pop" id="warnPop" hidden><ul class="warnings" id="warnings"></ul></div>
+    </div>
     <div class="printer" role="group" aria-label="Printer settings">
       <label>Machine<select id="bed" data-key="bed" title="Print bed size"><option value="180">180 × 180 · A1 mini</option><option value="220">220 × 220 · Ender 3</option><option value="250">250 × 210 · MK4</option><option value="256">256 × 256 · Bambu</option><option value="300">300 × 300</option><option value="350">350 × 350</option></select></label>
             <label>Nozzle<input id="nozzle" data-key="nozzle" data-commit="change" type="number" inputmode="decimal" step="0.05" min="0.1" max="1.2" title="Nozzle diameter in mm. Type any value."></label>
@@ -430,6 +444,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
           <button type="button" role="radio" data-value="print">Print plate</button>
         </div>
         <div class="vp-tools">
+        <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
         <button class="icon-btn" id="palToggle" title="Preview colors: plate, lettering, frame and name" aria-label="Preview colors" aria-expanded="false" aria-controls="palPop">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.6-2.2-.4-1.3.4-2.3 1.7-2.3H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>
         </button>
@@ -453,11 +468,6 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <div class="palette-row" id="palettes"></div>
         <p class="hint">Colors only change the preview and the 3MF; STL files have no color.</p>
       </div>
-      <div class="vp-bottom">
-        <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
-        <span class="vp-right"><span class="build-state" id="buildState" data-state="busy">Loading engine…</span></span>
-      </div>
-      <ul class="warnings" id="warnings"></ul>
       <div class="error-toast" id="errorToast" role="alert" hidden></div>
       <div class="overlay" id="overlay"><div><strong>Loading the 3D engine</strong>three.js and Manifold load from jsDelivr on first visit.</div></div>
     </div>
@@ -2275,7 +2285,6 @@ function applyView(refit) {
     sc.updateProjectionMatrix();
     fill.position.set(target.x + R, target.y + R * 0.2, target.z + R * 0.6);
   }
-  $('#vpHint').textContent = assembled ? (result && result.parts.tag ? (result.parts.slider ? 'Drag the frame or the name tag · drag empty space to orbit' : 'Drag the name tag in and out · drag empty space to orbit') : result && !result.parts.slider ? 'Drag to orbit · scroll to zoom' : 'Drag the frame to change status · drag empty space to orbit') : 'Parts in print orientation · no supports needed';
   if (refit) fitCamera();
   requestRender();
 }
@@ -3053,6 +3062,8 @@ $('#viewSeg').addEventListener('click', (e) => {
   saveState();
 });
 $('#resetView').addEventListener('click', fitCamera);
+$('#warnBtn').addEventListener('click', () => { const p = $('#warnPop'); p.hidden = !p.hidden; $('#warnBtn').setAttribute('aria-expanded', String(!p.hidden)); });
+document.addEventListener('pointerdown', (e) => { const p = $('#warnPop'); if (!p.hidden && !p.contains(e.target) && !$('#warnBtn').contains(e.target)) { p.hidden = true; $('#warnBtn').setAttribute('aria-expanded', 'false'); } });
 $('#palToggle').addEventListener('click', () => { const p = $('#palPop'); p.hidden = !p.hidden; $('#palToggle').setAttribute('aria-expanded', String(!p.hidden)); });
 document.addEventListener('pointerdown', (e) => { const p = $('#palPop'); if (!p.hidden && !p.contains(e.target) && !$('#palToggle').contains(e.target)) { p.hidden = true; $('#palToggle').setAttribute('aria-expanded', 'false'); } });
 const printDlg = $('#printDialog');
@@ -3091,12 +3102,19 @@ function updateReadout() {
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
   const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
   const small = i.capMin && i.capMin < state.nozzle * 8.75 - 0.01;
-  $('#spec').innerHTML = `<b>${fmt(i.W)} × ${fmt(i.H)} mm</b>${i.statusOn ? ` · window ${fmt(i.ww)} × ${fmt(i.wh)}` : ''}${small ? ` · <b class="bad">letters ${fmt(i.capMin)} mm</b>` : ''} · <span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'fits' : 'too big for'} ${bedW} × ${bedD} bed</span>`;
+  $('#spec').innerHTML = `<b>${fmt(i.W)} × ${fmt(i.H)} mm</b>${i.statusOn ? ` · window ${fmt(i.ww)} × ${fmt(i.wh)}` : ''}${small ? ` · <b class="bad">letters ${fmt(i.capMin)} mm</b>` : ''}`;
+  const chip = $('#sizeChip');
+  chip.classList.toggle('bad', !fitsBed);
+  chip.innerHTML = `${fmt(i.W)} × ${fmt(i.H)} mm<span>${fitsBed ? '' : ' · too big for the bed'}</span>`;
+  chip.title = `Plate ${fmt(i.W)} × ${fmt(i.H)} mm: ${fitsBed ? 'fits' : 'too big for'} the ${bedW} × ${bedD} mm bed of the machine picked at the top`;
   const warns = [...i.warnings];
   if (!state.dyn) { const { lo, hi } = layerRange(state.nozzle); if (state.layerH < lo - 1e-6 || state.layerH > hi + 1e-6) warns.push(`A ${state.layerH} mm layer is outside the usual ${lo}–${hi} mm for a ${state.nozzle} mm nozzle (25–75% of its width). Turn on Dynamic to skip this check.`); }
   if (textMissing.length) warns.unshift(`These characters have no printable outline here and were skipped: ${[...new Set(textMissing)].join(' ')}. Arabic and Indic scripts need text shaping, which this page does not do.`);
   $('#warnings').innerHTML = '';
   for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
+  $('#warnBtn').hidden = !warns.length;
+  $('#warnCount').textContent = warns.length === 1 ? '1 warning' : `${warns.length} warnings`;
+  if (!warns.length) { $('#warnPop').hidden = true; $('#warnBtn').setAttribute('aria-expanded', 'false'); }
   renderExport();
 }
 
