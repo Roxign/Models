@@ -102,6 +102,10 @@ button { cursor: pointer; }
 .vp-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
 .vp-top > * { pointer-events: auto; }
 .vp-bottom { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; flex-wrap: wrap; }
+.vp-right { display: flex; gap: 6px; align-items: center; }
+.vp-right .build-state { width: 136px; box-sizing: border-box; white-space: nowrap; background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; }
+.viewport .warnings { position: absolute; left: 12px; right: 12px; bottom: 46px; z-index: 3; max-height: 40%; overflow-y: auto; pointer-events: none; }
+.viewport .warnings li { background: var(--warn-bg); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15); }
 .vp-hint, .vp-dims { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; }
 .vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
 .vp-tools { display: flex; gap: 6px; }
@@ -321,13 +325,12 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   </div>
   <div class="top-actions">
     <div class="printer" role="group" aria-label="Printer settings">
-      <label>Machine<select id="bed" data-key="bed" title="Print bed size"><option value="180">180 × 180 · A1 mini, Prusa MINI</option><option value="220">220 × 220 · Ender 3</option><option value="250">250 × 210 · Prusa MK4</option><option value="256">256 × 256 · Bambu X1, P1, A1</option><option value="300">300 × 300</option><option value="350">350 × 350</option></select></label>
+      <label>Machine<select id="bed" data-key="bed" title="Print bed size"><option value="180">180 × 180 · A1 mini</option><option value="220">220 × 220 · Ender 3</option><option value="250">250 × 210 · MK4</option><option value="256">256 × 256 · Bambu</option><option value="300">300 × 300</option><option value="350">350 × 350</option></select></label>
             <label>Nozzle<input id="nozzle" data-key="nozzle" data-commit="change" type="number" inputmode="decimal" step="0.05" min="0.1" max="1.2" list="nozzleList" title="Nozzle diameter in mm. Pick a common size or type your own."></label>
       <datalist id="nozzleList"><option value="0.2"></option><option value="0.25"></option><option value="0.3"></option><option value="0.4"></option><option value="0.5"></option><option value="0.6"></option><option value="0.8"></option><option value="1"></option></datalist>
       <label>Layer<input id="layerH" data-key="layerH" data-commit="change" type="number" inputmode="decimal" step="any" min="0.005" title="Layer height in mm. Type any value."></label>
       <label class="chk" title="Dynamic layer height: dimensions are not tied to whole layers and the layer height is not checked against the nozzle"><input type="checkbox" id="dyn" data-key="dyn">Dynamic</label>
     </div>
-    <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
     <button class="btn" id="printOpen" type="button">Print guide</button>
     <button class="btn primary" id="dlZip" disabled>
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16"/></svg>
@@ -363,8 +366,9 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       </div>
       <div class="vp-bottom">
         <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
-        <span class="vp-dims" id="vpDims">—</span>
+        <span class="vp-right"><span class="build-state" id="buildState" data-state="busy">Loading engine…</span><span class="vp-dims" id="vpDims">—</span></span>
       </div>
+      <ul class="warnings" id="warnings"></ul>
       <div class="error-toast" id="errorToast" role="alert" hidden></div>
       <div class="overlay" id="overlay"><div><strong>Loading the 3D engine</strong>three.js and Manifold load from jsDelivr on first visit.</div></div>
     </div>
@@ -383,7 +387,6 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       </div>
       <div class="st-cards" id="statusCards"></div>
     </section>
-    <ul class="warnings" id="warnings"></ul>
   </section>
 
   <aside class="panel" aria-label="Settings">
@@ -1291,8 +1294,7 @@ const SECTIONS = [
     { sub: 'Shape', noteId: 'shapeName' },
     { html: 'shapes' },
     { sub: 'Size' },
-    { seg: 'sizeMode', aria: 'Sizing', options: [['auto', 'Fit to text'], ['manual', 'Set by hand']] },
-    { hint: 'The plate grows or shrinks to the smallest size that fits every status. Set the letter height on the Labels tab.', when: 'auto' },
+    { seg: 'sizeMode', aria: 'Sizing', options: [['auto', 'Fit to text', 'The plate grows or shrinks to the smallest size that fits every status. Set the letter height on the Labels tab.'], ['manual', 'Set by hand', 'Type or drag the width and height yourself. Starts from the size Fit to text calculated.']] },
     { slider: 'width', when: 'manual' },
     { slider: 'height', when: 'manual' },
     { html: 'spec' },
@@ -1921,7 +1923,7 @@ function itemHTML(it) {
   if (it.seg) {
     const lbl = it.label ? `<span class="lbl" id="${it.seg}Lbl">${it.label}</span>` : '';
     const name = it.label ? `aria-labelledby="${it.seg}Lbl"` : `aria-label="${it.aria}"`;
-    const opts = it.options.map(([v, t]) => `<button type="button" role="radio" data-value="${v}">${t}</button>`).join('');
+    const opts = it.options.map(([v, t, tip]) => `<button type="button" role="radio" data-value="${v}"${tip ? ` title="${tip}"` : ''}>${t}</button>`).join('');
     return `<div class="field"${when}>${lbl}<div class="seg" role="radiogroup" ${name} data-key="${it.seg}">${opts}</div></div>`;
   }
   if (it.select) {
