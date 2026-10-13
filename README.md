@@ -8,7 +8,7 @@ The page lets you design the sign in your browser and download print-ready STL f
 
 ## What you can change
 
-- **Statuses:** 2–6 labels with your own text and 16 icons (meeting, call, focus, lab, lunch, remote, travel and more), or pick from 81 ready-made statuses and a dozen preset sets.
+- **Statuses:** 2–12 labels with your own text and 16 icons (meeting, call, focus, lab, lunch, remote, travel and more), or pick from 81 ready-made statuses and a dozen preset sets.
 - **Shape:** 18 designs. **Rail only** is the default (just the rail, frame and the smallest back panel). Others: rounded, pill, **Classic** (English door-plate style with a raised double bead and serif lettering), **Honeycomb** (hexagon-perforated border, holes all the way round), arrow, lozenge, banner, **puzzle** (jigsaw ends so signs can join), pixel, folder, cat ears, ticket, cloud, speech bubble, scallop, wave and arch.
 - **Rails:** on Rail only, Classic, Honeycomb, Puzzle, Folder and Wave the rails stop at the ends of the track, inside the border or end features. On every other shape they run out to the edge of the plate and follow its outline, with the left end filled solid; the side margin keeps them back from the edge if you want a border. An optional bevel rounds off the outer edge of the whole base.
 - **Size:** by default the plate fits itself to your text at the letter height you choose. You can also set width and height by hand. Either way it's checked against your printer's bed size.

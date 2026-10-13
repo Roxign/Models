@@ -1044,7 +1044,7 @@ function createEngine(wasm) {
     const xNeed = wwReq * N / 2 + 5.6 + p.frame * (N + 1) / 2 + (p.mount === 'screw' ? 11 : 0);
     const make = (W, H) => SHAPES[p.shape].make(W, H);
     const findH = (W) => {
-      let lo = 20, hi = 300;
+      let lo = 20, hi = 600;
       if (vLayout(p, make(W, hi), hi, hh).wh < whReq) return hi;
       for (let i = 0; i < 18; i++) { const m = (lo + hi) / 2; if (vLayout(p, make(W, m), m, hh).wh >= whReq) hi = m; else lo = m; }
       return hi;
@@ -1075,7 +1075,7 @@ function createEngine(wasm) {
     W = findW(H);
     H = findH(W);
     W = findW(H);
-    return { W: Math.min(500, Math.ceil(W)), H: Math.min(300, Math.ceil(H)), hh };
+    return { W: Math.min(1500, Math.ceil(W)), H: Math.min(600, Math.ceil(H)), hh };
   }
 
   // Smallest plate for a sign with only a name: tall enough for the name band, long enough for the name.
@@ -1087,7 +1087,7 @@ function createEngine(wasm) {
     const make = (W, H) => SHAPES[p.shape].make(W, H);
     const room = (W, H) => { const z = vLayout(p, make(W, H), H, hh).hdrZone; return z[1] - z[0]; };
     const findH = (W) => {
-      let lo = 8, hi = 300;
+      let lo = 8, hi = 600;
       if (room(W, hi) < hh) return hi;
       for (let i = 0; i < 18; i++) { const mid = (lo + hi) / 2; if (room(W, mid) >= hh) hi = mid; else lo = mid; }
       return hi;
@@ -1102,7 +1102,7 @@ function createEngine(wasm) {
     };
     let W = 160, H = findH(W);
     W = findW(H); H = findH(W); W = findW(H);
-    return { W: Math.min(500, Math.ceil(W)), H: Math.min(300, Math.ceil(H)), hh };
+    return { W: Math.min(1500, Math.ceil(W)), H: Math.min(600, Math.ceil(H)), hh };
   }
 
   // Bevel for the final merged body: a stepped envelope, intersected with the body, that shrinks the outline by up to cT
@@ -1560,6 +1560,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/\.0+$/, '');
 const STORE_KEY = 'office-status-slider:v2';
+const MAX_STATUSES = 12, MAX_TEXT = 40;
 const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js';
 const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 const FONT_CDN = 'https://cdn.jsdelivr.net/npm/@fontsource/';
@@ -1649,42 +1650,42 @@ const DEFAULTS = {
 const mm = (d = 1) => (v) => `${fmt(v, d)} mm`;
 // nozzleMin: smallest value as a multiple of the nozzle diameter; layers: values stay whole numbers of layers.
 const SLIDERS = {
-  cap: { label: 'Status letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
-  hcap: { label: 'Header letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
-  width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
-  height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
-  thick: { label: 'Plate thickness', min: 0.8, max: 6, step: 0.2, layers: true, out: mm() },
-  reliefH: { label: 'Status text thickness', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
-  nameReliefH: { label: 'Name text thickness', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
-  frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
-  winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
-  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
-  tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, nozzleMin: 0.45, out: mm(2) },
-  magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
-  magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, layers: true, out: mm() },
-  tilt: { label: 'Lean back', min: 0, max: 25, step: 1, unit: '°', out: (v) => `${v}°` },
-  magInset: { label: 'Distance from the ends', min: 6, max: 60, step: 1, out: mm(0) },
-  screwD: { label: 'Screw hole diameter', min: 2, max: 8, step: 0.2, out: mm() },
-  screwHead: { label: 'Screw head diameter', min: 4, max: 16, step: 0.2, out: mm() },
-  footW: { label: 'Foot width', min: 10, max: 60, step: 1, out: mm(0) },
-  footF: { label: 'Foot extension, forward', min: 0, max: 60, step: 1, out: mm(0) },
-  footB: { label: 'Foot extension, backward', min: 0, max: 120, step: 1, out: mm(0) },
-  hangHole: { label: 'Loop hole diameter', min: 4, max: 20, step: 0.5, out: mm() },
-  bevel: { label: 'Bevel size', min: 0, max: 3, step: 0.1, layers: true, zero: true, out: mm() },
-  tagT: { label: 'Tag thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
-  proud: { label: 'Frame extrusion', min: 0, max: 4, step: 0.1, layers: true, zero: true, out: mm() },
-  cubP: { label: 'Panel thickness', min: 20, max: 100, step: 1, out: mm(0) },
-  hookBack: { label: 'Hook length down the back', min: 8, max: 80, step: 1, out: mm(0) },
-  railOpen: { label: 'Rail slot height', min: 4, max: 30, step: 0.1, out: mm() },
-  railLip: { label: 'Lip depth (slot to hollow)', min: 0.2, max: 5, step: 0.1, out: mm() },
-  railExt: { label: 'Hollow past the slot, up and down', min: 0.5, max: 10, step: 0.1, out: mm() },
-  railCav: { label: 'Hollow depth behind the lips', min: 0.4, max: 10, step: 0.1, out: mm() },
-  railDrop: { label: 'Sign top below the rail slot', min: 0, max: 120, step: 1, out: mm(0) },
-  hookDrop: { label: 'Sign top below the top of the panel', min: 0, max: 120, step: 1, out: mm(0) },
-  hookW: { label: 'Hook width', min: 10, max: 40, step: 1, layers: true, out: mm() },
-  marginV: { label: 'Top & bottom margin', min: 0, max: 20, step: 0.5, out: mm() },
-  marginH: { label: 'Side margin', min: 0, max: 20, step: 0.5, out: mm() },
-  pad: { label: 'Text padding', min: 0, max: 8, step: 0.2, out: mm() },
+  cap: { label: 'Status letter height', min: 2, max: 30, step: 0.5, nozzleMin: 8.75, out: mm() },
+  hcap: { label: 'Header letter height', min: 2, max: 40, step: 0.5, nozzleMin: 8.75, out: mm() },
+  width: { label: 'Width', min: 60, max: 800, step: 1, out: mm(0) },
+  height: { label: 'Height', min: 35, max: 400, step: 1, out: mm(0) },
+  thick: { label: 'Plate thickness', min: 0.8, max: 10, step: 0.2, layers: true, out: mm() },
+  reliefH: { label: 'Status text thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
+  nameReliefH: { label: 'Name text thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
+  frame: { label: 'Frame bars', min: 3, max: 15, step: 0.5, nozzleMin: 4, out: mm() },
+  winR: { label: 'Window corners', min: 0, max: 15, step: 0.5, out: mm() },
+  railH: { label: 'Rail height', min: 2.4, max: 10, step: 0.5, layers: true, out: mm() },
+  tol: { label: 'Slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
+  magD: { label: 'Magnet ⌀', min: 5, max: 40, step: 0.5, out: mm() },
+  magH: { label: 'Magnet height', min: 1, max: 10, step: 0.1, layers: true, out: mm() },
+  tilt: { label: 'Lean back', min: 0, max: 45, step: 1, unit: '°', out: (v) => `${v}°` },
+  magInset: { label: 'Distance from the ends', min: 6, max: 150, step: 1, out: mm(0) },
+  screwD: { label: 'Screw hole diameter', min: 2, max: 12, step: 0.2, out: mm() },
+  screwHead: { label: 'Screw head diameter', min: 4, max: 24, step: 0.2, out: mm() },
+  footW: { label: 'Foot width', min: 10, max: 100, step: 1, out: mm(0) },
+  footF: { label: 'Foot extension, forward', min: 0, max: 120, step: 1, out: mm(0) },
+  footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
+  hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
+  bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, zero: true, out: mm() },
+  tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
+  proud: { label: 'Frame extrusion', min: 0, max: 8, step: 0.1, layers: true, zero: true, out: mm() },
+  cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
+  hookBack: { label: 'Hook length down the back', min: 8, max: 150, step: 1, out: mm(0) },
+  railOpen: { label: 'Rail slot height', min: 4, max: 40, step: 0.1, out: mm() },
+  railLip: { label: 'Lip depth (slot to hollow)', min: 0.2, max: 10, step: 0.1, out: mm() },
+  railExt: { label: 'Hollow past the slot, up and down', min: 0.5, max: 20, step: 0.1, out: mm() },
+  railCav: { label: 'Hollow depth behind the lips', min: 0.4, max: 20, step: 0.1, out: mm() },
+  railDrop: { label: 'Sign top below the rail slot', min: 0, max: 300, step: 1, out: mm(0) },
+  hookDrop: { label: 'Sign top below the top of the panel', min: 0, max: 300, step: 1, out: mm(0) },
+  hookW: { label: 'Hook width', min: 10, max: 80, step: 1, layers: true, out: mm() },
+  marginV: { label: 'Top & bottom margin', min: 0, max: 50, step: 0.5, out: mm() },
+  marginH: { label: 'Side margin', min: 0, max: 50, step: 0.5, out: mm() },
+  pad: { label: 'Text padding', min: 0, max: 20, step: 0.2, out: mm() },
 };
 // Global printer settings. Slider limits and steps follow them.
 const NOZZLES = [0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8, 1];
@@ -1859,14 +1860,14 @@ function sanitize(s) {
   // designs saved before the Name tab: the tag switch and a typed header become the name mode
   if (s.nameMode == null) out.nameMode = s.nameRail ? 'tag' : (typeof s.header === 'string' && s.header.trim() ? 'plate' : 'off');
   if (!out.statusOn && out.nameMode === 'off') out.statusOn = true;
-  if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
+  if (typeof s.header === 'string') out.header = s.header.slice(0, MAX_TEXT);
   for (const k of ['colBase', 'colLabel', 'colSlider', 'colTag', 'colName']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
   // designs from before the name had its own color and thickness take the status lettering's
   if (!/^#[0-9a-f]{6}$/i.test(s.colName || '')) out.colName = out.colLabel;
   if (!Number.isFinite(+s.nameReliefH)) out.nameReliefH = out.reliefH;
   if (!/^#[0-9a-f]{6}$/i.test(s.colTag || '') && /^#[0-9a-f]{6}$/i.test(s.colSlider || '')) out.colTag = s.colSlider;
   if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
-    out.statuses = s.statuses.slice(0, 6).map((st) => ({ text: String(st && st.text || '').slice(0, 28), icon: String(st && st.icon || 'none') }));
+    out.statuses = s.statuses.slice(0, MAX_STATUSES).map((st) => ({ text: String(st && st.text || '').slice(0, MAX_TEXT), icon: String(st && st.icon || 'none') }));
   }
   out.current = Math.min(out.statuses.length - 1, Math.max(0, Math.round(+s.current || 0)));
   return out;
@@ -2543,7 +2544,7 @@ function itemHTML(it) {
     const opts = it.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
     return `<div class="field"${when}><label for="${it.select}">${it.label}</label><select id="${it.select}" data-key="${it.select}">${opts}</select></div>`;
   }
-  if (it.text) return `<div class="field"${when}><label for="${it.text}">${it.label}</label><input type="text" id="${it.text}" data-key="${it.text}" maxlength="28" placeholder="${it.placeholder}" autocomplete="off"></div>`;
+  if (it.text) return `<div class="field"${when}><label for="${it.text}">${it.label}</label><input type="text" id="${it.text}" data-key="${it.text}" maxlength="${MAX_TEXT}" placeholder="${it.placeholder}" autocomplete="off"></div>`;
   if (it.check) return `<label class="check"${when}${it.title ? ` title="${it.title}"` : ''}><input type="checkbox" id="${it.check}" data-key="${it.check}"> ${it.label}</label>`;
   if (it.color) return `<label class="swatch"${when}>${it.label}<input type="color" id="${it.color}" data-key="${it.color}"></label>`;
   if (it.fit) return '<label class="check" title="On: the plate grows or shrinks to the smallest size that fits every status (letter height is on the Labels tab), and width and height are locked to the result. Off: type or drag the size yourself, starting from the last result."><input type="checkbox" id="fit"> Fit to text <span class="hint">(locks width and height)</span></label>';
@@ -2617,7 +2618,7 @@ function renderStatuses(focusTarget) {
     card.innerHTML = `
       <div class="st-row">
         <button type="button" class="pick" data-role="show" data-idx="${i}" title="Show on the sign">${svgIcon(st.icon)}</button>
-        <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>
+        <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="${MAX_TEXT}" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>
       </div>
       <div class="st-tools">
         <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
@@ -2628,7 +2629,7 @@ function renderStatuses(focusTarget) {
     labelCard(card, st, i);
     wrap.appendChild(card);
   });
-  $('#addStatus').disabled = n >= 6;
+  $('#addStatus').disabled = n >= MAX_STATUSES;
   markCurrent(state.current);
   if (keep) {
     let el = wrap.querySelector(`[data-role="${keep.role}"][data-idx="${keep.idx}"]`);
@@ -2730,7 +2731,7 @@ cardsEl.addEventListener('click', (e) => {
 });
 $('#addStatus').addEventListener('click', () => {
   const s = state.statuses;
-  if (s.length >= 6) return;
+  if (s.length >= MAX_STATUSES) return;
   s.push({ text: 'BACK SOON', icon: 'clock' });
   state.current = s.length - 1;
   renderStatuses({ role: 'text', idx: s.length - 1 });
