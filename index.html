@@ -379,7 +379,6 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 
 <div class="popover set-pop" id="setPopover" role="listbox" aria-label="Ready-made statuses" hidden></div>
 
-<div class="popover" id="iconPopover" role="dialog" aria-label="Choose an icon" hidden></div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -1107,11 +1106,23 @@ const PRESETS = [
   { name: 'Studio', list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
   { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
 ];
-const EXTRA_STATUSES = [['STEP OUT', 'pin'], ['IN CLASS', 'people'], ['ON BREAK', 'cup'], ['OFFLINE', 'moon'], ['PLEASE KNOCK', 'check'], ['CLOSED', 'dnd']];
+const EXTRA_STATUSES = [
+  ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
+  ['STEP OUT', 'pin'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
+  ['VIDEO CALL', 'headset'], ['ON THE PHONE', 'headset'], ['CLOSED', 'dnd'], ['PRIVATE', 'dnd'], ['DEADLINE', 'dnd'],
+  ['BUSY', 'hourglass'], ['BE RIGHT BACK', 'hourglass'], ['FOCUS', 'target'], ['DEEP WORK', 'target'],
+  ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
+  ['AT LUNCH', 'forkknife'], ['OUT TO EAT', 'forkknife'], ['WORKING FROM HOME', 'house'], ['REMOTE', 'house'],
+  ['ON A TRIP', 'plane'], ['ON VACATION', 'plane'], ['OUT OF TOWN', 'plane'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
+  ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
+];
 const STATUS_SETS = (() => {
-  const seen = new Set(), out = [];
-  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES]) { if (!seen.has(text)) { seen.add(text); out.push({ text, icon }); } }
-  return out;
+  const seen = new Set(), all = [];
+  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES]) {
+    if (!seen.has(text + '|' + icon)) { seen.add(text + '|' + icon); all.push({ text, icon }); }
+  }
+  const order = [...new Set(all.map((x) => x.icon))];
+  return order.flatMap((ic) => all.filter((x) => x.icon === ic));
 })();
 const PALETTES = [
   { name: 'Charcoal & orange', base: '#2E3237', label: '#F3F1EA', slider: '#F06A28' },
@@ -1857,7 +1868,7 @@ function renderStatuses(focusTarget) {
     card.innerHTML = `
       <div class="st-top">
         <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
-        <button type="button" class="pick" data-role="pick" data-idx="${i}" title="Change icon">${svgIcon(st.icon)}</button>
+        <span class="pick" aria-hidden="true">${svgIcon(st.icon)}</span>
         <span class="st-tools">
           <button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button>
           <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
@@ -1881,7 +1892,6 @@ function renderStatuses(focusTarget) {
 function labelCard(card, st, i) {
   const name = statusName(st, i);
   card.querySelector('[data-role="show"]').setAttribute('aria-label', `Show ${name} on the sign`);
-  card.querySelector('[data-role="pick"]').setAttribute('aria-label', `Icon for ${name}: ${engine.icons[st.icon] || 'none'}`);
 }
 function markCurrent(idx) {
   $$('#statusCards .st-card').forEach((c, i) => {
@@ -1908,7 +1918,6 @@ cardsEl.addEventListener('click', (e) => {
   if (!b) { if (card) setCurrent(+card.dataset.idx); return; }
   const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
   if (role === 'show') { setCurrent(i); return; }
-  if (role === 'pick') { setCurrent(i); openIconPicker(b, i); return; }
   if (role === 'sets') { setCurrent(i); openSetPicker(b, i); return; }
   let focusTo = null;
   if (role === 'left' && i > 0) {
@@ -1955,48 +1964,9 @@ cardsEl.addEventListener('keydown', (e) => {
 });
 
 // icon picker
-const pop = $('#iconPopover');
-let popFor = null;
-function openIconPicker(btn, idx) {
-  popFor = { btn, idx };
-  const cur = state.statuses[idx].icon;
-  pop.innerHTML = Object.entries(engine.icons).map(([k, label]) => `<button type="button" data-icon="${k}" title="${label}" aria-label="${label}" aria-pressed="${k === cur}">${svgIcon(k)}</button>`).join('')
-    + `<button type="button" data-icon="none" title="No icon" aria-label="No icon" aria-pressed="${cur === 'none'}"><span class="none-label">none</span></button>`;
-  pop.hidden = false;
-  const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
-  let left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.left));
-  let top = r.bottom + 6;
-  if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 6);
-  pop.style.left = left + 'px';
-  pop.style.top = top + 'px';
-  const sel = pop.querySelector('[aria-pressed="true"]') || pop.querySelector('button');
-  sel.focus();
-}
-function closeIconPicker(refocus) {
-  if (pop.hidden) return;
-  pop.hidden = true;
-  if (refocus && popFor) popFor.btn.focus();
-  popFor = null;
-}
-pop.addEventListener('click', (e) => {
-  const b = e.target.closest('button');
-  if (!b || !popFor) return;
-  const idx = popFor.idx;
-  state.statuses[idx].icon = b.dataset.icon;
-  closeIconPicker(false);
-  renderStatuses({ role: 'pick', idx });
-  changed();
-});
-pop.addEventListener('keydown', (e) => {
-  const btns = $$('button', pop), i = btns.indexOf(document.activeElement);
-  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 5, ArrowUp: -5 }[e.key];
-  if (step && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + step))].focus(); }
-  if (e.key === 'Escape') closeIconPicker(true);
-});
 const setPop = $('#setPopover');
 let setFor = null;
 function openSetPicker(btn, idx) {
-  closeIconPicker(false);
   setFor = { btn, idx };
   const st = state.statuses[idx];
   setPop.innerHTML = STATUS_SETS.map((x, k) => `<button type="button" role="option" data-k="${k}" aria-selected="${x.text === st.text && x.icon === st.icon}">${svgIcon(x.icon)}<span></span></button>`).join('');
@@ -2030,8 +2000,6 @@ setPop.addEventListener('keydown', (e) => {
 });
 document.addEventListener('pointerdown', (e) => { if (!setPop.hidden && !setPop.contains(e.target) && !(setFor && setFor.btn.contains(e.target))) closeSetPicker(false); });
 window.addEventListener('resize', () => closeSetPicker(false));
-document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !(popFor && popFor.btn.contains(e.target))) closeIconPicker(false); });
-window.addEventListener('resize', () => closeIconPicker(false));
 
 function renderPresets() {
   const sel = $('#presetSel');
