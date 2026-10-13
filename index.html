@@ -64,6 +64,9 @@ button { cursor: pointer; }
 .page .grid, .group .grid { grid-template-columns: minmax(0, 1fr); }
 .group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
 .group > .sub { margin: 0; color: var(--hue); }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.printer input:disabled { opacity: 0.5; cursor: not-allowed; }
 .printer .chk { gap: 4px; }
 .printer .chk input { accent-color: var(--accent); margin: 0; }
 .printer label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
@@ -398,6 +401,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   <div class="dlg-head"><h2 id="printTitle">Print</h2><button type="button" class="icon-btn" id="printClose" aria-label="Close">✕</button></div>
   <div class="dlg-body">
     <button class="btn primary wide" id="dlZip2" disabled>Download all parts (.zip)</button>
+    <button class="btn wide" id="dl3mf" disabled title="One file with the parts laid out on the bed and the preview colors, for Bambu Studio, Orca Slicer and PrusaSlicer">Download as 3MF (one file, with colors)</button>
     <ol class="steps" id="steps"></ol>
     <details class="files"><summary>Single STL files</summary><ul class="parts" id="partsList"></ul></details>
     <div class="foot-actions"><button class="linkish" id="copyLink">Copy design link</button><button class="linkish" id="resetAll">Reset design</button></div>
@@ -692,6 +696,18 @@ function createEngine(wasm) {
         return { cs: union([lower, top]), body: [-H / 2, H / 2 - ah], crown: [H / 2 - ah, H / 2 - ah * 0.12] };
       },
     },
+    // The simplest possible part: a back panel just big enough to carry the rail, frame and labels.
+    rail: { label: 'Rail only', make: (W, H) => ({ cs: rect(W, H), body: [-H / 2, H / 2] }) },
+    // English classic: small scooped corners, a raised double bead along the edge (added in build), serif lettering.
+    classic: {
+      label: 'Classic', make: (W, H) => {
+        let cs = rrect(W, H, 1.5);
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]) cs = cs.subtract(circle(4, sx * W / 2, sy * H / 2, 48));
+        return { cs, body: [-H / 2, H / 2] };
+      },
+    },
+    // Hexagonal perforations through the plate: light, quick to print, awkward to make any other way (added in build).
+    honeycomb: { label: 'Honeycomb', make: (W, H) => ({ cs: rrect(W, H, Math.min(10, H * 0.2)), body: [-H / 2, H / 2] }) },
   };
 
   // ---------- text ----------
@@ -997,6 +1013,36 @@ function createEngine(wasm) {
         }
       }
 
+      if (p.shape === 'classic') {
+        const zone = rect(2 * X + 3, 2 * hrTot + 3, 0, yc), off = (d) => sh.cs.offset(d, 'Round', 2, 24);
+        const bead = union([off(-2.2).subtract(off(-3.4)), off(-4.6).subtract(off(-5.4))]).subtract(zone);
+        body = body.add(bead.extrude(0.82).translate([0, 0, T - 0.02]));
+      }
+      if (p.shape === 'honeycomb') {
+        const R = 2.6, wall = 1.2, sp = Math.sqrt(3) * R + wall, rowH = sp * Math.sqrt(3) / 2, m = 2.5, g = 2.5;
+        const hx = W / 2 - m, hy = H / 2 - m, rc = Math.max(0, Math.min(10, H * 0.2) - m);
+        const excl = [];
+        if (p.mount === 'screw') for (const sx of [-1, 1]) excl.push([sx * (X + 5.5), yc, 7]);
+        if (p.mount === 'magnet') {
+          const xs = X * 0.6, ys = p.magN === 4 ? [yc + hrTot * 0.42, yc - hrTot * 0.42] : [yc];
+          for (const sx of [-1, 1]) for (const y of ys) excl.push([sx * xs, y, p.magD / 2 + 2]);
+        }
+        const keep = (x, y) => {
+          const dx = Math.max(Math.abs(x) - (hx - rc), 0), dy = Math.max(Math.abs(y) - (hy - rc), 0);
+          if (dx * dx + dy * dy > rc * rc || Math.abs(x) > hx || Math.abs(y) > hy) return false;
+          if (Math.abs(x) < X + g && Math.abs(y - yc) < hrTot + g) return false;
+          return !excl.some(([ex, ey, er]) => Math.hypot(x - ex, y - ey) < er + R);
+        };
+        const rings = [];
+        for (let j = -Math.ceil(H / 2 / rowH) - 1; j <= Math.ceil(H / 2 / rowH) + 1; j++) {
+          for (let i = -Math.ceil(W / 2 / sp) - 1; i <= Math.ceil(W / 2 / sp) + 1; i++) {
+            const cx = i * sp + (j & 1 ? sp / 2 : 0), cy = j * rowH, ring = [];
+            for (let k = 0; k < 6; k++) ring.push([cx + R * Math.cos((30 + 60 * k) * D2R), cy + R * Math.sin((30 + 60 * k) * D2R)]);
+            if (ring.every(([x, y]) => keep(x, y))) rings.push(ring);
+          }
+        }
+        if (rings.length) body = body.subtract(CS(rings).extrude(T + 2).translate([0, 0, -1]));
+      }
       let labels = null, base = body;
       if (labelsCS) {
         if (raised) {
@@ -1208,6 +1254,7 @@ const PALETTES = [
   { name: 'White & blue', base: '#F2F2EE', label: '#1F2A44', slider: '#2F6BFF' },
   { name: 'Forest', base: '#1F3B2F', label: '#EDE6D6', slider: '#E8B73A' },
   { name: 'Matte black', base: '#1A1B1E', label: '#D9DDE2', slider: '#7A8088' },
+  { name: 'Brass', base: '#B5893A', label: '#2A1E10', slider: '#6E4A1F' },
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
@@ -1228,7 +1275,7 @@ const SLIDERS = {
   hcap: { label: 'Header letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
   width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
   height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
-  thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, layers: true, out: mm() },
+  thick: { label: 'Plate thickness', min: 0.8, max: 6, step: 0.2, layers: true, out: mm() },
   reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
@@ -1266,8 +1313,15 @@ function clampSnap(k, v, s = state) {
   return rnd(Math.min(max, min + Math.round((v - min) / step) * step));
 }
 const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
+// Picking a design can set related options; moving to a normal shape puts the neutral values back.
+const SHAPE_NEUTRAL = { thick: 3, marginV: 3, marginH: 1.5, chamfer: true };
+const SHAPE_DEFAULTS = {
+  rail: { thick: 1.2, marginV: 0, marginH: 0, chamfer: false },
+  classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#B5893A', colLabel: '#2A1E10', colSlider: '#6E4A1F' },
+  honeycomb: { marginV: 16, marginH: 12 },
+};
 const CHOICES = {
-  sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
+  sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'rail', 'classic', 'honeycomb'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
   mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
 };
@@ -1291,6 +1345,7 @@ const WHEN = {
 // the rest render as cards below. hue: the page's color; color: the part's preview color.
 const SECTIONS = [
   { tab: true, title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
+    { check: 'chamfer', label: 'Chamfered plate edge' },
     { sub: 'Shape', noteId: 'shapeName' },
     { html: 'shapes' },
     { sub: 'Size' },
@@ -1305,9 +1360,8 @@ const SECTIONS = [
     { hint: '', id: 'mountHint' },
     { row: [{ slider: 'magD' }, { slider: 'magH' }, { seg: 'magN', label: 'Pockets', options: [[2, '2'], [4, '4']] }], when: 'magnet' },
     { slider: 'tilt', when: 'stand' },
-    { sub: 'Thickness & edge' },
+    { sub: 'Thickness' },
     { slider: 'thick' },
-    { check: 'chamfer', label: 'Chamfered plate edge' },
   ] },
   { tab: true, title: 'Labels', hue: 'labels', color: 'colLabel', glyph: '<path d="M5 19 12 5l7 14M8 14h8"/>', items: [
     { sub: 'Style' },
@@ -1326,12 +1380,16 @@ const SECTIONS = [
     { row: [{ seg: 'relief', label: 'Labels are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
   ] },
   { tab: true, title: 'Frame', hue: 'frame', color: 'colSlider', glyph: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/>', items: [
-    { sub: 'Window' },
-    { row: [{ slider: 'frame' }, { slider: 'winR' }] },
-    { sub: 'Fit & height' },
-    { row: [{ slider: 'tol' }, { slider: 'railH' }] },
-    { slider: 'proud' },
-    { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
+    { group: 'Frame', items: [
+      { slider: 'frame' },
+      { slider: 'winR' },
+      { slider: 'proud' },
+    ] },
+    { group: 'Rail', items: [
+      { slider: 'railH' },
+      { slider: 'tol' },
+      { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
+    ] },
   ] },
 
 ];
@@ -1856,6 +1914,46 @@ function exportFiles() {
   return files;
 }
 function downloadOne(f) { saveBlob(new Blob([stlBlob(f.pos, f.mesh.idx, f.name)], { type: 'model/stl' }), f.name); }
+// 3MF: one file with every part laid out on the bed, the label part grouped with the base, and the preview colors as materials.
+function download3mf() {
+  const files = exportFiles();
+  if (!files.length) return;
+  const by = Object.fromEntries(files.map((x) => [x.key, x]));
+  const mats = [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider]];
+  const groups = [{ name: 'Base', parts: by.labels ? [['Base body', by.body, 0], ['Labels', by.labels, 1]] : [['Base', by.base, 0]] },
+    { name: 'Frame', parts: [['Frame', by.slider, 2]] }, { name: 'Stop pin', parts: [['Stop pin', by.pin, 0]] },
+    ...files.filter((x) => x.key.startsWith('foot')).map((x) => ({ name: x.label, parts: [[x.label, x, 0]] }))];
+  const size = (g) => { const b = boundsOf(g.parts[0][1].pos); return [b.max[0] - b.min[0], b.max[1] - b.min[1]]; };
+  const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed, gap = 8;
+  const base = size(groups[0]), rest = groups.slice(1), restW = rest.reduce((a, g) => a + size(g)[0], 0) + gap * Math.max(0, rest.length - 1);
+  let x = -restW / 2;
+  groups[0].at = [0, 0];
+  for (const g of rest) { const [w, h] = size(g); g.at = [x + w / 2, -(base[1] / 2) - gap - h / 2]; x += w + gap; }
+  const esc = (t) => String(t).replace(/[<>&"]/g, '');
+  let id = 1;
+  const res = [`<basematerials id="1">${mats.map(([n, c]) => `<base name="${n}" displaycolor="${c.toUpperCase()}FF"/>`).join('')}</basematerials>`], items = [];
+  for (const g of groups) {
+    const ids = g.parts.map(([name, file, mat]) => {
+      const oid = ++id, p = file.pos, ix = file.mesh.idx, v = [], t = [];
+      for (let i = 0; i < p.length; i += 3) v.push(`<vertex x="${p[i].toFixed(4)}" y="${p[i + 1].toFixed(4)}" z="${p[i + 2].toFixed(4)}"/>`);
+      for (let i = 0; i < ix.length; i += 3) t.push(`<triangle v1="${ix[i]}" v2="${ix[i + 1]}" v3="${ix[i + 2]}"/>`);
+      res.push(`<object id="${oid}" name="${esc(name)}" type="model" pid="1" pindex="${mat}"><mesh><vertices>${v.join('')}</vertices><triangles>${t.join('')}</triangles></mesh></object>`);
+      return oid;
+    });
+    let top = ids[0];
+    if (ids.length > 1) { top = ++id; res.push(`<object id="${top}" name="${esc(g.name)}" type="model"><components>${ids.map((o) => `<component objectid="${o}"/>`).join('')}</components></object>`); }
+    items.push(`<item objectid="${top}" transform="1 0 0 0 1 0 0 0 1 ${(bedW / 2 + g.at[0]).toFixed(3)} ${(bedD / 2 + g.at[1]).toFixed(3)} 0"/>`);
+  }
+  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Title">Office Status Slider</metadata><resources>${res.join('')}</resources><build>${items.join('')}</build></model>`;
+  const enc = new TextEncoder();
+  const zip = zipBlob([
+    { name: '[Content_Types].xml', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>') },
+    { name: '_rels/.rels', data: enc.encode('<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>') },
+    { name: '3D/3dmodel.model', data: enc.encode(model) },
+  ]);
+  const i = result.info;
+  saveBlob(new Blob([zip], { type: 'model/3mf' }), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.3mf`);
+}
 function downloadZip() {
   const files = exportFiles();
   if (!files.length) return;
@@ -2208,7 +2306,9 @@ function renderShapes() {
     b.setAttribute('aria-pressed', String(state.shape === k));
     b.innerHTML = `<svg viewBox="-104 -40 208 80" aria-hidden="true"><path d="${engine.shapePath(k)}"/></svg><span>${label}</span>`;
     b.addEventListener('click', () => {
+      const prev = state.shape;
       state.shape = k;
+      if (prev !== k && (SHAPE_DEFAULTS[k] || SHAPE_DEFAULTS[prev])) { Object.assign(state, SHAPE_NEUTRAL, SHAPE_DEFAULTS[k] || {}); syncControls(); applyColors(); }
       $$('.shape-tile').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.shape === k)));
       $('#shapeName').textContent = label;
       changed();
@@ -2236,6 +2336,7 @@ function renderPalettes() {
 // Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
 function syncControls() {
+  $('#layerH').disabled = !!state.dyn;
   for (const k of Object.keys(SLIDERS)) {
     const el = $(`#${k}`);
     if (el) { const l = limits(k); el.min = l.min; el.max = l.max; el.step = l.step; }
@@ -2464,6 +2565,7 @@ async function rebuild() {
     setBuildState('ok', `Built in ${Math.round(ms)} ms`);
     $('#dlZip').disabled = false;
     $('#dlZip2').disabled = false;
+    $('#dl3mf').disabled = false;
   } catch (e) {
     if (!e.user) console.error(e);
     showError(e.user ? e.message : 'Something went wrong while building the model: ' + (e.message || e));
@@ -2471,6 +2573,7 @@ async function rebuild() {
     // the preview still shows the last good model; don't let it be exported as if it matched the settings
     $('#dlZip').disabled = true;
     $('#dlZip2').disabled = true;
+    $('#dl3mf').disabled = true;
     $$('#partsList button').forEach((b) => { b.disabled = true; });
   } finally {
     building = false;
@@ -2480,6 +2583,7 @@ async function rebuild() {
 
 $('#dlZip').addEventListener('click', downloadZip);
 $('#dlZip2').addEventListener('click', downloadZip);
+$('#dl3mf').addEventListener('click', download3mf);
 $('#copyLink').addEventListener('click', async () => {
   const url = shareUrl();
   const note = $('#copyNote');
