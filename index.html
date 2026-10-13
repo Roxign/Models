@@ -61,6 +61,7 @@ button { cursor: pointer; }
 .numwrap { display: inline-flex; align-items: center; gap: 4px; }
 .num { width: 66px; text-align: right; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 6px; border: 1px solid var(--line); background: var(--soft); border-radius: 6px; }
 .unit { color: var(--muted); font-family: var(--font-mono); font-size: 11px; min-width: 14px; }
+.page .grid, .group .grid { grid-template-columns: minmax(0, 1fr); }
 .group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
 .group > .sub { margin: 0; color: var(--hue); }
 .printer .chk { gap: 4px; }
@@ -323,10 +324,8 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       <label>Machine<select id="bed" data-key="bed" title="Print bed size"><option value="180">180 × 180 · A1 mini, Prusa MINI</option><option value="220">220 × 220 · Ender 3</option><option value="250">250 × 210 · Prusa MK4</option><option value="256">256 × 256 · Bambu X1, P1, A1</option><option value="300">300 × 300</option><option value="350">350 × 350</option></select></label>
             <label>Nozzle<input id="nozzle" data-key="nozzle" data-commit="change" type="number" inputmode="decimal" step="0.05" min="0.1" max="1.2" list="nozzleList" title="Nozzle diameter in mm. Pick a common size or type your own."></label>
       <datalist id="nozzleList"><option value="0.2"></option><option value="0.25"></option><option value="0.3"></option><option value="0.4"></option><option value="0.5"></option><option value="0.6"></option><option value="0.8"></option><option value="1"></option></datalist>
-      <label>Layer<input id="layerH" data-key="layerH" data-commit="change" type="number" inputmode="decimal" step="0.01" list="layerList" title="Layer height in mm. Pick a common value or type your own."></label>
-      <label class="chk" title="Variable layer height: thicker layers for the plate, finer layers for labels and frame details"><input type="checkbox" id="dyn" data-key="dyn">Variable</label>
-      <label data-when="dyn">Fine<input id="layerF" data-key="layerF" data-commit="change" type="number" inputmode="decimal" step="0.01" list="layerFList" title="Layer height used from the top of the plate upward"></label>
-      <datalist id="layerList"></datalist><datalist id="layerFList"></datalist>
+      <label>Layer<input id="layerH" data-key="layerH" data-commit="change" type="number" inputmode="decimal" step="any" min="0.005" title="Layer height in mm. Type any value."></label>
+      <label class="chk" title="Dynamic layer height: dimensions are not tied to whole layers and the layer height is not checked against the nozzle"><input type="checkbox" id="dyn" data-key="dyn">Dynamic</label>
     </div>
     <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
     <button class="btn" id="printOpen" type="button">Print guide</button>
@@ -373,7 +372,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
     <section class="statuses hue-labels" aria-labelledby="statusesTitle">
       <div class="st-head">
         <h2 id="statusesTitle"><span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg></span>Statuses</h2>
-        <p class="hint">Click one to show it on the sign. Type <span class="mono">|</span> for a line break.</p>
+        <p class="hint">Click one to show it on the sign. Press <span class="mono">Enter</span> or type <span class="mono">|</span> for a line break.</p>
         <div class="st-actions">
           <select id="presetSel" aria-label="Replace the statuses with a preset set"><option value="">Load a preset…</option></select>
           <button class="btn small" id="addStatus" type="button">
@@ -717,29 +716,10 @@ function createEngine(wasm) {
     return font._cap;
   }
   const advWidth = (font, str) => font.advance(str);
-  function lineOptions(font, text, single) {
-    if (text.includes('|')) return [text.split('|').map((s) => s.trim()).filter(Boolean)];
-    const words = text.split(/\s+/).filter(Boolean);
-    const opts = [[words.join(' ')]];
-    if (single) return opts;
-    const wid = (arr) => Math.max(...arr.map((l) => advWidth(font, l)));
-    if (words.length >= 2) {
-      let best = null;
-      for (let i = 1; i < words.length; i++) {
-        const c = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
-        if (!best || wid(c) < wid(best)) best = c;
-      }
-      opts.push(best);
-    }
-    if (words.length >= 3) {
-      let best = null;
-      for (let i = 1; i < words.length - 1; i++) for (let j = i + 1; j < words.length; j++) {
-        const c = [words.slice(0, i).join(' '), words.slice(i, j).join(' '), words.slice(j).join(' ')];
-        if (!best || wid(c) < wid(best)) best = c;
-      }
-      opts.push(best);
-    }
-    return opts;
+  // Line breaks are part of the design: only an explicit | splits the text.
+  function lineOptions(font, text) {
+    if (text.includes('|')) return [text.split('|').map((x) => x.trim()).filter(Boolean)];
+    return [[text.split(/\s+/).filter(Boolean).join(' ')]];
   }
   // Fit text into a bw x bh box. Returns a CrossSection centred on the origin.
   function fitText(font, text, bw, bh, maxCap, single = false) {
@@ -1175,7 +1155,18 @@ const FONT_FAMILIES = {
   marker: { label: 'Permanent Marker', pkg: 'permanent-marker', ver: '5.3.0', w: 400, fb: 'sans' },
 };
 const FONT_VERSIONS = { '': '5.3.0', tc: '5.3.1', jp: '5.3.1', kr: '5.3.1', hebrew: '5.3.0', thai: '5.3.0' };
-const PRESETS = [
+// Presets ship with their line breaks: texts over 9 characters with spaces are split in two as evenly as possible.
+const withBreak = (t) => {
+  const words = t.split(' ');
+  if (t.length <= 9 || words.length < 2) return t;
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const a = words.slice(0, i).join(' '), b = words.slice(i).join(' ');
+    if (!best || Math.max(a.length, b.length) < best.w) best = { t: a + '|' + b, w: Math.max(a.length, b.length) };
+  }
+  return best.t;
+};
+const PRESETS_RAW = [
   { name: 'Office classic', list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
   { name: 'Hybrid team', list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
   { name: 'Deep work', list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
@@ -1189,6 +1180,7 @@ const PRESETS = [
   { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['通話中', 'headset'], ['請勿打擾', 'dnd']] },
   { name: '日本語', list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
+const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
   ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
   ['STEP OUT', 'pin'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
@@ -1202,7 +1194,7 @@ const EXTRA_STATUSES = [
 ];
 const STATUS_SETS = (() => {
   const seen = new Set(), all = [];
-  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES]) {
+  for (const [text, icon] of [...PRESETS.flatMap((p) => p.list), ...EXTRA_STATUSES.map(([t, i]) => [withBreak(t), i])]) {
     if (!seen.has(text + '|' + icon)) { seen.add(text + '|' + icon); all.push({ text, icon }); }
   }
   const order = [...new Set(all.map((x) => x.icon))];
@@ -1219,7 +1211,7 @@ const DEFAULTS = {
   current: 0, view: 'assembled', page: 'plate', dims: true,
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
-  nozzle: 0.4, layerH: 0.2, dyn: false, layerF: 0.1, hcap: 6.5,
+  nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 6.5,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 3, marginH: 1.5, pad: 2.4, chamfer: true,
   mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
@@ -1234,10 +1226,10 @@ const SLIDERS = {
   width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
   height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
   thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, layers: true, out: mm() },
-  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, fine: true, out: mm() },
+  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
-  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, fine: true, out: mm() },
+  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
   tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
   magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, out: mm() },
@@ -1251,24 +1243,15 @@ const SLIDERS = {
 const NOZZLES = [0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8, 1];
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 const FLOORS = { cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2 };
-const LAYERS = [0.05, 0.08, 0.1, 0.12, 0.15, 0.16, 0.2, 0.24, 0.25, 0.28, 0.3, 0.32, 0.36, 0.4, 0.45, 0.5, 0.6];
-const layerOptions = (n) => LAYERS.filter((l) => l >= n * 0.25 - 1e-9 && l <= n * 0.75 + 1e-9);
-// Typed layer heights are allowed anywhere from 25% to 75% of the nozzle; the fine layer is anything up to the main layer.
-const layerRange = (n) => ({ lo: Math.max(0.04, rnd(n * 0.25)), hi: rnd(n * 0.75) });
-function normalizePrinter(s) {
-  const { lo, hi } = layerRange(s.nozzle);
-  s.layerH = Math.min(hi, Math.max(lo, Math.round((+s.layerH || 0.2) * 100) / 100));
-  s.layerF = Math.min(s.layerH, Math.max(0.04, Math.round((+s.layerF || 0.1) * 100) / 100));
-}
-// Heights that sit on the fine layers (relief, rail) use the fine layer when variable layers are on.
-const layerFor = (f, s) => (f.fine && s.dyn ? s.layerF : s.layerH);
-const nearest = (list, v) => list.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
+// Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
+const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
+function normalizePrinter(s) { s.layerH = Math.min(5, Math.max(0.005, Math.round((+s.layerH || 0.2) * 1000) / 1000)); }
 function limits(k, s = state) {
-  const f = SLIDERS[k], L = layerFor(f, s);
+  const f = SLIDERS[k], L = s.layerH;
   let { min, max, step } = f;
   if (f.nozzleMin) min = Math.max(min, f.nozzleMin * s.nozzle);
-  if (f.layers) { step = L; min = Math.ceil(min / L - 1e-9) * L; max = Math.floor(max / L + 1e-9) * L; }
+  if (f.layers && !s.dyn) { step = L; min = Math.ceil(min / L - 1e-9) * L; max = Math.floor(max / L + 1e-9) * L; }
   else min = Math.ceil(min / step - 1e-9) * step;
   if (max < min) max = min;
   return { min: rnd(min), max: rnd(max), step: rnd(step) };
@@ -1357,7 +1340,6 @@ function sanitize(s) {
   for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
   if (Number.isFinite(+s.nozzle)) out.nozzle = Math.min(1.2, Math.max(0.1, Math.round(+s.nozzle * 100) / 100));
   if (Number.isFinite(+s.layerH)) out.layerH = +s.layerH;
-  if (Number.isFinite(+s.layerF)) out.layerF = +s.layerF;
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
   for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = freeClamp(k, +s[k]);
@@ -1846,7 +1828,7 @@ function saveBlob(blob, name) {
 }
 
 // Files in print orientation. Base body and labels share one offset so they line up as a two-part object.
-const layerFine = () => (state.dyn ? state.layerF : state.layerH);
+const layerFine = () => state.layerH;
 function exportFiles() {
   if (!result) return [];
   const { parts, info } = result;
@@ -2152,6 +2134,7 @@ cardsEl.addEventListener('input', (e) => {
   changed();
 });
 cardsEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.dataset.role === 'text') { e.preventDefault(); e.target.setRangeText('|', e.target.selectionStart, e.target.selectionEnd, 'end'); e.target.dispatchEvent(new Event('input', { bubbles: true })); return; }
   if (e.key === 'ArrowDown' && e.target.dataset.role === 'text') { e.preventDefault(); openSetPicker(e.target.nextElementSibling, +e.target.dataset.idx); return; }
   if (e.target.dataset.role !== 'show') return;
   const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
@@ -2165,7 +2148,7 @@ function openSetPicker(btn, idx) {
   setFor = { btn, idx };
   const st = state.statuses[idx];
   setPop.innerHTML = STATUS_SETS.map((x, k) => `<button type="button" role="option" data-k="${k}" aria-selected="${x.text === st.text && x.icon === st.icon}">${svgIcon(x.icon)}<span></span></button>`).join('');
-  $$('button span', setPop).forEach((sp, k) => { sp.textContent = STATUS_SETS[k].text; });
+  $$('button span', setPop).forEach((sp, k) => { sp.textContent = STATUS_SETS[k].text.replace(/\|/g, ' '); });
   setPop.hidden = false;
   const r = btn.getBoundingClientRect(), pw = setPop.offsetWidth, ph = setPop.offsetHeight;
   setPop.style.left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.right - pw)) + 'px';
@@ -2251,14 +2234,6 @@ function renderPalettes() {
 // Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
 function syncControls() {
-  const common = layerOptions(state.nozzle), { lo, hi } = layerRange(state.nozzle);
-  if ($('#layerList').dataset.for !== String(state.nozzle) + '|' + state.layerH) {
-    $('#layerList').innerHTML = common.map((l) => `<option value="${l}"></option>`).join('');
-    $('#layerFList').innerHTML = common.filter((l) => l <= state.layerH).map((l) => `<option value="${l}"></option>`).join('');
-    $('#layerList').dataset.for = String(state.nozzle) + '|' + state.layerH;
-  }
-  Object.assign($('#layerH'), { min: lo, max: hi });
-  Object.assign($('#layerF'), { min: 0.04, max: state.layerH });
   for (const k of Object.keys(SLIDERS)) {
     const el = $(`#${k}`);
     if (el) { const l = limits(k); el.min = l.min; el.max = l.max; el.step = l.step; }
@@ -2280,14 +2255,14 @@ function syncControls() {
 function setKey(k, raw, free) {
   let v = raw;
   if (SLIDERS[k]) { v = +raw; if (!Number.isFinite(v)) { syncControls(); return; } v = free ? freeClamp(k, v) : clampSnap(k, v); }
-  else if (k === 'nozzle' || k === 'layerH' || k === 'layerF' || typeof CHOICES[k]?.[0] === 'number') { v = +raw; if (!Number.isFinite(v)) { syncControls(); return; } }
+  else if (k === 'nozzle' || k === 'layerH' || typeof CHOICES[k]?.[0] === 'number') { v = +raw; if (!Number.isFinite(v)) { syncControls(); return; } }
   // switching to manual starts from the size the auto-fit last produced
   if (k === 'sizeMode' && v === 'manual' && result && result.info.auto) {
     state.width = Math.round(result.info.plateW * 10) / 10;
     state.height = Math.round(result.info.plateH * 10) / 10;
   }
   state[k] = v;
-  if (k === 'nozzle' || k === 'layerH' || k === 'layerF' || k === 'dyn') {
+  if (k === 'nozzle' || k === 'layerH' || k === 'dyn') {
     normalizePrinter(state);
   }
   syncControls();
@@ -2358,6 +2333,7 @@ function updateReadout() {
   $('#spec').innerHTML = `Plate <b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)} · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
     + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
   const warns = [...i.warnings];
+  if (!state.dyn) { const { lo, hi } = layerRange(state.nozzle); if (state.layerH < lo - 1e-6 || state.layerH > hi + 1e-6) warns.push(`A ${state.layerH} mm layer is outside the usual ${lo}–${hi} mm for a ${state.nozzle} mm nozzle (25–75% of its width). Turn on Dynamic to skip this check.`); }
   if (textMissing.length) warns.unshift(`These characters have no printable outline here and were skipped: ${[...new Set(textMissing)].join(' ')}. Arabic and Indic scripts need text shaping, which this page does not do.`);
   if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the size or pick a larger bed.`);
   $('#warnings').innerHTML = '';
@@ -2387,7 +2363,7 @@ function renderExport() {
     i.raised
       ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
-    state.dyn ? `<b>Variable layer height:</b> use <span class="mono">${state.layerH} mm</span> layers up to <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the plate) and <span class="mono">${state.layerF} mm</span> layers above it (labels and rails). In your slicer add a height range modifier, or use adaptive layers with these limits.` : null,
+    state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     `<b>Assemble:</b> slide the frame into the track from the left end (the end with the small hole), then press in the stop pin.`,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
     state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
