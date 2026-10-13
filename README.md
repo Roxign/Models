@@ -10,7 +10,7 @@ The page lets you design the sign in your browser and download print-ready STL f
 
 - **Statuses:** 2–6 labels with your own text and 15 icons (meeting, call, focus, lunch, remote, travel and more), or start from a preset set.
 - **Shape:** rounded, pill, badge, ticket, cloud, speech bubble, scallop, wave or arch.
-- **Size:** width, height and plate thickness, with a check against your printer's bed size.
+- **Size:** by default the plate fits itself to your text at the letter height you choose. You can also set width and height by hand. Either way it's checked against your printer's bed size.
 - **Labels and frame:** layout, typeface, raised or engraved text, optional header text, frame bar width, window corners and slide clearance.
 - **Mounting:** flat back for tape, magnet pockets, screw holes or desk-stand feet.
 
