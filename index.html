@@ -92,6 +92,15 @@ button { cursor: pointer; }
 .vp-bottom { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; flex-wrap: wrap; }
 .vp-hint, .vp-dims { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; }
 .vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
+.vp-tools { display: flex; gap: 6px; }
+.icon-btn[aria-pressed="true"] { color: var(--plate); border-color: color-mix(in srgb, var(--plate) 55%, transparent); background: color-mix(in srgb, var(--plate-soft) 60%, var(--panel)); }
+.dim-layer { position: absolute; top: 0; left: 0; pointer-events: none; }
+.dim {
+  font-family: var(--font-mono); font-size: 11px; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 3px 6px; border-radius: 5px; color: var(--plate); background: color-mix(in srgb, var(--panel) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--plate) 45%, transparent);
+}
+.dim.win { color: var(--frame); border-color: color-mix(in srgb, var(--frame) 50%, transparent); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; background: color-mix(in srgb, var(--stage) 88%, transparent); color: var(--muted); }
 .overlay strong { display: block; color: var(--ink); font-family: var(--font-display); font-stretch: 112%; font-size: 15px; margin-bottom: 4px; }
 .error-toast {
@@ -284,9 +293,14 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
           <button type="button" role="radio" data-value="assembled">Assembled</button>
           <button type="button" role="radio" data-value="print">Print plate</button>
         </div>
+        <div class="vp-tools">
+        <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>
+        </button>
         <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
         </button>
+        </div>
       </div>
       <div class="vp-bottom">
         <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
@@ -339,6 +353,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 // ==ENGINE-BEGIN==
 // Geometry engine: builds watertight solids with Manifold. Units are millimetres.
@@ -1017,7 +1032,7 @@ function createEngine(wasm) {
           feet: feet.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, xPin, pinH,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, xPin, pinH,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, stand, warnings, pitch, plateW: W, plateH: H, auto,
         },
       };
@@ -1067,7 +1082,7 @@ const PALETTES = [
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
-  current: 0, view: 'assembled', page: 'plate',
+  current: 0, view: 'assembled', page: 'plate', dims: true,
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
   layout: 'stack', font: 'helvetiker', caps: true, uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   frame: 4.5, winR: 2, railH: 3.5, tol: 0.25, arrows: true, chamfer: true,
@@ -1164,7 +1179,7 @@ function sanitize(s) {
   if (!s || typeof s !== 'object') return out;
   for (const k of Object.keys(RANGES)) if (Number.isFinite(+s[k])) out[k] = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +s[k]));
   for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
-  for (const k of ['caps', 'uniform', 'arrows', 'chamfer']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  for (const k of ['caps', 'uniform', 'arrows', 'chamfer', 'dims']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
   for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
   if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
@@ -1200,6 +1215,9 @@ renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 viewportEl.prepend(renderer.domElement);
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.className = 'dim-layer';
+renderer.domElement.after(labelRenderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
@@ -1244,9 +1262,12 @@ let needsRender = true;
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const requestRender = () => { needsRender = true; };
 
+const dimMat = new THREE.LineBasicMaterial({ color: 0x24768a, depthTest: false, transparent: true, opacity: 0.9 });
 function readStageColor() {
   const c = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() || '#D8DDE3';
   scene.background = new THREE.Color(c);
+  const plateHue = getComputedStyle(document.documentElement).getPropertyValue('--plate').trim();
+  if (plateHue) dimMat.color.set(plateHue);
   requestRender();
 }
 readStageColor();
@@ -1269,6 +1290,54 @@ function geometryFrom(mesh, transform) {
   if (out !== g) g.dispose();
   return out;
 }
+// Dimension lines: CAD-style extension lines and 45° ticks, drawn on top of the model, with HTML labels.
+const dimRefs = [];
+function dimLabel(text, cls, pos, parent) {
+  const el = document.createElement('div');
+  el.className = 'dim ' + cls;
+  el.textContent = text;
+  const o = new CSS2DObject(el);
+  o.position.set(...pos);
+  parent.add(o);
+  return o;
+}
+function addDimensions(info) {
+  const { ox0: x0, ox1: x1, oy0: y0, oy1: y1, zt } = info;
+  const W = x1 - x0, H = y1 - y0, off = Math.max(7, Math.min(W, H) * 0.16), t = 1.4, z = 0.2, pts = [];
+  const seg = (a, b) => pts.push(...a, ...b);
+  const tick = (x, y, zz = z) => seg([x - t, y - t, zz], [x + t, y + t, zz]);
+  // width, above the plate
+  const yd = y1 + off;
+  seg([x0, y1 + 1.5, z], [x0, yd + 2.5, z]); seg([x1, y1 + 1.5, z], [x1, yd + 2.5, z]);
+  seg([x0, yd, z], [x1, yd, z]); tick(x0, yd); tick(x1, yd);
+  // height, left of the plate
+  const xd = x0 - off;
+  seg([x0 - 1.5, y0, z], [xd - 2.5, y0, z]); seg([x0 - 1.5, y1, z], [xd - 2.5, y1, z]);
+  seg([xd, y0, z], [xd, y1, z]); tick(xd, y0); tick(xd, y1);
+  // depth with the frame, at the right end
+  const xz = x1 + off * 0.6, ym = info.yc;
+  seg([x1 + 1, ym, 0], [xz + 2, ym, 0]); seg([x1 + 1, ym, zt], [xz + 2, ym, zt]);
+  seg([xz, ym, 0], [xz, ym, zt]);
+  seg([xz - t, ym, -t], [xz + t, ym, t]); seg([xz - t, ym, zt - t], [xz + t, ym, zt + t]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const lines = new THREE.LineSegments(g, dimMat);
+  lines.renderOrder = 10;
+  signGroup.add(lines);
+  dimRefs.length = 0;
+  dimRefs.push(lines,
+    dimLabel(`${fmt(W)} mm`, 'plate', [(x0 + x1) / 2, yd, z], signGroup),
+    dimLabel(`${fmt(H)} mm`, 'plate', [xd, (y0 + y1) / 2, z], signGroup),
+    dimLabel(`${fmt(zt)} mm deep`, 'plate', [xz + 2, ym, zt / 2], signGroup),
+    // the window size rides on the frame's bottom bar
+    dimLabel(`window ${fmt(info.ww)} × ${fmt(info.wh)}`, 'win', [0, info.yc - info.wh / 2 - 2.6, zt + 0.3], sliderMesh));
+  showDimensions();
+}
+function showDimensions() {
+  for (const o of dimRefs) o.visible = state.dims;
+  requestRender();
+}
+
 function makeMesh(geo, mat) {
   const m = new THREE.Mesh(geo, mat);
   m.castShadow = true;
@@ -1311,6 +1380,7 @@ function updateScene(res, refit) {
   sliderTarget = info.cells[state.current] ?? 0;
   sliderMesh.position.x = sliderTarget;
   signGroup.add(sliderMesh);
+  addDimensions(info);
 
   if (info.stand) {
     signGroup.rotation.set(-info.stand.tilt * Math.PI / 180, 0, 0);
@@ -1442,6 +1512,7 @@ function resize() {
   const r = viewportEl.getBoundingClientRect();
   const w = Math.max(1, Math.floor(r.width)), h = Math.max(1, Math.floor(r.height));
   renderer.setSize(w, h, false);
+  labelRenderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   // re-frame when the viewport changes a lot (first layout, rotation, panel resize)
@@ -1467,7 +1538,7 @@ function loop() {
     if (Math.abs(dx) > 0.01) { sliderMesh.position.x += reduceMotion ? dx : dx * 0.18; moving = true; }
     else if (dx !== 0) { sliderMesh.position.x = sliderTarget; moving = true; }
   }
-  if (moving || needsRender) { renderer.render(scene, camera); needsRender = false; }
+  if (moving || needsRender) { renderer.render(scene, camera); labelRenderer.render(scene, camera); needsRender = false; }
 }
 
 // drag the frame along its track
@@ -1950,6 +2021,7 @@ function syncControls() {
   for (const p of $$('#settings [role="tabpanel"]')) p.hidden = p.id !== `page-${state.page}`;
   $('#mountHint').textContent = MOUNT_HINTS[state.mount];
   $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
+  $('#dimsToggle').setAttribute('aria-pressed', String(state.dims));
 }
 function setKey(k, raw) {
   let v = raw;
@@ -1988,6 +2060,12 @@ $('#viewSeg').addEventListener('click', (e) => {
   saveState();
 });
 $('#resetView').addEventListener('click', fitCamera);
+$('#dimsToggle').addEventListener('click', () => {
+  state.dims = !state.dims;
+  syncControls();
+  showDimensions();
+  saveState();
+});
 
 function applyColors() {
   mats.base.color.set(state.colBase);
