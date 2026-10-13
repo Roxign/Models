@@ -35,7 +35,7 @@
   --accent: #2346D6; --accent-ink: #FFFFFF; --accent-soft: rgba(35, 70, 214, 0.10); --stage: #D8DDE3;
   --warn: #8A4F00; --warn-bg: #FFF0D4; --good: #16714A; --danger: #B42318;
   --plate: #24768A; --plate-soft: rgba(36, 118, 138, 0.10); --labels: #7448C0; --labels-soft: rgba(116, 72, 192, 0.10);
-  --frame: #B8521B; --frame-soft: rgba(208, 98, 34, 0.11); --name: #A23E78; --name-soft: rgba(162, 62, 120, 0.10); --print: #2B7448; --print-soft: rgba(43, 116, 72, 0.10);
+  --frame: #B8521B; --frame-soft: rgba(208, 98, 34, 0.11); --name: #A23E78; --name-soft: rgba(162, 62, 120, 0.10); --shape: #8A6A12; --shape-soft: rgba(138, 106, 18, 0.11); --print: #2B7448; --print-soft: rgba(43, 116, 72, 0.10);
   --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
   --font-body: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -47,7 +47,7 @@
     --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
     --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
     --plate: #6CC3D5; --plate-soft: rgba(108, 195, 213, 0.13); --labels: #B99BF2; --labels-soft: rgba(185, 155, 242, 0.13);
-    --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
+    --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
     color-scheme: dark;
   }
 }
@@ -56,7 +56,7 @@
   --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
   --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
   --plate: #6CC3D5; --plate-soft: rgba(108, 195, 213, 0.13); --labels: #B99BF2; --labels-soft: rgba(185, 155, 242, 0.13);
-  --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
+  --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
   color-scheme: dark;
 }
 
@@ -238,6 +238,7 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .hue-labels { --hue: var(--labels); --hue-soft: var(--labels-soft); }
 .hue-frame { --hue: var(--frame); --hue-soft: var(--frame-soft); }
 .hue-name { --hue: var(--name); --hue-soft: var(--name-soft); }
+.hue-shape { --hue: var(--shape); --hue-soft: var(--shape-soft); }
 .hue-print { --hue: var(--print); --hue-soft: var(--print-soft); }
 .sec-head {
   display: flex; align-items: center; gap: 10px; margin: 0 -18px 2px; padding: 10px 14px 10px 14px;
@@ -265,7 +266,7 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .tab:hover .sec-tag { opacity: 0.8; }
 .tab[aria-selected="true"] { color: var(--hue); background: var(--hue-soft); border-bottom-color: var(--hue); }
 .tab[aria-selected="true"] .sec-tag { opacity: 1; }
-.page { padding: 6px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.page { padding: 14px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
 .color-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; padding: 8px 0 14px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 550; }
 .color-row input { width: 30px; height: 30px; padding: 0; border: 2px solid var(--panel); border-radius: 50%; box-shadow: 0 0 0 1px var(--line); cursor: pointer; background: none; }
 .color-row input::-webkit-color-swatch-wrapper { padding: 0; }
@@ -306,6 +307,9 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 .dlg-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
 .pal-pop { position: absolute; z-index: 5; top: 50px; right: 10px; width: min(300px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2); }
 .pal-pop strong { font-size: 13px; }
+.pal-colors { display: flex; flex-direction: column; }
+.pal-colors .color-row { padding: 6px 0; margin: 0; cursor: pointer; }
+.pal-colors .color-row:last-of-type { border-bottom: 0; }
 
 /* landscape windows: the app fills the screen, the preview takes all spare height and the settings scroll on their own */
 @media (min-width: 981px) and (max-height: 1100px) {
@@ -424,7 +428,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
           <button type="button" role="radio" data-value="print">Print plate</button>
         </div>
         <div class="vp-tools">
-        <button class="icon-btn" id="palToggle" title="Preview colors" aria-label="Preview colors" aria-expanded="false" aria-controls="palPop">
+        <button class="icon-btn" id="palToggle" title="Preview colors: plate, lettering, frame and name" aria-label="Preview colors" aria-expanded="false" aria-controls="palPop">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.6-2.2-.4-1.3.4-2.3 1.7-2.3H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>
         </button>
         <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="false">
@@ -437,8 +441,15 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       </div>
       <div class="pal-pop" id="palPop" hidden>
         <strong>Preview colors</strong>
+        <div class="pal-colors">
+          <label class="color-row">Plate<input type="color" id="colBase" data-key="colBase"></label>
+          <label class="color-row" data-when="status">Status lettering<input type="color" id="colLabel" data-key="colLabel"></label>
+          <label class="color-row" data-when="status">Frame<input type="color" id="colSlider" data-key="colSlider"></label>
+          <label class="color-row" data-when="name">Name text<input type="color" id="colName" data-key="colName"></label>
+          <label class="color-row" data-when="tag">Name tag<input type="color" id="colTag" data-key="colTag"></label>
+        </div>
         <div class="palette-row" id="palettes"></div>
-        <p class="hint">Set one part with the color dot at the top of its tab. Colors only change the preview; STL files have no color.</p>
+        <p class="hint">Colors only change the preview and the 3MF; STL files have no color.</p>
       </div>
       <div class="vp-bottom">
         <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
@@ -1141,6 +1152,8 @@ function createEngine(wasm) {
       const T = lz(p.thick, 2);
       const tol = p.tol, raised = p.relief === 'raised';
       const Lh = raised ? lz(p.reliefH) : 0, engr = raised ? 0 : Math.min(lz(p.reliefH), T - lz(1));
+      // the name has its own thickness (raised) or depth (engraved)
+      const Ln = raised ? lz(p.nameReliefH ?? p.reliefH) : 0, engrN = raised ? 0 : Math.min(lz(p.nameReliefH ?? p.reliefH), T - lz(1));
       const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fb = p.frame, fbx = p.frame, play = 0.6, proud = lz(p.proud ?? 0.8, 0);
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
@@ -1178,7 +1191,7 @@ function createEngine(wasm) {
 
       // labels
       const cw = ww - 2 * pad, ch = wh - 2 * pad;
-      const labelParts = [];
+      const labelParts = [], nameParts = [];
       let contents = statusOn ? p.statuses.map((st) => cellContent(st, font, cw, ch, p)) : [];
       const caps = contents.map((c) => c.cap).filter(Boolean);
       if (p.uniform && caps.length > 1 && Math.max(...caps) - Math.min(...caps) > 0.05) {
@@ -1198,12 +1211,12 @@ function createEngine(wasm) {
         if (tb.cs) {
           let k = 1, hcs = tb.cs.translate([0, my]);
           for (let i = 0; i < 12 && hcs.offset(1.4, 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.9; hcs = tb.cs.scale(k).translate([0, my]); }
-          labelParts.push(hcs);
+          nameParts.push(hcs);
           hdrCap = tb.cap * k;
           capMin = Math.min(capMin, hdrCap);
         }
       }
-      const labelsCS = union(labelParts);
+      const labelsCS = union(labelParts), nameCS = union(nameParts);
 
       // base body: plate + dovetail rails, closed at the left end and open at the right, + mounting
       const z0 = 0, z1 = T + Rh, chf = 0.8;
@@ -1344,10 +1357,10 @@ function createEngine(wasm) {
             hdrCap = tb.cap * k;
             capMin = Math.min(capMin, tb.cap * k);
             if (raised) {
-              tagText = tcs.extrude(Lh).translate([0, 0, zS + tt]);
-              tagAll = tagBody.add(tcs.extrude(Lh + 0.02).translate([0, 0, zS + tt - 0.02]));
+              tagText = tcs.extrude(Ln).translate([0, 0, zS + tt]);
+              tagAll = tagBody.add(tcs.extrude(Ln + 0.02).translate([0, 0, zS + tt - 0.02]));
             } else {
-              const dep = Math.min(lz(p.reliefH), lzDown(tt * 0.6));
+              const dep = Math.min(lz(p.nameReliefH ?? p.reliefH), lzDown(tt * 0.6));
               tagBody = tagBody.subtract(tcs.extrude(dep + 1).translate([0, 0, zS + tt - dep]));
               tagAll = tagBody;
             }
@@ -1358,19 +1371,20 @@ function createEngine(wasm) {
         const zTop = body.boundingBox().max[2], cT = Math.min(lz(p.bevel), lzDown(T * 0.8)), cR = zTop - T > LH ? Math.min(lz(p.bevel), lzDown((zTop - T) * 0.8)) : 0;
         body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR, (h) => (dyn ? 3 : Math.max(1, Math.round(h / LH)))));
       }
-      let labels = null, base = body;
-      if (labelsCS) {
-        if (raised) {
-          labels = labelsCS.extrude(Lh).translate([0, 0, T]);
-          base = body.add(labelsCS.extrude(Lh + 0.02).translate([0, 0, T - 0.02]));
-        } else {
-          body = body.subtract(labelsCS.extrude(engr + 1).translate([0, 0, T - engr]));
-          base = body;
-        }
+      let labels = null, nameText = null, base = body;
+      if (raised) {
+        if (labelsCS) labels = labelsCS.extrude(Lh).translate([0, 0, T]);
+        if (nameCS) nameText = nameCS.extrude(Ln).translate([0, 0, T]);
+        const extra = [labelsCS && labelsCS.extrude(Lh + 0.02).translate([0, 0, T - 0.02]), nameCS && nameCS.extrude(Ln + 0.02).translate([0, 0, T - 0.02])].filter(Boolean);
+        if (extra.length) base = body.add(Manifold.union(extra));
+      } else {
+        if (labelsCS) body = body.subtract(labelsCS.extrude(engr + 1).translate([0, 0, T - engr]));
+        if (nameCS) body = body.subtract(nameCS.extrude(engrN + 1).translate([0, 0, T - engrN]));
+        base = body;
       }
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const ztS = T + Rh + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const ztS = T + Rh + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1437,6 +1451,7 @@ function createEngine(wasm) {
           base: meshData(base),
           body: meshData(body),
           labels: labels ? meshData(labels) : null,
+          nameText: nameText ? meshData(nameText) : null,
           slider: slider ? meshData(slider) : null,
           tag: tagAll ? meshData(tagAll) : null,
           tagBody: tagAll && tagText ? meshData(tagBody) : null,
@@ -1445,7 +1460,7 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, engr, raised, zt, zb, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, pitch, plateW: W, plateH: H, auto,
         },
       };
@@ -1596,14 +1611,14 @@ const PALETTES = [
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
-  current: 0, view: 'assembled', page: 'plate', showDims: false,
+  current: 0, view: 'assembled', page: 'shape', showDims: false,
   shape: 'rail', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 1.2, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 6.5,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railLipT: 3, railLipH: 10, hookDrop: 5, hookW: 20, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -1615,7 +1630,8 @@ const SLIDERS = {
   width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
   height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
   thick: { label: 'Plate thickness', min: 0.8, max: 6, step: 0.2, layers: true, out: mm() },
-  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
+  reliefH: { label: 'Status text thickness', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
+  nameReliefH: { label: 'Name text thickness', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
   railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
@@ -1679,13 +1695,13 @@ const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm
 const SHAPE_NEUTRAL = { thick: 3, marginV: 0, marginH: 0 };
 const SHAPE_DEFAULTS = {
   rail: { thick: 1.2, marginV: 0, marginH: 0 },
-  classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#B5893A', colLabel: '#2A1E10', colSlider: '#6E4A1F', colTag: '#6E4A1F' },
+  classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#B5893A', colLabel: '#2A1E10', colSlider: '#6E4A1F', colTag: '#6E4A1F', colName: '#2A1E10' },
   honeycomb: { marginV: 16, marginH: 12 },
 };
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'name', 'frame'], nameMode: ['off', 'plate', 'tag'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -1715,14 +1731,15 @@ const WHEN = {
   dyn: (s) => !!s.dyn,
 };
 
-// The settings panel. Sections with tab: true become pages behind Plate | Labels | Frame tabs;
-// the rest render as cards below. hue: the page's color; color: the part's preview color.
+// The settings panel. Sections with tab: true become pages behind the Shape | Plate | Status | Name tabs;
+// the rest render as cards below. hue: the page's color. Preview colors live in their own popover on the 3D view.
 const SECTIONS = [
-  { tab: true, title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
-    { slider: 'bevel' },
-    { group: 'Shape & mounting', items: [
+  { tab: true, title: 'Shape', hue: 'shape', glyph: '<path d="M12 3 21 9v6l-9 6-9-6V9z"/>', items: [
+    { group: 'Shape', items: [
       { html: 'shapes' },
-      { seg: 'mount', label: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop'], ['cubicle', 'Cubicle hook'], ['cubrail', 'Cubicle rail']] },
+    ] },
+    { group: 'Mounting', items: [
+      { seg: 'mount', label: 'Mount', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop'], ['cubicle', 'Cubicle hook'], ['cubrail', 'Cubicle rail']] },
       { hint: '', id: 'mountHint' },
       { slider: 'magD', when: 'magnet' },
       { slider: 'magH', when: 'magnet' },
@@ -1744,6 +1761,9 @@ const SECTIONS = [
       { slider: 'hookW', when: 'hooked' },
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
     ] },
+  ] },
+  { tab: true, title: 'Plate', hue: 'plate', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
+    { slider: 'bevel' },
     { group: 'Size', items: [
       { fit: true },
       { slider: 'width' },
@@ -1756,7 +1776,7 @@ const SECTIONS = [
       { slider: 'thick' },
     ] },
   ] },
-  { tab: true, title: 'Status', hue: 'labels', color: 'colLabel', colorLabel: 'Lettering color in the preview', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
+  { tab: true, title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
     { check: 'statusOn', label: 'Status track and sliding frame', title: 'The row of statuses with the frame that slides along it. Turn it off for a sign with only a name.' },
     { hint: 'Off: the sign carries only the name from the Name tab.', when: 'nostatus' },
     { group: 'Status labels', when: 'status', items: [
@@ -1767,33 +1787,31 @@ const SECTIONS = [
     ] },
     { group: 'Lettering', items: [
       { select: 'font', label: 'Typeface', options: Object.entries(FONT_FAMILIES).map(([k, v]) => [k, v.label]) },
-      { row: [{ seg: 'relief', label: 'Letters are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
-      { hint: 'Used for the statuses and the name.' },
+      { seg: 'relief', label: 'Letters are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] },
+      { slider: 'reliefH', when: 'status' },
+      { hint: 'Typeface and raised or engraved apply to the name too; the name sets its own thickness on the Name tab.' },
     ] },
-  ] },
-  { tab: true, title: 'Name', hue: 'name', color: 'colTag', colorLabel: 'Name tag color in the preview', glyph: '<path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>', items: [
-    { seg: 'nameMode', label: 'Name', options: [['off', 'Off'], ['plate', 'On the plate', 'Raised or engraved straight on the plate'], ['tag', 'Slide-in tag', 'A separate flat tag that slides into a rail, so the sign can be reused by printing a new tag']] },
-    { group: 'Name', when: 'name', items: [
-      { text: 'header', label: 'Text', placeholder: 'e.g. Alan Chien' },
-      { slider: 'hcap' },
-      { slider: 'tagT', when: 'tag' },
-    ] },
-    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move.', when: 'tag' },
-  ] },
-  { tab: true, title: 'Frame', hue: 'frame', color: 'colSlider', colorLabel: 'Frame color in the preview', glyph: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/>', items: [
-    { hint: 'The frame belongs to the status track, which is off on the Status tab.', when: 'nostatus' },
     { group: 'Frame', when: 'status', items: [
       { slider: 'frame' },
       { slider: 'winR' },
       { slider: 'proud' },
     ] },
-    { group: 'Rail', when: 'status', items: [
+    { group: 'Track', when: 'status', items: [
       { slider: 'railH' },
       { slider: 'tol' },
       { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
     ] },
   ] },
-
+  { tab: true, title: 'Name', hue: 'name', glyph: '<path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>', items: [
+    { seg: 'nameMode', label: 'Name', options: [['off', 'Off'], ['plate', 'On the plate', 'Raised or engraved straight on the plate'], ['tag', 'Slide-in tag', 'A separate flat tag that slides into a rail, so the sign can be reused by printing a new tag']] },
+    { group: 'Name', when: 'name', items: [
+      { text: 'header', label: 'Text', placeholder: 'e.g. Alan Chien' },
+      { slider: 'hcap' },
+      { slider: 'nameReliefH' },
+      { slider: 'tagT', when: 'tag' },
+    ] },
+    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move.', when: 'tag' },
+  ] },
 ];
 
 function sanitize(s) {
@@ -1812,7 +1830,10 @@ function sanitize(s) {
   if (s.nameMode == null) out.nameMode = s.nameRail ? 'tag' : (typeof s.header === 'string' && s.header.trim() ? 'plate' : 'off');
   if (!out.statusOn && out.nameMode === 'off') out.statusOn = true;
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
-  for (const k of ['colBase', 'colLabel', 'colSlider', 'colTag']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
+  for (const k of ['colBase', 'colLabel', 'colSlider', 'colTag', 'colName']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
+  // designs from before the name had its own color and thickness take the status lettering's
+  if (!/^#[0-9a-f]{6}$/i.test(s.colName || '')) out.colName = out.colLabel;
+  if (!Number.isFinite(+s.nameReliefH)) out.nameReliefH = out.reliefH;
   if (!/^#[0-9a-f]{6}$/i.test(s.colTag || '') && /^#[0-9a-f]{6}$/i.test(s.colSlider || '')) out.colTag = s.colSlider;
   if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
     out.statuses = s.statuses.slice(0, 6).map((st) => ({ text: String(st && st.text || '').slice(0, 28), icon: String(st && st.icon || 'none') }));
@@ -1874,6 +1895,7 @@ const mats = {
   label: new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }),
   slider: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }),
   tag: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }),
+  name: new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }),
 };
 const shadowMat = new THREE.ShadowMaterial({ opacity: 0.2 });
 const wall = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), shadowMat);
@@ -2010,11 +2032,12 @@ function updateScene(res, refit) {
 
   signGroup.add(makeMesh(geometryFrom(parts.body), mats.base));
   if (parts.labels) signGroup.add(makeMesh(geometryFrom(parts.labels), mats.label));
+  if (parts.nameText) signGroup.add(makeMesh(geometryFrom(parts.nameText), mats.name));
   // the name tag moves as one piece; it keeps how far it was pulled out across rebuilds
   tagGroup = null;
   if (parts.tag) {
     tagGroup = new THREE.Group();
-    if (parts.tagBody) { tagGroup.add(makeMesh(geometryFrom(parts.tagBody), mats.tag)); tagGroup.add(makeMesh(geometryFrom(parts.tagText), mats.label)); }
+    if (parts.tagBody) { tagGroup.add(makeMesh(geometryFrom(parts.tagBody), mats.tag)); tagGroup.add(makeMesh(geometryFrom(parts.tagText), mats.name)); }
     else tagGroup.add(makeMesh(geometryFrom(parts.tag), mats.tag));
     tagMax = parts.tag.max[0] - parts.tag.min[0] + 4;
     tagGroup.position.x = Math.min(tagOut, tagMax);
@@ -2057,9 +2080,10 @@ function updateScene(res, refit) {
 
   // print plate layout in rows, each centered under the plate and aligned with it: base, then the name tag, then frame, pin and feet
   const bed = state.bed, bedD = bed === 250 ? 210 : bed;
-  const mk = (mesh, mat, xf, overlay, overlayMat) => ({ mesh, mat, xf, overlay, overlayMat });
-  const rows = [[mk(parts.body, mats.base, null, parts.labels, mats.label)]];
-  if (parts.tag) rows.push([parts.tagBody ? mk(parts.tagBody, mats.tag, null, parts.tagText, mats.label) : mk(parts.tag, mats.tag, null)]);
+  // overlays: extra parts that share the main part's coordinates (labels and name on the base, text on the tag)
+  const mk = (mesh, mat, xf, overlays = []) => ({ mesh, mat, xf, overlays: overlays.filter((o) => o[0]) });
+  const rows = [[mk(parts.body, mats.base, null, [[parts.labels, mats.label], [parts.nameText, mats.name]])]];
+  if (parts.tag) rows.push([parts.tagBody ? mk(parts.tagBody, mats.tag, null, [[parts.tagText, mats.name]]) : mk(parts.tag, mats.tag, null)]);
   const small = [...(parts.slider ? [mk(parts.slider, mats.slider, PRINT_XF.slider(info))] : []), ...parts.feet.map((x) => mk(x, mats.base, PRINT_XF.foot())), ...parts.hooks.map((x) => mk(x, mats.base, PRINT_XF.hook()))];
   if (small.length) rows.push(small);
   const placed = [];
@@ -2086,7 +2110,7 @@ function updateScene(res, refit) {
       printGroup.add(m);
     };
     place(q.it.mesh, q.pos, q.it.mat);
-    if (q.it.overlay) place(q.it.overlay, q.it.overlay.pos, q.it.overlayMat);
+    for (const [m, mat] of q.it.overlays) place(m, m.pos, mat);
   }
   const bedMesh = new THREE.Mesh(new THREE.BoxGeometry(bed, 1.5, bedD), new THREE.MeshStandardMaterial({ color: 0x34373c, roughness: 0.85 }));
   bedMesh.position.y = -0.76;
@@ -2343,9 +2367,10 @@ function exportFiles() {
   const baseRef = boundsOf(parts.body.pos);
   const add = (key, name, label, mesh, pos) => files.push({ key, name: `status-slider_${tag}_${name}.stl`, label, mesh, pos });
   add('base', 'base_one-color', 'Base, one color', parts.base, centre(parts.base.pos, baseRef));
-  if (parts.labels) {
+  if (parts.labels || parts.nameText) {
     add('body', 'base_body', 'Base body (multi-color)', parts.body, centre(parts.body.pos, baseRef));
-    add('labels', 'base_labels', 'Labels (multi-color)', parts.labels, centre(parts.labels.pos, baseRef));
+    if (parts.labels) add('labels', 'base_labels', 'Status labels (multi-color)', parts.labels, centre(parts.labels.pos, baseRef));
+    if (parts.nameText) add('nameText', 'base_name', 'Name text (multi-color)', parts.nameText, centre(parts.nameText.pos, baseRef));
   }
   if (parts.slider) add('slider', 'frame_slider', 'Frame slider', parts.slider, centre(printPositions(parts.slider, PRINT_XF.slider(info))));
   if (parts.tag) {
@@ -2366,10 +2391,11 @@ function download3mf() {
   const files = exportFiles();
   if (!files.length) return;
   const by = Object.fromEntries(files.map((x) => [x.key, x]));
-  const mats = [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag]];
-  const groups = [{ name: 'Base', parts: by.labels ? [['Base body', by.body, 0], ['Labels', by.labels, 1]] : [['Base', by.base, 0]] },
+  const mats = [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag], ['Name text', state.colName]];
+  const baseParts = by.body ? [['Base body', by.body, 0], ...(by.labels ? [['Status labels', by.labels, 1]] : []), ...(by.nameText ? [['Name text', by.nameText, 4]] : [])] : [['Base', by.base, 0]];
+  const groups = [{ name: 'Base', parts: baseParts },
     ...(by.slider ? [{ name: 'Frame', parts: [['Frame', by.slider, 2]] }] : []),
-    ...(by.tag ? [{ name: 'Name tag', parts: by.tagBody ? [['Name tag body', by.tagBody, 3], ['Name tag text', by.tagText, 1]] : [['Name tag', by.tag, 3]] }] : []),
+    ...(by.tag ? [{ name: 'Name tag', parts: by.tagBody ? [['Name tag body', by.tagBody, 3], ['Name tag text', by.tagText, 4]] : [['Name tag', by.tag, 3]] }] : []),
     ...files.filter((x) => x.key.startsWith('foot') || x.key.startsWith('hook')).map((x) => ({ name: x.label, parts: [[x.label, x, 0]] }))];
   const size = (g) => { const b = boundsOf(g.parts[0][1].pos); return [b.max[0] - b.min[0], b.max[1] - b.min[1]]; };
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed, gap = 8;
@@ -2412,6 +2438,8 @@ function downloadZip() {
   const i = result.info;
   saveBlob(zipBlob(zfiles), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.zip`);
 }
+// height of the tallest raised text on the base
+const topText = (i) => Math.max(result.parts.labels ? i.Lh : 0, result.parts.nameText ? i.Ln : 0);
 function readmeText() {
   const i = result.info;
   const lines = [
@@ -2423,14 +2451,14 @@ function readmeText() {
     '',
     'Files (already in print orientation, no supports needed)',
     '- base_one-color: plate, rails and labels as one part.',
-    i.raised ? '- base_body + base_labels: load both as ONE object with two parts for a multi-color printer (AMS, MMU). They share coordinates.' : '- Labels are engraved, so the base prints in one color.',
+    i.raised ? `- base_body${result.parts.labels ? ' + base_labels' : ''}${result.parts.nameText ? ' + base_name' : ''}: load them as ONE object with several parts for a multi-color printer (AMS, MMU). They share coordinates.` : '- Labels are engraved, so the base prints in one color.',
     result.parts.slider ? '- frame_slider: printed face-down.' : null,
     result.parts.tag ? '- name_tag: the slide-in name tag, printed flat. Print a new one with another name for each person.' : null,
     state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
     result.parts.hooks.length ? '- cubicle_hook_left / cubicle_hook_right: printed on their side.' : null,
     '',
     'Two colors on a single nozzle',
-    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
+    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + topText(i)).toFixed(2)} mm.${result.parts.nameText && result.parts.labels ? ' The status labels and the name share that color this way; for two text colors use a multi-color printer.' : ''}` : '- Not needed: labels are engraved.',
     i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
     i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
@@ -2490,14 +2518,14 @@ function itemHTML(it) {
   if (it.group) return `<div class="group"${when}><h3 class="sub">${it.group}</h3>${it.items.map(itemHTML).join('')}</div>`;
   if (it.sub) return `<h3 class="sub"${when}>${it.sub}${it.noteId ? ` <small id="${it.noteId}"></small>` : ''}</h3>`;
   if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
-  return { shapes: '<div class="field"><span class="lbl">Shape</span><button type="button" class="shape-btn" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-106 -54 212 108" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
+  return { shapes: '<div class="field"><button type="button" class="shape-btn" aria-label="Shape" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-106 -54 212 108" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
 }
 const tagHTML = (s) => `<span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24">${s.glyph}</svg></span>`;
 function renderPanel() {
   const pages = SECTIONS.filter((s) => s.tab), cards = SECTIONS.filter((s) => !s.tab);
   const tabs = pages.map((s) => `<button type="button" role="tab" class="tab hue-${s.hue}" id="tab-${s.hue}" data-page="${s.hue}" aria-controls="page-${s.hue}">${tagHTML(s)}<span>${s.title}</span></button>`).join('');
   const bodies = pages.map((s) => `<div class="page hue-${s.hue}" role="tabpanel" id="page-${s.hue}" aria-labelledby="tab-${s.hue}">`
-    + `<div class="color-row"><label for="${s.color}">${s.colorLabel || s.title + ' color in the preview'}</label><input type="color" id="${s.color}" data-key="${s.color}"></div>${s.items.map(itemHTML).join('')}</div>`).join('');
+    + `${s.items.map(itemHTML).join('')}</div>`).join('');
   $('#settings').innerHTML = `<div class="pages"><div class="tabs" role="tablist" aria-label="Settings">${tabs}</div>${bodies}</div>`
     + cards.map((s) => `<section class="section"><div class="sec-head"><h2>${s.title}</h2></div>${s.items.map(itemHTML).join('')}</section>`).join('');
 }
@@ -2814,7 +2842,7 @@ function renderPalettes() {
     b.type = 'button';
     b.innerHTML = `<i><b style="background:${p.base}"></b><b style="background:${p.label}"></b><b style="background:${p.slider}"></b></i>&nbsp;${p.name}`;
     b.addEventListener('click', () => {
-      Object.assign(state, { colBase: p.base, colLabel: p.label, colSlider: p.slider, colTag: p.slider });
+      Object.assign(state, { colBase: p.base, colLabel: p.label, colSlider: p.slider, colTag: p.slider, colName: p.label });
       syncControls();
       applyColors();
       saveState();
@@ -2824,7 +2852,7 @@ function renderPalettes() {
 }
 
 // Controls bound with data-key read and write state[key].
-const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider', 'colTag']);
+const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider', 'colTag', 'colName']);
 function syncControls() {
   const fitOn = state.sizeMode === 'auto';
   $('#fit').checked = fitOn;
@@ -2915,6 +2943,7 @@ function applyColors() {
   mats.label.color.set(state.colLabel);
   mats.slider.color.set(state.colSlider);
   mats.tag.color.set(state.colTag);
+  mats.name.color.set(state.colName);
   requestRender();
 }
 function setBuildState(kind, text) {
@@ -2963,7 +2992,7 @@ function renderExport() {
   const steps = [
     `<b>Print</b> every part as exported. They are already oriented for printing and need no supports${result.parts.slider ? '; the frame prints face-down' : ''}.`,
     i.raised
-      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
+      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + topText(i)).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
