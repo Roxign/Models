@@ -1,0 +1,2073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Office Status Slider</title>
+<meta name="description" content="Design a 3D-printable office status sign with a sliding frame, preview it in 3D and download STL files.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  /* Layout: a sticky 3D build window on the left, a scrolling control rail on the right; one column on phones */
+  --bg: #E6E9ED;
+  --panel: #F7F8FA;
+  --soft: #EDF0F3;
+  --ink: #14171B;
+  --muted: #5A636E;
+  --line: #CED4DB;
+  --accent: #2346D6;
+  --accent-ink: #FFFFFF;
+  --accent-soft: rgba(35, 70, 214, 0.10);
+  --stage: #D8DDE3;
+  --warn: #8A4F00;
+  --warn-bg: #FFF0D4;
+  --good: #16714A;
+  --danger: #B42318;
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1114; --panel: #171A1F; --soft: #1E2228; --ink: #E7EAEE; --muted: #9AA3AE; --line: #2A3038;
+    --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
+    --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1114; --panel: #171A1F; --soft: #1E2228; --ink: #E7EAEE; --muted: #9AA3AE; --line: #2A3038;
+  --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
+  --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 14px 16px 10px;
+}
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand svg { flex: none; }
+.brand h1 {
+  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750;
+  font-size: 19px; letter-spacing: -0.01em; text-wrap: balance;
+}
+.brand p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+.top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.build-state {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.build-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
+.build-state[data-state="busy"]::before { background: var(--warn); animation: pulse 0.9s infinite alternate; }
+.build-state[data-state="error"] { color: var(--danger); }
+.build-state[data-state="error"]::before { background: var(--danger); }
+@keyframes pulse { to { opacity: 0.25; } }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  padding: 8px 12px; font-weight: 550; font-size: 13px; line-height: 1.2;
+}
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.small { padding: 6px 9px; font-size: 12px; }
+
+/* ---------- app grid ---------- */
+.app {
+  display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start;
+  padding-inline: 16px; padding-block: 4px 32px; max-width: 1560px; margin: 0 auto;
+}
+.stage-col { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.viewport {
+  position: relative; height: min(64vh, 640px); min-height: 320px;
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--stage);
+}
+.viewport canvas { display: block; width: 100%; height: 100%; }
+.vp-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
+.vp-top > * { pointer-events: auto; }
+.vp-bottom { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; flex-wrap: wrap; }
+.vp-hint, .vp-dims {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+  background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px;
+}
+.vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
+.overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+  background: color-mix(in srgb, var(--stage) 88%, transparent); color: var(--muted);
+}
+.overlay strong { display: block; color: var(--ink); font-family: var(--font-display); font-stretch: 112%; font-size: 15px; margin-bottom: 4px; }
+.error-toast {
+  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); max-width: min(92%, 520px);
+  background: var(--panel); border: 1px solid var(--danger); color: var(--ink); border-radius: 8px;
+  padding: 8px 12px; font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.12);
+}
+
+/* segmented controls */
+.seg { display: inline-flex; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; flex-wrap: wrap; }
+.seg button {
+  border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 550; color: var(--muted);
+}
+.seg button[aria-checked="true"], .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.vp-top .seg { background: color-mix(in srgb, var(--panel) 85%, transparent); }
+.icon-btn {
+  width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px;
+  border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent);
+}
+.icon-btn:hover { border-color: var(--muted); }
+
+/* status bar = the live indicator */
+.statusbar-wrap { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow {
+  font-family: var(--font-display); font-stretch: 118%; font-weight: 700; font-size: 11px;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted);
+}
+.statusbar { display: flex; gap: 6px; flex-wrap: wrap; }
+.statusbar button {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px 8px 10px;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 9px;
+  font-family: var(--font-display); font-stretch: 105%; font-weight: 650; font-size: 12.5px; letter-spacing: 0.02em;
+}
+.statusbar button svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+.statusbar button[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* readout */
+.readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.readout > div { background: var(--panel); padding: 9px 12px; min-width: 0; }
+.readout dt { font-size: 11px; color: var(--muted); margin: 0 0 2px; }
+.readout dd { margin: 0; font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.readout dd.bad { color: var(--danger); }
+.readout dd.good { color: var(--good); }
+.warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.warnings li { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
+
+/* ---------- control rail ---------- */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
+.section { padding: 16px 18px 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+.section:first-child { border-top: 0; }
+.section h2 {
+  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px;
+  letter-spacing: 0.06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.section h2 small { font-family: var(--font-mono); font-stretch: 100%; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11.5px; }
+.hint { margin: 0; color: var(--muted); font-size: 12.5px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.field label, .field .lbl { font-size: 13px; font-weight: 550; }
+.num {
+  width: 72px; text-align: right; font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line); background: var(--soft); border-radius: 6px; padding: 3px 6px;
+}
+.unit { color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; margin-left: 4px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+select, input[type="text"] {
+  border: 1px solid var(--line); background: var(--soft); border-radius: 8px; padding: 7px 9px; width: 100%; min-width: 0;
+}
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+
+/* statuses list */
+.status-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.status-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.status-row .pick {
+  width: 38px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft);
+  display: grid; place-items: center; padding: 0;
+}
+.status-row .pick svg { width: 20px; height: 20px; fill: currentColor; }
+.status-row .pick:hover { border-color: var(--muted); }
+.row-tools { display: flex; gap: 2px; }
+.row-tools button { width: 28px; height: 30px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.row-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
+.row-tools button:disabled { opacity: 0.3; cursor: default; }
+.row-tools svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.list-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.popover {
+  position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.18); padding: 8px; display: grid; grid-template-columns: repeat(5, 44px); gap: 4px;
+}
+.popover button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; padding: 0; }
+.popover button svg { width: 24px; height: 24px; fill: currentColor; }
+.popover button:hover { background: var(--soft); }
+.popover button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.popover .none-label { font-size: 10.5px; color: var(--muted); }
+
+/* shapes */
+.shape-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.shape-tile {
+  border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 8px 6px 6px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 550; color: var(--muted);
+}
+.shape-tile svg { width: 100%; height: 34px; }
+.shape-tile svg path { fill: color-mix(in srgb, currentColor 16%, transparent); stroke: currentColor; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-width: 1.4; }
+.shape-tile:hover { border-color: var(--muted); }
+.shape-tile[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+/* colors */
+.swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.swatch { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 550; }
+.swatch input[type="color"] { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); padding: 3px; cursor: pointer; }
+.palette-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.palette-row button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 8px 3px 4px; display: inline-flex; gap: 5px; align-items: center; font-size: 11.5px; }
+.palette-row i { display: inline-flex; }
+.palette-row i b { width: 12px; height: 12px; border-radius: 50%; display: block; margin-right: -3px; border: 1px solid rgba(0,0,0,.2); }
+
+/* export */
+.parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
+.parts li:first-child { border-top: 0; }
+.parts .pname { font-weight: 600; font-size: 13px; }
+.parts .pmeta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12.5px; }
+.steps b { color: var(--ink); font-weight: 600; }
+.mono { font-family: var(--font-mono); font-size: 0.95em; }
+.foot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 980px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .stage-col { position: static; }
+  .viewport { height: 56vh; min-height: 280px; }
+}
+@media (max-width: 560px) {
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shape-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .brand p { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .build-state[data-state="busy"]::before { animation: none; }
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+      <rect x="2" y="9" width="34" height="20" rx="4" fill="none" stroke="var(--ink)" stroke-width="2"/>
+      <rect x="13" y="12" width="12" height="14" rx="2" fill="none" stroke="var(--accent)" stroke-width="3"/>
+      <circle cx="7.5" cy="19" r="1.6" fill="var(--muted)"/><circle cx="30.5" cy="19" r="1.6" fill="var(--muted)"/>
+    </svg>
+    <div>
+      <h1>Office Status Slider</h1>
+      <p>A 3D-printable door sign. Slide the frame to show where you are.</p>
+    </div>
+  </div>
+  <div class="top-actions">
+    <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
+    <button class="btn primary" id="dlZip" disabled>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16"/></svg>
+      Download STL files
+    </button>
+  </div>
+</header>
+
+<main class="app">
+  <section class="stage-col" aria-label="Preview">
+    <div class="viewport" id="viewport">
+      <div class="vp-top">
+        <div class="seg" role="radiogroup" aria-label="Preview mode" id="viewSeg">
+          <button role="radio" data-value="assembled" aria-checked="true">Assembled</button>
+          <button role="radio" data-value="print" aria-checked="false">Print plate</button>
+        </div>
+        <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        </button>
+      </div>
+      <div class="vp-bottom">
+        <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
+        <span class="vp-dims" id="vpDims">—</span>
+      </div>
+      <div class="error-toast" id="errorToast" role="alert" hidden></div>
+      <div class="overlay" id="overlay"><div><strong>Loading the 3D engine</strong>three.js and Manifold load from jsDelivr on first visit.</div></div>
+    </div>
+
+    <div class="statusbar-wrap">
+      <span class="eyebrow" id="statusbarLabel">Current status</span>
+      <div class="statusbar" id="statusbar" role="radiogroup" aria-labelledby="statusbarLabel"></div>
+    </div>
+
+    <dl class="readout" id="readout">
+      <div><dt>Window per status</dt><dd id="roWindow">—</dd></div>
+      <div><dt>Smallest letters</dt><dd id="roText">—</dd></div>
+      <div><dt>Color change</dt><dd id="roColor">—</dd></div>
+      <div><dt>Print bed</dt><dd id="roBed">—</dd></div>
+    </dl>
+    <ul class="warnings" id="warnings"></ul>
+  </section>
+
+  <aside class="panel" aria-label="Design options">
+    <!-- Statuses -->
+    <section class="section">
+      <h2>Statuses <small id="statusCount">4 of 6</small></h2>
+      <ul class="status-list" id="statusList"></ul>
+      <div class="list-actions">
+        <button class="btn small" id="addStatus">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add status
+        </button>
+        <span class="hint">Type <span class="mono">|</span> to force a line break.</span>
+      </div>
+      <div class="field">
+        <span class="lbl">Start from a set</span>
+        <div class="chips" id="presetChips"></div>
+      </div>
+    </section>
+
+    <!-- Shape -->
+    <section class="section">
+      <h2>Plate shape <small id="shapeName">Rounded</small></h2>
+      <div class="shape-grid" id="shapeGrid"></div>
+      <p class="hint">Cloud and Arch keep their top area for the header text.</p>
+    </section>
+
+    <!-- Size -->
+    <section class="section">
+      <h2>Size <small id="sizeSummary">200 × 72 mm</small></h2>
+      <div class="field">
+        <div class="field-row"><label for="width">Width</label><span><input class="num" type="number" id="widthNum" data-mirror="width" aria-label="Width in millimetres"><span class="unit">mm</span></span></div>
+        <input type="range" id="width" data-key="width" min="100" max="320" step="1">
+      </div>
+      <div class="field">
+        <div class="field-row"><label for="height">Height</label><span><input class="num" type="number" id="heightNum" data-mirror="height" aria-label="Height in millimetres"><span class="unit">mm</span></span></div>
+        <input type="range" id="height" data-key="height" min="45" max="150" step="1">
+      </div>
+      <div class="field">
+        <div class="field-row"><label for="thick">Plate thickness</label><span><input class="num" type="number" id="thickNum" data-mirror="thick" aria-label="Plate thickness in millimetres"><span class="unit">mm</span></span></div>
+        <input type="range" id="thick" data-key="thick" min="2" max="6" step="0.2">
+      </div>
+      <div class="field">
+        <label for="bed">Your printer bed</label>
+        <select id="bed" data-key="bed">
+          <option value="180">180 × 180 mm (A1 mini, Prusa MINI)</option>
+          <option value="220">220 × 220 mm (Ender 3)</option>
+          <option value="250">250 × 210 mm (Prusa MK4)</option>
+          <option value="256">256 × 256 mm (Bambu X1, P1, A1)</option>
+          <option value="300">300 × 300 mm</option>
+          <option value="350">350 × 350 mm</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Labels -->
+    <section class="section">
+      <h2>Labels</h2>
+      <div class="field">
+        <span class="lbl" id="layoutLbl">Layout</span>
+        <div class="seg" role="radiogroup" aria-labelledby="layoutLbl" data-key="layout">
+          <button role="radio" data-value="stack">Icon over text</button>
+          <button role="radio" data-value="side">Icon beside</button>
+          <button role="radio" data-value="text">Text only</button>
+          <button role="radio" data-value="icon">Icon only</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label for="font">Typeface</label>
+          <select id="font" data-key="font">
+            <option value="helvetiker">Helvetiker Bold</option>
+            <option value="droid">Droid Sans Bold</option>
+            <option value="optimer">Optimer Bold</option>
+            <option value="gentilis">Gentilis Bold</option>
+          </select>
+        </div>
+        <div class="field">
+          <span class="lbl" id="reliefLbl">Relief</span>
+          <div class="seg" role="radiogroup" aria-labelledby="reliefLbl" data-key="relief">
+            <button role="radio" data-value="raised">Raised</button>
+            <button role="radio" data-value="engraved">Engraved</button>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-row"><label for="reliefH">Relief depth</label><span><input class="num" type="number" id="reliefHNum" data-mirror="reliefH" aria-label="Relief depth in millimetres"><span class="unit">mm</span></span></div>
+        <input type="range" id="reliefH" data-key="reliefH" min="0.4" max="1.6" step="0.1">
+      </div>
+      <label class="check"><input type="checkbox" id="caps" data-key="caps"> All capitals</label>
+      <label class="check"><input type="checkbox" id="uniform" data-key="uniform"> Same letter size on every status</label>
+      <div class="field">
+        <label for="header">Header text <span class="hint">(optional, e.g. a name or room)</span></label>
+        <input type="text" id="header" data-key="header" maxlength="28" placeholder="e.g. Room 4B · Design Studio" autocomplete="off">
+      </div>
+    </section>
+
+    <!-- Frame & track -->
+    <section class="section">
+      <h2>Frame &amp; track</h2>
+      <div class="grid2">
+        <div class="field">
+          <div class="field-row"><label for="frame">Frame bars</label><span class="mono" id="frameOut"></span></div>
+          <input type="range" id="frame" data-key="frame" min="3" max="8" step="0.5">
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="winR">Window corners</label><span class="mono" id="winROut"></span></div>
+          <input type="range" id="winR" data-key="winR" min="0" max="8" step="0.5">
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="railH">Rail height</label><span class="mono" id="railHOut"></span></div>
+          <input type="range" id="railH" data-key="railH" min="2.5" max="6" step="0.5">
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="tol">Slide clearance</label><span class="mono" id="tolOut"></span></div>
+          <input type="range" id="tol" data-key="tol" min="0.1" max="0.5" step="0.05">
+        </div>
+      </div>
+      <p class="hint">Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.</p>
+      <label class="check"><input type="checkbox" id="arrows" data-key="arrows"> Pointer arrows on the frame</label>
+      <label class="check"><input type="checkbox" id="chamfer" data-key="chamfer"> Chamfered plate edge</label>
+    </section>
+
+    <!-- Mounting -->
+    <section class="section">
+      <h2>Mounting</h2>
+      <div class="seg" role="radiogroup" aria-label="Mounting" data-key="mount">
+        <button role="radio" data-value="none">Flat back</button>
+        <button role="radio" data-value="magnet">Magnets</button>
+        <button role="radio" data-value="screw">Screws</button>
+        <button role="radio" data-value="stand">Desk stand</button>
+      </div>
+      <p class="hint" id="mountHint"></p>
+      <div class="grid2" id="magnetOpts">
+        <div class="field">
+          <div class="field-row"><label for="magD">Magnet ⌀</label><span class="mono" id="magDOut"></span></div>
+          <input type="range" id="magD" data-key="magD" min="5" max="20" step="0.5">
+        </div>
+        <div class="field">
+          <div class="field-row"><label for="magH">Magnet height</label><span class="mono" id="magHOut"></span></div>
+          <input type="range" id="magH" data-key="magH" min="1" max="4" step="0.1">
+        </div>
+        <div class="field">
+          <span class="lbl" id="magNLbl">Pockets</span>
+          <div class="seg" role="radiogroup" aria-labelledby="magNLbl" data-key="magN">
+            <button role="radio" data-value="2">2</button>
+            <button role="radio" data-value="4">4</button>
+          </div>
+        </div>
+      </div>
+      <div class="field" id="standOpts">
+        <div class="field-row"><label for="tilt">Lean back</label><span class="mono" id="tiltOut"></span></div>
+        <input type="range" id="tilt" data-key="tilt" min="5" max="25" step="1">
+      </div>
+    </section>
+
+    <!-- Colors -->
+    <section class="section">
+      <h2>Filament colors <small>preview only</small></h2>
+      <div class="swatches">
+        <label class="swatch">Plate<input type="color" id="colBase" data-key="colBase"></label>
+        <label class="swatch">Labels<input type="color" id="colLabel" data-key="colLabel"></label>
+        <label class="swatch">Frame<input type="color" id="colSlider" data-key="colSlider"></label>
+      </div>
+      <div class="palette-row" id="palettes"></div>
+    </section>
+
+    <!-- Export -->
+    <section class="section">
+      <h2>Print &amp; export</h2>
+      <ul class="parts" id="partsList"></ul>
+      <ol class="steps" id="steps"></ol>
+      <div class="foot-actions">
+        <button class="btn primary" id="dlZip2" disabled>Download all parts (.zip)</button>
+        <button class="btn" id="copyLink">Copy design link</button>
+        <button class="btn" id="resetAll">Reset design</button>
+      </div>
+      <p class="hint" id="copyNote" role="status"></p>
+    </section>
+  </aside>
+</main>
+
+<div class="popover" id="iconPopover" role="dialog" aria-label="Choose an icon" hidden></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// ==ENGINE-BEGIN==
+// Geometry engine: builds watertight solids with Manifold. Units are millimetres.
+// Sign coordinates: X along the plate, Y up the plate, Z out of the front face (back face at Z = 0).
+function createEngine(wasm) {
+  const { Manifold, CrossSection } = wasm;
+
+  // Every Manifold/CrossSection lives in WASM memory; track them and free after each build.
+  const ARENA = new Set();
+  const track = (r) => {
+    if (r && typeof r === 'object') {
+      if (typeof r.isDeleted === 'function') ARENA.add(r);
+      else if (Array.isArray(r) && r.length && r[0] && typeof r[0].isDeleted === 'function') r.forEach((o) => ARENA.add(o));
+    }
+    return r;
+  };
+  const patch = (target) => {
+    for (const n of Object.getOwnPropertyNames(target)) {
+      if (n === 'constructor' || n === 'prototype' || n === 'length' || n === 'name' || n[0] === '_') continue;
+      const d = Object.getOwnPropertyDescriptor(target, n);
+      if (!d || typeof d.value !== 'function' || d.value.__tracked) continue;
+      const f = d.value;
+      const g = function (...a) { return track(f.apply(this, a)); };
+      g.__tracked = true;
+      try { target[n] = g; } catch (e) { /* read-only member */ }
+    }
+  };
+  {
+    const m = Manifold.cube([1, 1, 1]);
+    const c = CrossSection.square([1, 1]);
+    patch(Object.getPrototypeOf(m));
+    patch(Object.getPrototypeOf(c));
+    m.delete(); c.delete();
+    patch(Manifold);
+    patch(CrossSection);
+  }
+  const free = () => {
+    for (const o of ARENA) { try { if (!o.isDeleted()) o.delete(); } catch (e) { /* already gone */ } }
+    ARENA.clear();
+  };
+
+  class UserError extends Error { constructor(msg) { super(msg); this.user = true; } }
+
+  const D2R = Math.PI / 180;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const segsFor = (r) => Math.max(20, Math.min(120, Math.round(r * 4 + 16)));
+  const CS = (polys) => track(new CrossSection(polys, 'NonZero'));
+  const circle = (r, x = 0, y = 0, n) => CrossSection.circle(r, n || segsFor(r)).translate([x, y]);
+  const rect = (w, h, x = 0, y = 0) => CrossSection.square([w, h], true).translate([x, y]);
+  const rrect = (w, h, r, x = 0, y = 0) => {
+    r = Math.min(r, w / 2 - 0.02, h / 2 - 0.02);
+    if (!(r > 0.05)) return rect(w, h, x, y);
+    return CrossSection.square([w - 2 * r, h - 2 * r], true).offset(r, 'Round', 2, segsFor(r)).translate([x, y]);
+  };
+  const poly = (pts) => CS([pts]);
+  const union = (list) => {
+    list = list.filter(Boolean);
+    if (!list.length) return null;
+    return list.length === 1 ? list[0] : CrossSection.union(list);
+  };
+  const cap = (a, b, w) => CrossSection.hull([circle(w / 2, a[0], a[1], 20), circle(w / 2, b[0], b[1], 20)]);
+  const stroke = (pts, w, closed = false) => {
+    const parts = [];
+    for (let i = 0; i < pts.length - 1; i++) parts.push(cap(pts[i], pts[i + 1], w));
+    if (closed) parts.push(cap(pts[pts.length - 1], pts[0], w));
+    return union(parts);
+  };
+  const arc = (cx, cy, r, a0, a1, n) => {
+    n = n || Math.max(6, Math.ceil(Math.abs(a1 - a0) / 9));
+    const out = [];
+    for (let i = 0; i <= n; i++) {
+      const a = (a0 + (a1 - a0) * i / n) * D2R;
+      out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return out;
+  };
+  const ring = (r, w, x = 0, y = 0) => circle(r + w / 2, x, y).subtract(circle(r - w / 2, x, y));
+  const star4 = (r, x, y) => {
+    const pts = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (90 + i * 45) * D2R, rr = i % 2 ? r * 0.34 : r;
+      pts.push([x + rr * Math.cos(a), y + rr * Math.sin(a)]);
+    }
+    return poly(pts);
+  };
+  // Profile drawn in (Y, Z) and swept along X between x0 and x1.
+  const extrudeX = (cs, x0, x1) => cs.extrude(x1 - x0).transform([0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, x0, 0, 0, 1]);
+  // Footprint drawn in (X, -Z) and extruded up along Y (used for the desk feet, built in world space).
+  const extrudeY = (cs, h) => cs.extrude(h).transform([1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]);
+
+  // ---------- icons: drawn in a box of size s centred on the origin ----------
+  const ICONS = {
+    check: { label: 'Check', make: (s, w, P) => union([ring(s / 2 - w / 2, w), stroke([P(-0.21, 0.0), P(-0.06, -0.15), P(0.22, 0.15)], w * 1.15)]) },
+    people: {
+      label: 'People', make: (s, w, P) => {
+        const clip = rect(s * 1.2, s * 0.96, 0, 0.02 * s);
+        const person = (x, hy, hr, by, br) => union([circle(hr * s, x * s, hy * s), circle(br * s, x * s, by * s).intersect(clip)]);
+        const mid = person(0, 0.17, 0.14, -0.31, 0.27);
+        const sides = union([person(-0.3, 0.09, 0.11, -0.33, 0.2), person(0.3, 0.09, 0.11, -0.33, 0.2)]).subtract(mid.offset(0.07 * s, 'Round', 2, 24));
+        return union([mid, sides]);
+      },
+    },
+    headset: {
+      label: 'Headset', make: (s, w, P) => union([
+        stroke(arc(0, 0.02 * s, 0.36 * s, 180, 0), w * 1.1),
+        rrect(0.17 * s, 0.32 * s, 0.07 * s, -0.36 * s, -0.08 * s),
+        rrect(0.17 * s, 0.32 * s, 0.07 * s, 0.36 * s, -0.08 * s),
+        stroke(arc(0.08 * s, -0.16 * s, 0.28 * s, -15, -90), w * 0.9),
+        rrect(0.17 * s, 0.1 * s, 0.05 * s, 0.03 * s, -0.44 * s),
+      ]),
+    },
+    dnd: { label: 'Do not disturb', make: (s, w, P) => circle(s / 2).subtract(rrect(0.6 * s, 0.17 * s, 0.04 * s)) },
+    hourglass: {
+      label: 'Hourglass', make: (s, w, P) => union([
+        stroke([P(-0.32, 0.46), P(0.32, 0.46)], w * 1.1),
+        stroke([P(-0.32, -0.46), P(0.32, -0.46)], w * 1.1),
+        stroke([P(-0.22, 0.46), P(-0.22, 0.3), P(-0.04, 0.0), P(-0.22, -0.3), P(-0.22, -0.46)], w),
+        stroke([P(0.22, 0.46), P(0.22, 0.3), P(0.04, 0.0), P(0.22, -0.3), P(0.22, -0.46)], w),
+        poly([P(-0.15, -0.4), P(0.15, -0.4), P(0.15, -0.33), P(0, -0.15), P(-0.15, -0.33)]),
+        poly([P(-0.11, 0.25), P(0.11, 0.25), P(0, 0.1)]),
+      ]),
+    },
+    target: { label: 'Focus target', make: (s, w, P) => union([ring(s / 2 - w / 2, w), ring(0.26 * s, w), circle(Math.max(0.1 * s, w * 0.8))]) },
+    clock: {
+      label: 'Clock', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w),
+        stroke([P(0, 0), P(0, 0.27)], w),
+        stroke([P(0, 0), P(0.2, -0.08)], w),
+        circle(w * 0.95),
+      ]),
+    },
+    cup: {
+      label: 'Coffee', make: (s, w, P) => {
+        const wave = (x0) => {
+          const pts = [];
+          for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push(P(x0 + 0.035 * Math.sin(t * Math.PI * 2), 0.17 + t * 0.29)); }
+          return stroke(pts, w * 0.85);
+        };
+        return union([
+          rrect(0.52 * s, 0.4 * s, 0.1 * s, -0.07 * s, -0.14 * s),
+          ring(0.1 * s, w, 0.22 * s, -0.12 * s),
+          stroke([P(-0.42, -0.46), P(0.3, -0.46)], w),
+          wave(-0.21), wave(-0.07), wave(0.07),
+        ]);
+      },
+    },
+    forkknife: {
+      label: 'Lunch', make: (s, w, P) => union([
+        stroke([P(-0.2, -0.46), P(-0.2, 0.0)], w * 1.1),
+        stroke(arc(-0.2 * s, 0.12 * s, 0.14 * s, 180, 360), w * 0.85),
+        stroke([P(-0.34, 0.12), P(-0.34, 0.46)], w * 0.8),
+        stroke([P(-0.2, 0.0), P(-0.2, 0.46)], w * 0.8),
+        stroke([P(-0.06, 0.12), P(-0.06, 0.46)], w * 0.8),
+        stroke([P(0.22, -0.46), P(0.22, -0.02)], w * 1.1),
+        poly([P(0.15, -0.04), P(0.29, -0.04), P(0.29, 0.31), P(0.23, 0.46), P(0.15, 0.4)]),
+      ]),
+    },
+    house: {
+      label: 'Home', make: (s, w, P) => union([
+        stroke([P(-0.47, 0.0), P(0, 0.42), P(0.47, 0.0)], w * 1.15),
+        stroke([P(-0.31, -0.06), P(-0.31, -0.46), P(0.31, -0.46), P(0.31, -0.06)], w),
+        rrect(0.17 * s, 0.26 * s, 0.03 * s, 0, -0.33 * s),
+        rect(0.09 * s, 0.18 * s, 0.24 * s, 0.31 * s),
+      ]),
+    },
+    pin: { label: 'Location', make: (s, w, P) => CrossSection.hull([circle(0.3 * s, 0, 0.16 * s), circle(0.03 * s, 0, -0.46 * s)]).subtract(circle(0.12 * s, 0, 0.16 * s)) },
+    plane: {
+      label: 'Travel', make: (s, w, P) => union([
+        cap(P(0, -0.4), P(0, 0.4), 0.13 * s),
+        poly([P(0.02, 0.12), P(0.46, -0.06), P(0.46, -0.15), P(0.02, -0.05)]),
+        poly([P(-0.02, 0.12), P(-0.02, -0.05), P(-0.46, -0.15), P(-0.46, -0.06)]),
+        poly([P(0.02, -0.26), P(0.18, -0.38), P(0.18, -0.45), P(0.02, -0.38)]),
+        poly([P(-0.02, -0.26), P(-0.02, -0.38), P(-0.18, -0.45), P(-0.18, -0.38)]),
+      ]).rotate(-45),
+    },
+    moon: { label: 'Moon', make: (s, w, P) => union([circle(0.44 * s, -0.04 * s, -0.02 * s).subtract(circle(0.36 * s, 0.16 * s, 0.14 * s)), star4(0.13 * s, 0.25 * s, 0.2 * s)]) },
+    code: {
+      label: 'Code', make: (s, w, P) => union([
+        stroke([P(-0.2, 0.26), P(-0.44, 0), P(-0.2, -0.26)], w * 1.1),
+        stroke([P(0.2, 0.26), P(0.44, 0), P(0.2, -0.26)], w * 1.1),
+        stroke([P(0.09, 0.36), P(-0.09, -0.36)], w * 1.1),
+      ]),
+    },
+    mic: {
+      label: 'Microphone', make: (s, w, P) => union([
+        rrect(0.26 * s, 0.46 * s, 0.13 * s, 0, 0.21 * s),
+        stroke(arc(0, 0.12 * s, 0.25 * s, 180, 360), w),
+        stroke([P(0, -0.13), P(0, -0.42)], w),
+        stroke([P(-0.18, -0.43), P(0.18, -0.43)], w * 1.1),
+      ]),
+    },
+  };
+  const iconCS = (name, s) => {
+    const def = ICONS[name];
+    if (!def) return null;
+    const w = Math.max(1.2, s * 0.095);
+    return def.make(s, w, (x, y) => [x * s, y * s]);
+  };
+
+  // ---------- plate outlines: W x H box centred on the origin ----------
+  // body = vertical span that runs the full width (the track goes there); crown = extra space reserved for a header.
+  const SHAPES = {
+    rounded: { label: 'Rounded', make: (W, H) => ({ cs: rrect(W, H, Math.min(12, H * 0.2)), body: [-H / 2, H / 2] }) },
+    pill: { label: 'Pill', make: (W, H) => ({ cs: CrossSection.hull([circle(H / 2, -(W / 2 - H / 2), 0, 128), circle(H / 2, W / 2 - H / 2, 0, 128)]), body: [-H / 2, H / 2] }) },
+    badge: {
+      label: 'Badge', make: (W, H) => {
+        const c = Math.min(H * 0.26, W * 0.2);
+        const cs = poly([[-W / 2 + c, -H / 2], [W / 2 - c, -H / 2], [W / 2, -H / 2 + c], [W / 2, H / 2 - c], [W / 2 - c, H / 2], [-W / 2 + c, H / 2], [-W / 2, H / 2 - c], [-W / 2, -H / 2 + c]])
+          .offset(-2, 'Round', 2, 24).offset(2, 'Round', 2, 24);
+        return { cs, body: [-H / 2, H / 2] };
+      },
+    },
+    ticket: {
+      label: 'Ticket', make: (W, H) => {
+        const r = Math.min(H * 0.17, 12);
+        let cs = rrect(W, H, 2);
+        for (const sx of [-1, 1]) for (const sy of [-1, 1]) cs = cs.subtract(circle(r, sx * W / 2, sy * H / 2, 72));
+        return { cs, body: [-H / 2, H / 2] };
+      },
+    },
+    cloud: {
+      label: 'Cloud', make: (W, H) => {
+        const bodyH = H * 0.74;
+        const parts = [rrect(W - H * 0.2, bodyH, bodyH * 0.42, 0, -H / 2 + bodyH / 2)];
+        const k = clamp(Math.round(W / (H * 0.5)), 3, 8);
+        const rs = [0.25, 0.31, 0.27, 0.32, 0.26, 0.3, 0.25, 0.29];
+        for (let i = 0; i < k; i++) {
+          const t = i / (k - 1);
+          const r = H * rs[i % rs.length] * (i === 0 || i === k - 1 ? 0.84 : 1);
+          parts.push(circle(r, -W / 2 + H * 0.3 + t * (W - H * 0.6), H / 2 - r, 96));
+        }
+        parts.push(circle(H * 0.26, -W / 2 + H * 0.26, -H / 2 + H * 0.31, 96), circle(H * 0.26, W / 2 - H * 0.26, -H / 2 + H * 0.31, 96));
+        return { cs: union(parts), body: [-H / 2, -H / 2 + bodyH], crown: [-H / 2 + bodyH, H / 2 - H * 0.04] };
+      },
+    },
+    speech: {
+      label: 'Speech', make: (W, H) => {
+        const th = Math.min(H * 0.17, 14), bh = H - th;
+        const body = rrect(W, bh, Math.min(12, bh * 0.2), 0, H / 2 - bh / 2);
+        const x0 = -W / 2 + Math.max(10, W * 0.05);
+        const tail = poly([[x0, -H / 2 + th + 4], [x0 + th * 1.5, -H / 2 + th + 4], [x0 - th * 0.15, -H / 2]]).offset(-0.8, 'Round', 2, 16).offset(0.8, 'Round', 2, 16);
+        return { cs: union([body, tail]), body: [-H / 2 + th, H / 2] };
+      },
+    },
+    scallop: {
+      label: 'Scallop', make: (W, H) => {
+        const s = clamp(H * 0.065, 3, 6), iw = W - 2 * s, ih = H - 2 * s;
+        const parts = [rrect(iw, ih, s)];
+        const nx = Math.max(2, Math.round(iw / (s * 1.7))), ny = Math.max(1, Math.round(ih / (s * 1.7)));
+        for (let i = 0; i <= nx; i++) { const x = -iw / 2 + iw * i / nx; parts.push(circle(s, x, ih / 2, 32), circle(s, x, -ih / 2, 32)); }
+        for (let j = 1; j < ny; j++) { const y = -ih / 2 + ih * j / ny; parts.push(circle(s, -iw / 2, y, 32), circle(s, iw / 2, y, 32)); }
+        return { cs: union(parts), body: [-ih / 2, ih / 2] };
+      },
+    },
+    wave: {
+      label: 'Wave', make: (W, H) => {
+        const A = Math.min(H * 0.06, 5), n = Math.max(2, Math.round(W / 45)), lam = W / n, N = n * 24, pts = [];
+        for (let i = 0; i <= N; i++) { const x = -W / 2 + W * i / N; pts.push([x, H / 2 - A + A * Math.cos(2 * Math.PI * (x + W / 2) / lam)]); }
+        for (let i = N; i >= 0; i--) { const x = -W / 2 + W * i / N; pts.push([x, -H / 2 + A + A * Math.cos(2 * Math.PI * (x + W / 2) / lam)]); }
+        const cs = poly(pts).offset(-3, 'Round', 2, 32).offset(3, 'Round', 2, 32);
+        return { cs, body: [-H / 2 + 2 * A, H / 2 - 2 * A] };
+      },
+    },
+    arch: {
+      label: 'Arch', make: (W, H) => {
+        const ah = Math.min(H * 0.32, W * 0.3), lowH = H - ah;
+        const lower = union([rrect(W, lowH, 6, 0, -H / 2 + lowH / 2), rect(W, lowH / 2, 0, -H / 2 + lowH * 0.75)]);
+        const top = CrossSection.circle(1, 160).scale([W / 2, ah]).translate([0, H / 2 - ah]);
+        return { cs: union([lower, top]), body: [-H / 2, H / 2 - ah], crown: [H / 2 - ah, H / 2 - ah * 0.12] };
+      },
+    },
+  };
+
+  // ---------- text ----------
+  function cleanRing(pts, ccw) {
+    const out = [];
+    for (const v of pts) {
+      const q = [v.x, v.y], l = out[out.length - 1];
+      if (!l || Math.hypot(l[0] - q[0], l[1] - q[1]) > 1e-4) out.push(q);
+    }
+    if (out.length > 2) { const f = out[0], l = out[out.length - 1]; if (Math.hypot(f[0] - l[0], f[1] - l[1]) < 1e-4) out.pop(); }
+    if (out.length < 3) return null;
+    let a = 0;
+    for (let i = 0; i < out.length; i++) { const p = out[i], q = out[(i + 1) % out.length]; a += p[0] * q[1] - q[0] * p[1]; }
+    if ((a > 0) !== ccw) out.reverse();
+    return out;
+  }
+  function textLine(font, str, size) {
+    const polys = [];
+    for (const shp of font.generateShapes(str, size)) {
+      const { shape, holes } = shp.extractPoints(8);
+      const o = cleanRing(shape, true);
+      if (o) polys.push(o);
+      for (const h of holes) { const r = cleanRing(h, false); if (r) polys.push(r); }
+    }
+    return polys.length ? CS(polys) : null;
+  }
+  const capCache = new Map();
+  function capRef(font) {
+    if (!capCache.has(font)) {
+      const c = textLine(font, 'H', 10);
+      const b = c && c.bounds();
+      capCache.set(font, b ? b.max[1] - b.min[1] : 7.2);
+    }
+    return capCache.get(font);
+  }
+  function advWidth(font, str) {
+    const d = font.data, res = d.resolution || 1000;
+    let w = 0;
+    for (const ch of str) { const g = d.glyphs[ch] || d.glyphs['?']; w += g ? g.ha : res * 0.6; }
+    return w / res;
+  }
+  function lineOptions(font, text, single) {
+    if (text.includes('|')) return [text.split('|').map((s) => s.trim()).filter(Boolean)];
+    const words = text.split(/\s+/).filter(Boolean);
+    const opts = [[words.join(' ')]];
+    if (single) return opts;
+    const wid = (arr) => Math.max(...arr.map((l) => advWidth(font, l)));
+    if (words.length >= 2) {
+      let best = null;
+      for (let i = 1; i < words.length; i++) {
+        const c = [words.slice(0, i).join(' '), words.slice(i).join(' ')];
+        if (!best || wid(c) < wid(best)) best = c;
+      }
+      opts.push(best);
+    }
+    if (words.length >= 3) {
+      let best = null;
+      for (let i = 1; i < words.length - 1; i++) for (let j = i + 1; j < words.length; j++) {
+        const c = [words.slice(0, i).join(' '), words.slice(i, j).join(' '), words.slice(j).join(' ')];
+        if (!best || wid(c) < wid(best)) best = c;
+      }
+      opts.push(best);
+    }
+    return opts;
+  }
+  // Fit text into a bw x bh box. Returns a CrossSection centred on the origin.
+  function fitText(font, text, bw, bh, maxCap, single = false) {
+    const REF = 10, cr = capRef(font);
+    let best = null;
+    for (const lines of lineOptions(font, text, single)) {
+      const parts = [];
+      lines.forEach((ln, i) => {
+        const c = textLine(font, ln, REF);
+        if (!c) return;
+        const b = c.bounds();
+        parts.push(c.translate([-(b.min[0] + b.max[0]) / 2, -i * REF * 1.32]));
+      });
+      if (!parts.length) continue;
+      const blk = union(parts), b = blk.bounds();
+      const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1];
+      const k = Math.min(bw / w, bh / h, maxCap / cr);
+      if (!best || k > best.k * 1.08) best = { k, blk, b, w, h };
+    }
+    if (!best || !(best.k > 0)) return { cs: null, w: 0, h: 0, cap: 0 };
+    const cx = (best.b.min[0] + best.b.max[0]) / 2, cy = (best.b.min[1] + best.b.max[1]) / 2;
+    return { cs: best.blk.translate([-cx, -cy]).scale(best.k), w: best.w * best.k, h: best.h * best.k, cap: cr * best.k };
+  }
+
+  function cellContent(st, font, cw, ch, p, capLimit = Infinity) {
+    const raw = (st.text || '').trim();
+    const text = p.caps ? raw.toUpperCase() : raw;
+    const iconOn = p.layout !== 'text' && st.icon && ICONS[st.icon];
+    const textOn = p.layout !== 'icon' && text.replace(/\|/g, '').trim().length > 0;
+    if (iconOn && textOn) {
+      if (p.layout === 'side') {
+        const s = Math.min(ch * 0.78, cw * 0.32, 24), gap = Math.max(1.8, s * 0.16);
+        const tb = fitText(font, text, cw - s - gap, ch, Math.min(9, capLimit));
+        if (!tb.cs) return { cs: iconCS(st.icon, s), cap: null };
+        const left = -(s + gap + tb.w) / 2;
+        return { cs: union([iconCS(st.icon, s).translate([left + s / 2, 0]), tb.cs.translate([left + s + gap + tb.w / 2, 0])]), cap: tb.cap };
+      }
+      const s = Math.min(ch * 0.44, cw * 0.56, 22), gap = Math.max(1.6, ch * 0.07);
+      const tb = fitText(font, text, cw, ch - s - gap, Math.min(9, capLimit));
+      if (!tb.cs) return { cs: iconCS(st.icon, s), cap: null };
+      const top = (s + gap + tb.h) / 2;
+      return { cs: union([iconCS(st.icon, s).translate([0, top - s / 2]), tb.cs.translate([0, top - s - gap - tb.h / 2])]), cap: tb.cap };
+    }
+    if (iconOn) return { cs: iconCS(st.icon, Math.min(cw, ch) * 0.76), cap: null };
+    if (textOn) { const tb = fitText(font, text, cw, ch, Math.min(12, capLimit)); return { cs: tb.cs, cap: tb.cap }; }
+    return { cs: null, cap: null };
+  }
+
+  function chamferPlate(cs, T, on) {
+    if (!on) return cs.extrude(T);
+    const cd = Math.min(1.2, T * 0.35), n = 3, step = cd / n;
+    const parts = [cs.extrude(T - cd)];
+    for (let i = 0; i < n; i++) {
+      const z0 = T - cd + i * step - 0.01;
+      parts.push(cs.offset(-(i + 1) * step, 'Round', 2, 32).extrude(T - cd + (i + 1) * step - z0).translate([0, 0, z0]));
+    }
+    return Manifold.union(parts);
+  }
+
+  function meshData(m) {
+    const g = m.getMesh();
+    const np = g.numProp, n = g.vertProperties.length / np;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { pos[i * 3] = g.vertProperties[i * np]; pos[i * 3 + 1] = g.vertProperties[i * np + 1]; pos[i * 3 + 2] = g.vertProperties[i * np + 2]; }
+    const bb = m.boundingBox();
+    return { pos, idx: new Uint32Array(g.triVerts), vol: m.volume(), min: Array.from(bb.min), max: Array.from(bb.max) };
+  }
+
+  function build(p, font) {
+    try {
+      const warnings = [];
+      const W = p.width, H = p.height, T = p.thick;
+      const tol = p.tol, raised = p.relief === 'raised';
+      const Lh = raised ? p.reliefH : 0, engr = raised ? 0 : Math.min(p.reliefH, T - 1);
+      const Rh = p.railH, d = 2.0, Rw = 6, pad = 2.4, fb = p.frame, fbx = p.frame, play = 0.6, pinR = 2, proud = 0.8;
+      const sh = SHAPES[p.shape].make(W, H);
+      const ob = sh.cs.bounds();
+
+      // vertical layout
+      const vm = Math.max(3, H * 0.05);
+      let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
+      if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + 11);
+      const headerText = (p.header || '').trim();
+      let hdrZone = null;
+      if (headerText) {
+        if (sh.crown) hdrZone = sh.crown.slice();
+        else { const hh = clamp(H * 0.17, 8, 16); hdrZone = [b1 - hh, b1]; b1 -= hh + 1; }
+      }
+      const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2;
+      const yR = hrTot - Rw;
+      const wh = 2 * (yR - tol - fb);
+      if (wh < 12) throw new UserError('The plate is too short for the track. Increase the height' + (headerText && !sh.crown ? ' or clear the header text' : '') + '.');
+
+      // horizontal: widest rail span that stays inside the outline
+      const clear = 1.5, yLo = yc - hrTot - clear, yHi = yc + hrTot + clear;
+      const fits = (hx) => rect(2 * hx, yHi - yLo, 0, (yLo + yHi) / 2).subtract(sh.cs).area() < 0.05;
+      if (!fits(5)) throw new UserError('This shape is too small for a track. Increase the width or height.');
+      let lo = 5, hi = W / 2 + 1;
+      for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; if (fits(m)) lo = m; else hi = m; }
+      let X = lo - clear;
+      const X0 = X;
+      if (p.mount === 'screw') X -= 11;
+      const xR = X - 5;
+      const N = p.statuses.length;
+      const ww = 2 * (xR - play - fbx * (N + 1) / 2) / N;
+      if (ww < 14) throw new UserError(`Each window would be only ${Math.max(0, ww).toFixed(1)} mm wide. Make the plate wider or use fewer statuses.`);
+      const pitch = ww + fbx, Sx = ww + 2 * fbx;
+      const cells = Array.from({ length: N }, (_, i) => (i - (N - 1) / 2) * pitch);
+
+      // labels
+      const cw = ww - 2 * pad, ch = wh - 2 * pad;
+      const labelParts = [];
+      let contents = p.statuses.map((st) => cellContent(st, font, cw, ch, p));
+      const caps = contents.map((c) => c.cap).filter(Boolean);
+      if (p.uniform && caps.length > 1 && Math.max(...caps) - Math.min(...caps) > 0.05) {
+        const limit = Math.min(...caps) + 1e-6;
+        contents = p.statuses.map((st) => cellContent(st, font, cw, ch, p, limit));
+      }
+      let capMin = Infinity;
+      contents.forEach((c, i) => {
+        if (c.cs) labelParts.push(c.cs.translate([cells[i], yc]));
+        if (c.cap) capMin = Math.min(capMin, c.cap);
+      });
+      let hdrCap = 0;
+      if (headerText) {
+        const [h0, h1] = hdrZone, zh = h1 - h0, my = (h0 + h1) / 2;
+        const tb = fitText(font, p.caps ? headerText.toUpperCase() : headerText, Math.min(2 * X0, W * 0.86), zh * 0.72, Math.min(10, zh * 0.62), true);
+        if (tb.cs) {
+          let k = 1, hcs = tb.cs.translate([0, my]);
+          for (let i = 0; i < 12 && hcs.offset(1.4, 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.9; hcs = tb.cs.scale(k).translate([0, my]); }
+          labelParts.push(hcs);
+          hdrCap = tb.cap * k;
+          capMin = Math.min(capMin, hdrCap);
+        }
+      }
+      const labelsCS = union(labelParts);
+
+      // base body: plate + dovetail rails + right end stop - pin hole - mounting
+      const z0 = T - 0.02, z1 = T + Rh, chf = 0.8;
+      const yi = yR, yo = yR + Rw;
+      const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d]]);
+      const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
+      const block = rect(X - xR, 2 * (yR + d) + 1, (xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
+      let body = Manifold.union([chamferPlate(sh.cs, T, p.chamfer), extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block]);
+      const xPin = -(xR + pinR + 0.4);
+      body = body.subtract(Manifold.cylinder(T + 2, pinR + 0.08, pinR + 0.08, 40).translate([xPin, yc, -1]));
+
+      if (p.mount === 'magnet') {
+        const r = p.magD / 2 + 0.1, depth = Math.min(p.magH + 0.2, T - 0.6);
+        if (p.magH + 0.2 > T - 0.6) warnings.push(`Magnet pockets are limited to ${depth.toFixed(1)} mm deep by the ${T} mm plate. Use thinner magnets or a thicker plate.`);
+        const xs = X * 0.6, pts = p.magN === 4 ? [[-xs, yc + hrTot * 0.42], [xs, yc + hrTot * 0.42], [-xs, yc - hrTot * 0.42], [xs, yc - hrTot * 0.42]] : [[-xs, yc], [xs, yc]];
+        for (const [x, y] of pts) body = body.subtract(Manifold.cylinder(depth + 0.01, r, r, 56).translate([x, y, -0.01]));
+        if (engr > 0 && T - depth - engr < 0.6) warnings.push('Engraved labels plus magnet pockets leave very thin plastic. Switch to raised labels or a thicker plate.');
+      }
+      if (p.mount === 'screw') {
+        const cs = Math.min(2.2, T - 0.8);
+        for (const sx of [-1, 1]) {
+          const x = sx * (X + 5.5);
+          body = body.subtract(Manifold.cylinder(T + 2, 2.2, 2.2, 32).translate([x, yc, -1]));
+          body = body.subtract(Manifold.cylinder(cs + 0.01, 2.2, 2.2 + cs, 40).translate([x, yc, T - cs]));
+          body = body.subtract(Manifold.cylinder(1, 2.2 + cs, 2.2 + cs, 40).translate([x, yc, T]));
+        }
+      }
+
+      let labels = null, base = body;
+      if (labelsCS) {
+        if (raised) {
+          labels = labelsCS.extrude(Lh).translate([0, 0, T]);
+          base = body.add(labelsCS.extrude(Lh + 0.02).translate([0, 0, T - 0.02]));
+        } else {
+          body = body.subtract(labelsCS.extrude(engr + 1).translate([0, 0, T - engr]));
+          base = body;
+        }
+      }
+
+      // frame slider: dovetail tongue at the bottom, window in the middle
+      const zb = T + tol, zt = T + Rh + proud;
+      const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
+      const prof = poly([[yc - tY, zb], [yc + tY, zb], [yc + yS, zK], [yc + yS, zt], [yc - yS, zt], [yc - yS, zK]]);
+      let slider = extrudeX(prof, -Sx / 2, Sx / 2);
+      slider = slider.subtract(rrect(ww, wh, p.winR, 0, yc).extrude(zt - zb + 2).translate([0, 0, zb - 1]));
+      if (raised) {
+        const ph = wh / 2 - pad + 0.8;
+        slider = slider.subtract(rect(Sx + 2, 2 * ph, 0, yc).extrude(T + Lh + tol + 0.15 - (zb - 1)).translate([0, 0, zb - 1]));
+      }
+      if (p.arrows) {
+        const fbw = yS - wh / 2, aw = Math.min(fbw * 1.3, 7), ah = fbw * 0.5;
+        const yt = yc + wh / 2 + fbw / 2, yb = yc - wh / 2 - fbw / 2;
+        const tri = union([poly([[-aw / 2, yt + ah / 2], [aw / 2, yt + ah / 2], [0, yt - ah / 2]]), poly([[-aw / 2, yb - ah / 2], [0, yb + ah / 2], [aw / 2, yb - ah / 2]])]);
+        slider = slider.subtract(tri.extrude(1).translate([0, 0, zt - 0.6]));
+      }
+
+      // stop pin
+      const pinH = T + Rh - 0.3;
+      const pin = Manifold.union([
+        Manifold.cylinder(0.6, pinR - 0.45, pinR, 32),
+        Manifold.cylinder(pinH - 1.0, pinR, pinR, 32).translate([0, 0, 0.6]),
+        Manifold.cylinder(0.4, pinR, pinR - 0.3, 32).translate([0, 0, pinH - 0.4]),
+      ]);
+
+      // desk feet (built in world space: Y up, sign leaning back)
+      let feet = [], stand = null;
+      if (p.mount === 'stand') {
+        const a = p.tilt * D2R, ca = Math.cos(a), sa = Math.sin(a);
+        const ybG = ob.min[1], floor = 2;
+        const ty = floor - ybG * ca, tz = ybG * sa;
+        const M = [1, 0, 0, 0, 0, ca, -sa, 0, 0, sa, ca, 0, 0, ty, tz, 1];
+        const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]).transform(M);
+        const fl = 22, fd = clamp(H * 0.5, 34, 64);
+        for (const sx of [-1, 1]) {
+          const xf = sx * Math.min(W * 0.28, X * 0.75);
+          const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
+          const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
+          const hF = (ybL - ybG) * ca + floor + 7.5;
+          const zMid = -(ybL - ybG) * sa + T * ca / 2;
+          const zFront = zMid + fd * 0.42, zBack = zMid - fd * 0.58;
+          feet.push(extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot));
+        }
+        stand = { tilt: p.tilt, ty, tz };
+      }
+
+      if (Number.isFinite(capMin) && capMin < 3.5) warnings.push(`The smallest letters are ${capMin.toFixed(1)} mm tall. Below about 3.5 mm they blur on a 0.4 mm nozzle. Make the plate bigger, use fewer statuses or shorter words, or try another layout.`);
+      if (tol < 0.15) warnings.push('Clearance under 0.15 mm usually needs a very well-calibrated printer, or the frame will not slide.');
+
+      const out = {
+        parts: {
+          base: meshData(base),
+          body: meshData(body),
+          labels: labels ? meshData(labels) : null,
+          slider: meshData(slider),
+          pin: meshData(pin),
+          feet: feet.map(meshData),
+        },
+        info: {
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, xPin, pinH,
+          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, stand, warnings, pitch,
+        },
+      };
+      return out;
+    } finally {
+      free();
+    }
+  }
+
+  function svgPath(cs) {
+    return cs.toPolygons().map((pg) => 'M' + pg.map(([x, y]) => `${x.toFixed(2)} ${(-y).toFixed(2)}`).join('L') + 'Z').join('');
+  }
+  return {
+    build,
+    free,
+    icons: Object.fromEntries(Object.entries(ICONS).map(([k, v]) => [k, v.label])),
+    shapes: Object.fromEntries(Object.entries(SHAPES).map(([k, v]) => [k, v.label])),
+    iconPath(name) { try { const cs = iconCS(name, 24); return cs ? svgPath(cs) : ''; } finally { free(); } },
+    shapePath(kind) { try { return svgPath(SHAPES[kind].make(200, 72).cs); } finally { free(); } },
+  };
+}
+// ==ENGINE-END==
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const STORE_KEY = 'office-status-slider:v1';
+const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js';
+const FONT_BASE = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/fonts/';
+const FONT_FILES = { helvetiker: 'helvetiker_bold.typeface.json', optimer: 'optimer_bold.typeface.json', gentilis: 'gentilis_bold.typeface.json', droid: 'droid/droid_sans_bold.typeface.json' };
+
+const PRESETS = [
+  { name: 'Office classic', list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
+  { name: 'Hybrid team', list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
+  { name: 'Deep work', list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
+  { name: 'Studio', list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
+];
+const PALETTES = [
+  { name: 'Charcoal & orange', base: '#2E3237', label: '#F3F1EA', slider: '#F06A28' },
+  { name: 'White & blue', base: '#F2F2EE', label: '#1F2A44', slider: '#2F6BFF' },
+  { name: 'Forest', base: '#1F3B2F', label: '#EDE6D6', slider: '#E8B73A' },
+  { name: 'Matte black', base: '#1A1B1E', label: '#D9DDE2', slider: '#7A8088' },
+];
+const DEFAULTS = {
+  statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
+  current: 0, view: 'assembled',
+  shape: 'rounded', width: 200, height: 72, thick: 3, bed: 256,
+  layout: 'stack', font: 'helvetiker', caps: true, uniform: true, relief: 'raised', reliefH: 0.8, header: '',
+  frame: 4.5, winR: 2, railH: 3.5, tol: 0.25, arrows: true, chamfer: true,
+  mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
+};
+const RANGES = { width: [100, 320], height: [45, 150], thick: [2, 6], reliefH: [0.4, 1.6], frame: [3, 8], winR: [0, 8], railH: [2.5, 6], tol: [0.1, 0.5], magD: [5, 20], magH: [1, 4], tilt: [5, 25] };
+const CHOICES = { shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'], layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FILES), relief: ['raised', 'engraved'], mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: [180, 220, 250, 256, 300, 350], view: ['assembled', 'print'] };
+const MOUNT_HINTS = {
+  none: 'Flat back for double-sided tape or Command strips.',
+  magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
+  screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
+  stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
+};
+
+function sanitize(s) {
+  const out = structuredClone(DEFAULTS);
+  if (!s || typeof s !== 'object') return out;
+  for (const k of Object.keys(RANGES)) if (Number.isFinite(+s[k])) out[k] = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +s[k]));
+  for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
+  for (const k of ['caps', 'uniform', 'arrows', 'chamfer']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
+  for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
+  if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
+    out.statuses = s.statuses.slice(0, 6).map((st) => ({ text: String(st && st.text || '').slice(0, 28), icon: String(st && st.icon || 'none') }));
+  }
+  out.current = Math.min(out.statuses.length - 1, Math.max(0, Math.round(+s.current || 0)));
+  return out;
+}
+function encodeState(s) {
+  const bytes = new TextEncoder().encode(JSON.stringify(s));
+  let bin = ''; bytes.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeState(str) {
+  const bin = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+}
+function loadState() {
+  let s = null;
+  try { if (location.hash.startsWith('#cfg=')) s = decodeState(location.hash.slice(5)); } catch (e) { s = null; }
+  if (!s) { try { s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { s = null; } }
+  return sanitize(s);
+}
+let state = loadState();
+const saveState = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* storage unavailable */ } };
+
+// ---------------------------------------------------------------------------
+// 3D view
+// ---------------------------------------------------------------------------
+const viewportEl = $('#viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewportEl.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.12;
+controls.maxPolarAngle = Math.PI * 0.94;
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x7f8794, 1.15);
+const key = new THREE.DirectionalLight(0xffffff, 2.1);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.4;
+const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+scene.add(hemi, key, key.target, fill);
+
+const mats = {
+  base: new THREE.MeshStandardMaterial({ roughness: 0.62, metalness: 0 }),
+  label: new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }),
+  slider: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }),
+};
+const shadowMat = new THREE.ShadowMaterial({ opacity: 0.2 });
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), shadowMat);
+wall.receiveShadow = true;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), shadowMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(wall, ground);
+
+const signGroup = new THREE.Group();
+const feetGroup = new THREE.Group();
+const printGroup = new THREE.Group();
+scene.add(signGroup, feetGroup, printGroup);
+
+let result = null;
+let sliderMesh = null;
+let sliderTarget = 0;
+let needsRender = true;
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const requestRender = () => { needsRender = true; };
+
+function readStageColor() {
+  const c = getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() || '#D8DDE3';
+  scene.background = new THREE.Color(c);
+  requestRender();
+}
+readStageColor();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readStageColor);
+new MutationObserver(readStageColor).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+function geometryFrom(mesh, transform) {
+  let pos = mesh.pos;
+  if (transform) {
+    pos = new Float32Array(mesh.pos.length);
+    for (let i = 0; i < pos.length; i += 3) {
+      const v = transform(mesh.pos[i], mesh.pos[i + 1], mesh.pos[i + 2]);
+      pos[i] = v[0]; pos[i + 1] = v[1]; pos[i + 2] = v[2];
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(mesh.idx, 1));
+  const out = toCreasedNormals(g, THREE.MathUtils.degToRad(32));
+  if (out !== g) g.dispose();
+  return out;
+}
+function makeMesh(geo, mat) {
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  return m;
+}
+function clearGroup(g) {
+  for (const c of [...g.children]) { g.remove(c); if (c.geometry) c.geometry.dispose(); if (c.children.length) clearGroup(c); }
+}
+
+// Print orientation for each part (mm, Z up, resting on the bed).
+const PRINT_XF = {
+  slider: (info) => (x, y, z) => [x, -y, info.zt - z],
+  foot: () => (x, y, z) => [x, -z, y],
+};
+function printPositions(mesh, xf) {
+  const p = new Float32Array(mesh.pos.length);
+  for (let i = 0; i < p.length; i += 3) {
+    const v = xf ? xf(mesh.pos[i], mesh.pos[i + 1], mesh.pos[i + 2]) : [mesh.pos[i], mesh.pos[i + 1], mesh.pos[i + 2]];
+    p[i] = v[0]; p[i + 1] = v[1]; p[i + 2] = v[2];
+  }
+  return p;
+}
+function boundsOf(pos) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { const v = pos[i + k]; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
+  return { min: mn, max: mx };
+}
+
+function updateScene(res, refit) {
+  const { parts, info } = res;
+  clearGroup(signGroup); clearGroup(feetGroup); clearGroup(printGroup);
+
+  signGroup.add(makeMesh(geometryFrom(parts.body), mats.base));
+  if (parts.labels) signGroup.add(makeMesh(geometryFrom(parts.labels), mats.label));
+  const pin = makeMesh(geometryFrom(parts.pin), mats.base);
+  pin.position.set(info.xPin, info.yc, 0);
+  signGroup.add(pin);
+  sliderMesh = makeMesh(geometryFrom(parts.slider), mats.slider);
+  sliderTarget = info.cells[state.current] ?? 0;
+  sliderMesh.position.x = sliderTarget;
+  signGroup.add(sliderMesh);
+
+  if (info.stand) {
+    signGroup.rotation.set(-info.stand.tilt * Math.PI / 180, 0, 0);
+    signGroup.position.set(0, info.stand.ty, info.stand.tz);
+    for (const f of parts.feet) feetGroup.add(makeMesh(geometryFrom(f), mats.base));
+  } else {
+    signGroup.rotation.set(0, 0, 0);
+    signGroup.position.set(0, 0, 0);
+  }
+
+  // print plate layout: parts laid flat, base on top row, small parts below
+  const bed = state.bed, bedD = bed === 250 ? 210 : bed;
+  const items = [
+    { mesh: parts.body, mat: mats.base, xf: null, key: 'body' },
+    { mesh: parts.slider, mat: mats.slider, xf: PRINT_XF.slider(info) },
+    { mesh: parts.pin, mat: mats.base, xf: null },
+    ...parts.feet.map((f) => ({ mesh: f, mat: mats.base, xf: PRINT_XF.foot() })),
+  ];
+  let rowY = null, cursorX = 0, rowH = 0;
+  const placed = [];
+  items.forEach((it, i) => {
+    const pos = printPositions(it.mesh, it.xf);
+    const b = boundsOf(pos);
+    const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1];
+    if (i === 0) { placed.push({ it, pos, b, x: -w / 2, y: 0, w, h }); rowY = -(h / 2) - 8; return; }
+    if (i === 1) { cursorX = -placed[0].w / 2; }
+    placed.push({ it, pos, b, x: cursorX, y: rowY - h, w, h });
+    cursorX += w + 8;
+    rowH = Math.max(rowH, h);
+  });
+  // centre the whole layout on the bed
+  const allMinX = Math.min(...placed.map((q) => q.x)), allMaxX = Math.max(...placed.map((q) => q.x + q.w));
+  const allMaxY = placed[0].h / 2, allMinY = Math.min(...placed.map((q) => q.y));
+  const offX = -(allMinX + allMaxX) / 2, offY = -(allMinY + allMaxY) / 2;
+  for (const q of placed) {
+    const g = new THREE.BufferGeometry();
+    const pos = q.pos;
+    for (let i = 0; i < pos.length; i += 3) {
+      pos[i] += -q.b.min[0] + q.x + offX;
+      pos[i + 1] += q === placed[0] ? -(q.b.min[1] + q.b.max[1]) / 2 + offY : -q.b.min[1] + q.y + offY;
+      pos[i + 2] += -q.b.min[2];
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setIndex(new THREE.BufferAttribute(q.it.mesh.idx, 1));
+    const geo = toCreasedNormals(g, THREE.MathUtils.degToRad(32));
+    const m = makeMesh(geo, q.it.mat);
+    m.rotation.x = -Math.PI / 2;
+    printGroup.add(m);
+    if (q.it.key === 'body' && parts.labels) {
+      const lpos = new Float32Array(parts.labels.pos);
+      const dx = -q.b.min[0] + q.x + offX, dy = -(q.b.min[1] + q.b.max[1]) / 2 + offY, dz = -q.b.min[2];
+      for (let i = 0; i < lpos.length; i += 3) { lpos[i] += dx; lpos[i + 1] += dy; lpos[i + 2] += dz; }
+      const lg = new THREE.BufferGeometry();
+      lg.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
+      lg.setIndex(new THREE.BufferAttribute(parts.labels.idx, 1));
+      const lm = makeMesh(toCreasedNormals(lg, THREE.MathUtils.degToRad(32)), mats.label);
+      lm.rotation.x = -Math.PI / 2;
+      printGroup.add(lm);
+    }
+  }
+  const bedMesh = new THREE.Mesh(new THREE.BoxGeometry(bed, 1.5, bedD), new THREE.MeshStandardMaterial({ color: 0x34373c, roughness: 0.85 }));
+  bedMesh.position.y = -0.76;
+  bedMesh.receiveShadow = true;
+  printGroup.add(bedMesh);
+  const grid = new THREE.GridHelper(Math.max(bed, bedD), Math.max(bed, bedD) / 10, 0x5d636b, 0x4a4f56);
+  grid.scale.set(bed / Math.max(bed, bedD), 1, bedD / Math.max(bed, bedD));
+  grid.position.y = 0.02;
+  printGroup.add(grid);
+
+  applyView(refit);
+}
+
+function applyView(refit) {
+  const assembled = state.view === 'assembled';
+  signGroup.visible = assembled;
+  feetGroup.visible = assembled;
+  printGroup.visible = !assembled;
+  const standing = assembled && result && result.info.stand;
+  wall.visible = assembled && !standing;
+  ground.visible = !!standing;
+  if (result) {
+    const info = result.info;
+    wall.position.set(0, 0, -0.05);
+    ground.position.set(0, 0, 0);
+    // light rig sized to the model
+    const target = assembled ? (standing ? new THREE.Vector3(0, info.H * 0.5, 0) : new THREE.Vector3(0, 0, 0)) : new THREE.Vector3(0, 0, 0);
+    const R = Math.max(info.W, info.H, state.bed) * 0.75;
+    key.position.set(target.x - R * 0.55, target.y + R * 0.95, target.z + R * 1.25);
+    key.target.position.copy(target);
+    const sc = key.shadow.camera;
+    sc.left = -R; sc.right = R; sc.top = R; sc.bottom = -R; sc.near = 1; sc.far = R * 6;
+    sc.updateProjectionMatrix();
+    fill.position.set(target.x + R, target.y + R * 0.2, target.z + R * 0.6);
+  }
+  $('#vpHint').textContent = assembled ? 'Drag the frame to change status · drag empty space to orbit' : 'Parts in print orientation · no supports needed';
+  if (refit) fitCamera();
+  requestRender();
+}
+
+function fitCamera() {
+  const assembled = state.view === 'assembled';
+  const obj = assembled ? signGroup : printGroup;
+  const box = new THREE.Box3().setFromObject(obj);
+  if (assembled && feetGroup.children.length) box.union(new THREE.Box3().setFromObject(feetGroup));
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const dir = assembled ? new THREE.Vector3(0.22, 0.2, 1).normalize() : new THREE.Vector3(0, 1.25, 0.95).normalize();
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const halfW = size.x / 2, halfH = (assembled ? size.y : Math.max(size.z, size.y)) / 2;
+  const dist = Math.max(halfW / Math.tan(hFov / 2), halfH / Math.tan(vFov / 2)) * 1.18 + size.z / 2;
+  camera.position.copy(center).addScaledVector(dir, dist);
+  camera.near = Math.max(0.5, dist / 100);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.update();
+  fitSize = renderer.getSize(new THREE.Vector2());
+  requestRender();
+}
+
+let fitSize = null;
+function resize() {
+  const r = viewportEl.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(r.width)), h = Math.max(1, Math.floor(r.height));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  // re-frame when the viewport changes a lot (first layout, rotation, panel resize)
+  if (result && fitSize && (Math.abs(w - fitSize.x) > fitSize.x * 0.25 || Math.abs(h - fitSize.y) > fitSize.y * 0.25)) fitCamera();
+  requestRender();
+}
+new ResizeObserver(resize).observe(viewportEl);
+resize();
+
+function loop() {
+  requestAnimationFrame(loop);
+  let moving = controls.update();
+  if (sliderMesh && !drag) {
+    const dx = sliderTarget - sliderMesh.position.x;
+    if (Math.abs(dx) > 0.01) { sliderMesh.position.x += reduceMotion ? dx : dx * 0.18; moving = true; }
+    else if (dx !== 0) { sliderMesh.position.x = sliderTarget; moving = true; }
+  }
+  if (moving || needsRender) { renderer.render(scene, camera); needsRender = false; }
+}
+
+// drag the frame along its track
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let drag = null;
+function rayFromEvent(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  raycaster.setFromCamera(ndc, camera);
+}
+function localX(e) {
+  rayFromEvent(e);
+  signGroup.updateMatrixWorld();
+  const ray = raycaster.ray.clone().applyMatrix4(signGroup.matrixWorld.clone().invert());
+  const zt = result.info.zt;
+  if (Math.abs(ray.direction.z) < 1e-6) return null;
+  const t = (zt - ray.origin.z) / ray.direction.z;
+  return ray.origin.x + t * ray.direction.x;
+}
+function nearestCell(x) {
+  const cells = result.info.cells;
+  let best = 0;
+  cells.forEach((c, i) => { if (Math.abs(c - x) < Math.abs(cells[best] - x)) best = i; });
+  return best;
+}
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (state.view !== 'assembled' || !sliderMesh || !result) return;
+  rayFromEvent(e);
+  if (!raycaster.intersectObject(sliderMesh, false).length) return;
+  const x = localX(e);
+  if (x == null) return;
+  drag = { id: e.pointerId, x0: x, p0: sliderMesh.position.x };
+  controls.enabled = false;
+  renderer.domElement.setPointerCapture(e.pointerId);
+  renderer.domElement.style.cursor = 'grabbing';
+  e.preventDefault();
+});
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!result || state.view !== 'assembled') return;
+  if (drag && e.pointerId === drag.id) {
+    const x = localX(e);
+    if (x == null) return;
+    const cells = result.info.cells;
+    sliderMesh.position.x = Math.min(cells[cells.length - 1], Math.max(cells[0], drag.p0 + x - drag.x0));
+    markStatusbar(nearestCell(sliderMesh.position.x));
+    requestRender();
+    return;
+  }
+  if (e.pointerType === 'mouse' && sliderMesh) {
+    rayFromEvent(e);
+    renderer.domElement.style.cursor = raycaster.intersectObject(sliderMesh, false).length ? 'grab' : '';
+  }
+});
+const endDrag = (e) => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag = null;
+  controls.enabled = true;
+  renderer.domElement.style.cursor = '';
+  setCurrent(nearestCell(sliderMesh.position.x));
+};
+renderer.domElement.addEventListener('pointerup', endDrag);
+renderer.domElement.addEventListener('pointercancel', endDrag);
+
+// ---------------------------------------------------------------------------
+// Export: binary STL + stored ZIP
+// ---------------------------------------------------------------------------
+function stlBlob(pos, idx, name) {
+  const n = idx.length / 3;
+  const buf = new ArrayBuffer(84 + n * 50), dv = new DataView(buf);
+  const head = ('Office Status Slider - ' + name).slice(0, 79);
+  for (let i = 0; i < head.length; i++) dv.setUint8(i, head.charCodeAt(i) & 0x7f);
+  dv.setUint32(80, n, true);
+  let o = 84;
+  for (let t = 0; t < n; t++) {
+    const a = idx[t * 3] * 3, b = idx[t * 3 + 1] * 3, c = idx[t * 3 + 2] * 3;
+    const ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+    const vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz) || 1;
+    nx /= l; ny /= l; nz /= l;
+    for (const v of [nx, ny, nz, pos[a], pos[a + 1], pos[a + 2], pos[b], pos[b + 1], pos[b + 2], pos[c], pos[c + 1], pos[c + 2]]) { dv.setFloat32(o, v, true); o += 4; }
+    dv.setUint16(o, 0, true); o += 2;
+  }
+  return new Uint8Array(buf);
+}
+const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipBlob(files) {
+  const enc = new TextEncoder(), chunks = [], central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  for (const f of files) {
+    const name = enc.encode(f.name), data = f.data, crc = crc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, data.length, true); lh.setUint32(22, data.length, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    chunks.push(new Uint8Array(lh.buffer), name, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, data.length, true); ch.setUint32(24, data.length, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((s, c) => s + c.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...chunks, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
+}
+function saveBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+// Files in print orientation. Base body and labels share one offset so they line up as a two-part object.
+function exportFiles() {
+  if (!result) return [];
+  const { parts, info } = result;
+  const tag = `${Math.round(info.W)}x${Math.round(info.H)}`;
+  const files = [];
+  const centre = (pos, ref) => {
+    const b = ref || boundsOf(pos);
+    const dx = -(b.min[0] + b.max[0]) / 2, dy = -(b.min[1] + b.max[1]) / 2, dz = -b.min[2];
+    const out = new Float32Array(pos.length);
+    for (let i = 0; i < pos.length; i += 3) { out[i] = pos[i] + dx; out[i + 1] = pos[i + 1] + dy; out[i + 2] = pos[i + 2] + dz; }
+    return out;
+  };
+  const baseRef = boundsOf(parts.body.pos);
+  const add = (key, name, label, mesh, pos) => files.push({ key, name: `status-slider_${tag}_${name}.stl`, label, mesh, pos });
+  add('base', 'base_one-color', 'Base, one color', parts.base, centre(parts.base.pos, baseRef));
+  if (parts.labels) {
+    add('body', 'base_body', 'Base body (multi-color)', parts.body, centre(parts.body.pos, baseRef));
+    add('labels', 'base_labels', 'Labels (multi-color)', parts.labels, centre(parts.labels.pos, baseRef));
+  }
+  add('slider', 'frame_slider', 'Frame slider', parts.slider, centre(printPositions(parts.slider, PRINT_XF.slider(info))));
+  add('pin', 'stop_pin', 'Stop pin', parts.pin, centre(parts.pin.pos));
+  parts.feet.forEach((f, i) => add('foot' + i, `desk_foot_${i ? 'right' : 'left'}`, `Desk foot, ${i ? 'right' : 'left'}`, f, centre(printPositions(f, PRINT_XF.foot()))));
+  return files;
+}
+function downloadOne(f) { saveBlob(new Blob([stlBlob(f.pos, f.mesh.idx, f.name)], { type: 'model/stl' }), f.name); }
+function downloadZip() {
+  const files = exportFiles();
+  if (!files.length) return;
+  const zfiles = files.map((f) => ({ name: f.name, data: stlBlob(f.pos, f.mesh.idx, f.name) }));
+  zfiles.push({ name: 'README.txt', data: new TextEncoder().encode(readmeText()) });
+  const i = result.info;
+  saveBlob(zipBlob(zfiles), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.zip`);
+}
+function readmeText() {
+  const i = result.info;
+  const lines = [
+    'Office Status Slider',
+    '====================',
+    `Plate ${i.W.toFixed(1)} x ${i.H.toFixed(1)} mm, ${i.zt.toFixed(1)} mm deep with the frame. Shape: ${engine.shapes[state.shape]}.`,
+    `Statuses: ${state.statuses.map((s) => s.text.replace(/\|/g, ' ')).join(' / ')}`,
+    '',
+    'Files (already in print orientation, no supports needed)',
+    '- base_one-color: plate, rails and labels as one part.',
+    i.raised ? '- base_body + base_labels: load both as ONE object with two parts for a multi-color printer (AMS, MMU). They share coordinates.' : '- Labels are engraved, so the base prints in one color.',
+    '- frame_slider: printed face-down.',
+    '- stop_pin: printed standing up.',
+    state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
+    '',
+    'Two colors on a single nozzle',
+    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + 0.2).toFixed(2)} mm layer with 0.2 mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
+    i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
+    '',
+    'Assembly',
+    '1. Slide the frame into the dovetail track from the LEFT end (the end with the small hole).',
+    '2. Press the stop pin into the hole. A drop of glue makes it permanent.',
+    state.mount === 'magnet' ? `3. Glue ${state.magN} magnets (${state.magD} x ${state.magH} mm) into the back pockets.` : null,
+    '',
+    `Slide clearance used: ${state.tol} mm. If the frame binds, regenerate with +0.05 mm.`,
+    `Design link: ${shareUrl()}`,
+  ];
+  return lines.filter((l) => l !== null).join('\r\n') + '\r\n';
+}
+function shareUrl() {
+  const { view, ...rest } = state;
+  const hash = '#cfg=' + encodeState(rest);
+  // a page opened from a data:/blob: URL has no address worth sharing; keep just the settings fragment
+  return /^(https?|file):$/.test(location.protocol) ? location.href.split('#')[0] + hash : hash;
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+let engine = null;
+const iconSvg = {};
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/\.0+$/, '');
+
+function svgIcon(name) {
+  if (!name || name === 'none' || !iconSvg[name]) return '<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="M-6 0h12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
+  return `<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="${iconSvg[name]}"/></svg>`;
+}
+
+function renderStatuses() {
+  const list = $('#statusList');
+  const focusedIdx = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.idx : null;
+  const focusedRole = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.role : null;
+  list.innerHTML = '';
+  state.statuses.forEach((st, i) => {
+    const li = document.createElement('li');
+    li.className = 'status-row';
+    li.innerHTML = `
+      <button class="pick" type="button" data-role="pick" data-idx="${i}" aria-label="Icon for status ${i + 1}: ${engine.icons[st.icon] || 'none'}">${svgIcon(st.icon)}</button>
+      <input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" aria-label="Status ${i + 1} text" autocomplete="off">
+      <span class="row-tools">
+        <button type="button" data-role="up" data-idx="${i}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></svg></button>
+        <button type="button" data-role="down" data-idx="${i}" aria-label="Move down" ${i === state.statuses.length - 1 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+        <button type="button" data-role="del" data-idx="${i}" aria-label="Remove status" ${state.statuses.length <= 2 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </span>`;
+    li.querySelector('input').value = st.text;
+    list.appendChild(li);
+  });
+  $('#statusCount').textContent = `${state.statuses.length} of 6`;
+  $('#addStatus').disabled = state.statuses.length >= 6;
+  if (focusedIdx != null && focusedRole) {
+    const el = list.querySelector(`[data-role="${focusedRole}"][data-idx="${focusedIdx}"]`);
+    if (el && !el.disabled) el.focus();
+  }
+  renderStatusbar();
+}
+
+function renderStatusbar() {
+  const bar = $('#statusbar');
+  bar.innerHTML = '';
+  state.statuses.forEach((st, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.setAttribute('role', 'radio');
+    b.dataset.idx = i;
+    b.tabIndex = i === state.current ? 0 : -1;
+    b.innerHTML = `${svgIcon(st.icon)}<span></span>`;
+    b.querySelector('span').textContent = (st.text || '—').replace(/\|/g, ' ');
+    bar.appendChild(b);
+  });
+  markStatusbar(state.current);
+}
+function markStatusbar(idx) {
+  $$('#statusbar button').forEach((b, i) => { b.setAttribute('aria-checked', String(i === idx)); b.tabIndex = i === idx ? 0 : -1; });
+}
+function setCurrent(i, focus) {
+  state.current = Math.max(0, Math.min(state.statuses.length - 1, i));
+  markStatusbar(state.current);
+  if (result) sliderTarget = result.info.cells[state.current] ?? 0;
+  if (focus) { const b = $$('#statusbar button')[state.current]; if (b) b.focus(); }
+  saveState();
+  requestRender();
+}
+$('#statusbar').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setCurrent(+b.dataset.idx); });
+$('#statusbar').addEventListener('keydown', (e) => {
+  const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
+});
+
+$('#statusList').addEventListener('input', (e) => {
+  const el = e.target;
+  if (el.dataset.role !== 'text') return;
+  state.statuses[+el.dataset.idx].text = el.value;
+  renderStatusbar();
+  changed();
+});
+$('#statusList').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const i = +b.dataset.idx, s = state.statuses;
+  if (b.dataset.role === 'pick') { openIconPicker(b, i); return; }
+  if (b.dataset.role === 'up' && i > 0) { [s[i - 1], s[i]] = [s[i], s[i - 1]]; if (state.current === i) state.current--; else if (state.current === i - 1) state.current++; }
+  if (b.dataset.role === 'down' && i < s.length - 1) { [s[i + 1], s[i]] = [s[i], s[i + 1]]; if (state.current === i) state.current++; else if (state.current === i + 1) state.current--; }
+  if (b.dataset.role === 'del' && s.length > 2) { s.splice(i, 1); state.current = Math.min(state.current, s.length - 1); }
+  renderStatuses();
+  changed();
+});
+$('#addStatus').addEventListener('click', () => {
+  if (state.statuses.length >= 6) return;
+  state.statuses.push({ text: 'BACK SOON', icon: 'clock' });
+  renderStatuses();
+  changed();
+  const inp = $(`#status-text-${state.statuses.length - 1}`);
+  if (inp) { inp.focus(); inp.select(); }
+});
+
+// icon picker
+const pop = $('#iconPopover');
+let popFor = null;
+function openIconPicker(btn, idx) {
+  popFor = { btn, idx };
+  const cur = state.statuses[idx].icon;
+  pop.innerHTML = Object.entries(engine.icons).map(([k, label]) => `<button type="button" data-icon="${k}" title="${label}" aria-label="${label}" aria-pressed="${k === cur}">${svgIcon(k)}</button>`).join('')
+    + `<button type="button" data-icon="none" title="No icon" aria-label="No icon" aria-pressed="${cur === 'none'}"><span class="none-label">none</span></button>`;
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.left));
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  const sel = pop.querySelector('[aria-pressed="true"]') || pop.querySelector('button');
+  sel.focus();
+}
+function closeIconPicker(refocus) {
+  if (pop.hidden) return;
+  pop.hidden = true;
+  if (refocus && popFor) popFor.btn.focus();
+  popFor = null;
+}
+pop.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !popFor) return;
+  const idx = popFor.idx;
+  state.statuses[idx].icon = b.dataset.icon;
+  closeIconPicker(false);
+  renderStatuses();
+  const btn = $(`#statusList [data-role="pick"][data-idx="${idx}"]`);
+  if (btn) btn.focus();
+  changed();
+});
+pop.addEventListener('keydown', (e) => {
+  const btns = $$('button', pop), i = btns.indexOf(document.activeElement);
+  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 5, ArrowUp: -5 }[e.key];
+  if (step && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + step))].focus(); }
+  if (e.key === 'Escape') closeIconPicker(true);
+});
+document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !(popFor && popFor.btn.contains(e.target))) closeIconPicker(false); });
+window.addEventListener('resize', () => closeIconPicker(false));
+
+function renderPresets() {
+  const wrap = $('#presetChips');
+  wrap.innerHTML = '';
+  PRESETS.forEach((p) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = p.name;
+    b.addEventListener('click', () => {
+      state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
+      state.current = 0;
+      renderStatuses();
+      changed();
+    });
+    wrap.appendChild(b);
+  });
+}
+function renderShapes() {
+  const grid = $('#shapeGrid');
+  grid.innerHTML = '';
+  for (const [k, label] of Object.entries(engine.shapes)) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
+    b.setAttribute('aria-pressed', String(state.shape === k));
+    b.innerHTML = `<svg viewBox="-104 -40 208 80" aria-hidden="true"><path d="${engine.shapePath(k)}"/></svg><span>${label}</span>`;
+    b.addEventListener('click', () => {
+      state.shape = k;
+      $$('.shape-tile').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.shape === k)));
+      $('#shapeName').textContent = label;
+      changed();
+    });
+    grid.appendChild(b);
+  }
+  $('#shapeName').textContent = engine.shapes[state.shape];
+}
+function renderPalettes() {
+  const row = $('#palettes');
+  row.innerHTML = '';
+  PALETTES.forEach((p) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<i><b style="background:${p.base}"></b><b style="background:${p.label}"></b><b style="background:${p.slider}"></b></i>&nbsp;${p.name}`;
+    b.addEventListener('click', () => {
+      Object.assign(state, { colBase: p.base, colLabel: p.label, colSlider: p.slider });
+      syncControls();
+      applyColors();
+      saveState();
+    });
+    row.appendChild(b);
+  });
+}
+
+// generic controls bound with data-key
+const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
+const NO_REBUILD = new Set(['bed']);
+function syncControls() {
+  for (const el of $$('[data-key]')) {
+    const k = el.dataset.key, v = state[k];
+    if (el.classList.contains('seg')) {
+      $$('button', el).forEach((b) => b.setAttribute('aria-checked', String(String(v) === b.dataset.value)));
+    } else if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = v;
+  }
+  for (const el of $$('[data-mirror]')) el.value = state[el.dataset.mirror];
+  $('#frameOut').textContent = fmt(state.frame) + ' mm';
+  $('#winROut').textContent = fmt(state.winR) + ' mm';
+  $('#railHOut').textContent = fmt(state.railH) + ' mm';
+  $('#tolOut').textContent = state.tol.toFixed(2) + ' mm';
+  $('#magDOut').textContent = fmt(state.magD) + ' mm';
+  $('#magHOut').textContent = fmt(state.magH) + ' mm';
+  $('#tiltOut').textContent = state.tilt + '°';
+  $('#sizeSummary').textContent = `${state.width} × ${state.height} mm`;
+  $('#magnetOpts').hidden = state.mount !== 'magnet';
+  $('#standOpts').hidden = state.mount !== 'stand';
+  $('#mountHint').textContent = MOUNT_HINTS[state.mount];
+  $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
+}
+function setKey(k, raw) {
+  let v = raw;
+  if (RANGES[k]) { v = +raw; if (!Number.isFinite(v)) return; v = Math.min(RANGES[k][1], Math.max(RANGES[k][0], v)); }
+  else if (k === 'magN' || k === 'bed') v = +raw;
+  state[k] = v;
+  syncControls();
+  if (COLOR_KEYS.has(k)) { applyColors(); saveState(); return; }
+  if (NO_REBUILD.has(k)) { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
+  changed();
+}
+for (const el of $$('[data-key]')) {
+  const k = el.dataset.key;
+  if (el.classList.contains('seg')) {
+    el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setKey(k, b.dataset.value); });
+    el.addEventListener('keydown', (e) => {
+      const btns = $$('button', el), i = btns.findIndex((b) => b.getAttribute('aria-checked') === 'true');
+      const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (d) { e.preventDefault(); const nb = btns[(i + d + btns.length) % btns.length]; setKey(k, nb.dataset.value); nb.focus(); }
+    });
+  } else if (el.type === 'checkbox') el.addEventListener('change', () => setKey(k, el.checked));
+  else if (el.type === 'color') el.addEventListener('input', () => setKey(k, el.value));
+  else el.addEventListener('input', () => setKey(k, el.value));
+}
+for (const el of $$('[data-mirror]')) {
+  el.addEventListener('change', () => setKey(el.dataset.mirror, el.value));
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') setKey(el.dataset.mirror, el.value); });
+}
+$('#viewSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.dataset.value === state.view) return;
+  state.view = b.dataset.value;
+  syncControls();
+  applyView(true);
+  saveState();
+});
+$('#resetView').addEventListener('click', fitCamera);
+
+function applyColors() {
+  mats.base.color.set(state.colBase);
+  mats.label.color.set(state.colLabel);
+  mats.slider.color.set(state.colSlider);
+  requestRender();
+}
+
+function setBuildState(kind, text) {
+  const el = $('#buildState');
+  el.dataset.state = kind;
+  el.textContent = text;
+}
+function showError(msg) {
+  const t = $('#errorToast');
+  t.textContent = msg || '';
+  t.hidden = !msg;
+}
+
+function updateReadout() {
+  if (!result) return;
+  const i = result.info;
+  $('#vpDims').textContent = `${fmt(i.W)} × ${fmt(i.H)} × ${fmt(i.zt)} mm`;
+  $('#roWindow').textContent = `${fmt(i.ww)} × ${fmt(i.wh)} mm`;
+  const ro = $('#roText');
+  ro.textContent = i.capMin ? `${fmt(i.capMin)} mm caps` : 'icons only';
+  ro.className = i.capMin && i.capMin < 3.5 ? 'bad' : '';
+  $('#roColor').textContent = i.raised ? `Z ${i.T.toFixed(2)} → ${(i.T + i.Lh).toFixed(2)} mm` : 'not needed';
+  const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
+  const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
+  const bed = $('#roBed');
+  bed.textContent = fitsBed ? `fits ${bedW} × ${bedD}` : `too big for ${bedW} × ${bedD}`;
+  bed.className = fitsBed ? 'good' : 'bad';
+  const warns = [...i.warnings];
+  if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the width or pick a larger bed.`);
+  $('#warnings').innerHTML = '';
+  for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
+  renderExport();
+}
+
+function renderExport() {
+  const files = exportFiles();
+  const ul = $('#partsList');
+  ul.innerHTML = '';
+  for (const f of files) {
+    const b = boundsOf(f.pos);
+    const li = document.createElement('li');
+    const grams = f.mesh.vol / 1000 * 1.24;
+    li.innerHTML = `<div><div class="pname"></div><div class="pmeta">${fmt(b.max[0] - b.min[0])} × ${fmt(b.max[1] - b.min[1])} × ${fmt(b.max[2] - b.min[2])} mm · ${fmt(f.mesh.vol / 1000, 1)} cm³ · ≈${Math.max(1, Math.round(grams))} g solid PLA</div></div>`;
+    li.querySelector('.pname').textContent = f.label;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn small'; btn.textContent = 'STL';
+    btn.setAttribute('aria-label', `Download ${f.label} STL`);
+    btn.addEventListener('click', () => downloadOne(f));
+    li.appendChild(btn);
+    ul.appendChild(li);
+  }
+  const i = result.info;
+  const steps = [
+    `<b>Print</b> every part as exported. They are already oriented for printing and need no supports; the frame prints face-down.`,
+    i.raised
+      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + 0.2).toFixed(2)} mm</span> layer at 0.2 mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
+      : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
+    `<b>Assemble:</b> slide the frame into the track from the left end (the end with the small hole), then press in the stop pin.`,
+    state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
+    state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
+    `<b>Fit:</b> clearance is ${state.tol.toFixed(2)} mm. If the frame binds, add 0.05 mm and reprint only the frame.`,
+  ].filter(Boolean);
+  $('#steps').innerHTML = steps.map((s) => `<li>${s}</li>`).join('');
+}
+
+// ---------------------------------------------------------------------------
+// Build pipeline
+// ---------------------------------------------------------------------------
+const fontCache = {};
+function getFont(key) {
+  if (!fontCache[key]) {
+    fontCache[key] = new Promise((res, rej) => new FontLoader().load(FONT_BASE + FONT_FILES[key], res, undefined, rej))
+      .catch((e) => { delete fontCache[key]; throw new Error('Could not load the typeface. Check your connection and try again.'); });
+  }
+  return fontCache[key];
+}
+
+let rebuildTimer = 0, building = false, pending = false, firstBuild = true;
+let lastSizeKey = '';
+function changed() {
+  saveState();
+  if (!engine) return;
+  clearTimeout(rebuildTimer);
+  setBuildState('busy', 'Rebuilding…');
+  rebuildTimer = setTimeout(rebuild, 140);
+}
+async function rebuild() {
+  if (building) { pending = true; return; }
+  building = true;
+  try {
+    const font = await getFont(state.font);
+    const t0 = performance.now();
+    const params = { ...state, statuses: state.statuses.map((s) => ({ ...s })) };
+    result = engine.build(params, font);
+    const ms = performance.now() - t0;
+    if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
+    const sizeKey = [state.width, state.height, state.mount === 'stand', state.view].join('|');
+    updateScene(result, firstBuild || sizeKey !== lastSizeKey);
+    lastSizeKey = sizeKey;
+    firstBuild = false;
+    updateReadout();
+    showError('');
+    setBuildState('ok', `Built in ${Math.round(ms)} ms`);
+    $('#dlZip').disabled = false;
+    $('#dlZip2').disabled = false;
+  } catch (e) {
+    if (!e.user) console.error(e);
+    showError(e.user ? e.message : 'Something went wrong while building the model: ' + (e.message || e));
+    setBuildState('error', e.user ? 'Check the size' : 'Build failed');
+    // the preview still shows the last good model; don't let it be exported as if it matched the settings
+    $('#dlZip').disabled = true;
+    $('#dlZip2').disabled = true;
+    $$('#partsList button').forEach((b) => { b.disabled = true; });
+  } finally {
+    building = false;
+    if (pending) { pending = false; rebuild(); }
+  }
+}
+
+$('#dlZip').addEventListener('click', downloadZip);
+$('#dlZip2').addEventListener('click', downloadZip);
+$('#copyLink').addEventListener('click', async () => {
+  const url = shareUrl();
+  const note = $('#copyNote');
+  try {
+    await navigator.clipboard.writeText(url);
+    note.textContent = 'Link copied. Anyone who opens it gets this exact design.';
+  } catch (e) {
+    note.textContent = url;
+  }
+});
+$('#resetAll').addEventListener('click', () => {
+  const view = state.view;
+  state = structuredClone(DEFAULTS);
+  state.view = view;
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  syncControls(); renderStatuses(); renderShapes(); applyColors();
+  lastSizeKey = '';
+  changed();
+});
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+syncControls();
+applyColors();
+renderPresets();
+renderPalettes();
+requestAnimationFrame(loop);
+
+(async () => {
+  try {
+    const [{ default: Module }] = await Promise.all([import(MANIFOLD_URL), getFont(state.font)]);
+    const wasm = await Module();
+    wasm.setup();
+    engine = createEngine(wasm);
+    for (const k of Object.keys(engine.icons)) iconSvg[k] = engine.iconPath(k);
+    renderShapes();
+    renderStatuses();
+    $('#overlay').hidden = true;
+    await rebuild();
+    if (location.hash.startsWith('#cfg=')) history.replaceState(null, '', location.pathname + location.search);
+  } catch (e) {
+    console.error(e);
+    $('#overlay').innerHTML = '<div><strong>The 3D engine did not load</strong>This page needs an internet connection the first time to fetch three.js and Manifold from cdn.jsdelivr.net. Reload to try again.</div>';
+    setBuildState('error', 'Engine unavailable');
+  }
+})();
+</script>
+</body>
+</html>
