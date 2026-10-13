@@ -702,6 +702,79 @@ function createEngine(wasm) {
         stroke([P(-0.18, -0.43), P(0.18, -0.43)], w * 1.1),
       ]),
     },
+    // business trip: a solid case with a handle, a seam across it and a clasp
+    briefcase: {
+      label: 'Business trip', make: (s, w, P) => {
+        const body = rrect(0.94 * s, 0.62 * s, 0.1 * s, 0, -0.14 * s);
+        const seam = rect(0.94 * s + 2, Math.max(w * 0.7, 0.05 * s), 0, -0.07 * s);
+        return union([
+          body.subtract(seam),
+          rrect(0.2 * s, 0.15 * s, 0.03 * s, 0, -0.07 * s),
+          stroke([P(-0.17, 0.16), P(-0.17, 0.33), P(0.17, 0.33), P(0.17, 0.16)], w * 1.05),
+        ]);
+      },
+    },
+    // vacation: a leaning palm with five fronds on a small island
+    palm: {
+      label: 'Vacation', make: (s, w, P) => {
+        const crown = [0.06, 0.14];
+        const curve = (a, b, bend, n = 10) => {
+          const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy);
+          const c = [mx - dy / l * bend, my + dx / l * bend], pts = [];
+          for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; pts.push(P(u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1])); }
+          return pts;
+        };
+        // fronds arch up from the crown and droop at their tips
+        const tips = [[-0.46, -0.08], [-0.36, 0.3], [-0.02, 0.46], [0.38, 0.34], [0.5, -0.06]];
+        return union([
+          stroke(curve([-0.14, -0.42], crown, -0.1), w * 1.3), // trunk
+          ...tips.map((tip) => stroke(curve(crown, tip, tip[0] < crown[0] ? -0.15 : 0.15), w * 1.1)),
+          circle(0.055 * s, 0.0, 0.07 * s), circle(0.055 * s, 0.12 * s, 0.07 * s), // coconuts
+          CrossSection.circle(1, 48).scale([0.34 * s, 0.09 * s]).translate([-0.06 * s, -0.46 * s]).intersect(rect(s, 0.2 * s, 0, -0.4 * s)),
+        ]);
+      },
+    },
+    // client visit nearby: a car, side on, with windows and wheels set in their arches
+    car: {
+      label: 'Client visit', make: (s, w, P) => {
+        const wheels = [-0.26, 0.26].map((x) => [x * s, -0.2 * s]);
+        let lower = rrect(0.96 * s, 0.26 * s, 0.08 * s, 0, -0.1 * s);
+        const cabin = poly([P(-0.3, 0.0), P(-0.17, 0.26), P(0.17, 0.26), P(0.33, 0.0)]).offset(-0.02 * s, 'Round', 2, 12).offset(0.02 * s, 'Round', 2, 12);
+        const glass = cabin.offset(-w * 0.9, 'Round', 2, 12).intersect(rect(s, 0.4 * s, 0, 0.23 * s)).subtract(rect(w * 0.9, s, 0.01 * s, 0));
+        for (const [x, y] of wheels) lower = lower.subtract(circle(0.16 * s, x, y));
+        return union([lower, cabin.subtract(glass), ...wheels.map(([x, y]) => circle(Math.max(0.11 * s, w), x, y))]);
+      },
+    },
+    // at the factory: saw-tooth roof, a chimney and a row of windows
+    factory: {
+      label: 'Factory', make: (s, w, P) => {
+        const hall = poly([P(-0.46, -0.42), P(0.46, -0.42), P(0.46, 0.14), P(0.16, -0.02), P(0.16, 0.14), P(-0.14, -0.02), P(-0.14, 0.14), P(-0.46, -0.02)]);
+        const win = Math.max(0.12 * s, w * 1.2);
+        return union([hall, rect(0.13 * s, 0.4 * s, -0.36 * s, 0.22 * s)]).subtract(union([-0.27, 0.01, 0.29].map((x) => rect(win, win, x * s, -0.2 * s))));
+      },
+    },
+    // stepped out: a door frame open on one side with an arrow leaving it
+    exit: {
+      label: 'Stepped out', make: (s, w, P) => union([
+        stroke([P(-0.06, 0.42), P(-0.42, 0.42), P(-0.42, -0.42), P(-0.06, -0.42)], w * 1.1),
+        stroke([P(-0.16, 0), P(0.42, 0)], w * 1.1),
+        stroke([P(0.24, 0.18), P(0.43, 0), P(0.24, -0.18)], w * 1.1),
+      ]),
+    },
+    // sick: a thermometer, an outlined tube on a solid bulb, with marks beside it
+    thermo: {
+      label: 'Sick', make: (s, w, P) => {
+        const tw = Math.max(0.3 * s, 2 * w + 1.2), a = P(-0.06, -0.24), b = P(-0.06, 0.38);
+        const tube = cap(a, b, tw).subtract(cap(a, b, tw - 2 * w));
+        const inner = tw - 2 * w - 1.4 * w;
+        return union([
+          tube,
+          circle(0.2 * s, -0.06 * s, -0.3 * s),
+          inner > 0.8 ? cap(P(-0.06, -0.24), P(-0.06, 0.1), inner) : null,
+          ...[0.3, 0.16, 0.02].map((y) => stroke([P(0.17, y), P(0.33, y)], w * 0.9)),
+        ]);
+      },
+    },
   };
   let minLine = 0.8; // set per build: the thinnest line worth drawing, two nozzle widths
   const iconCS = (name, s) => {
@@ -1610,13 +1683,19 @@ const PRESETS_RAW = [
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
   ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
-  ['STEP OUT', 'pin'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
+  ['STEP OUT', 'exit'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
   ['VIDEO CALL', 'headset'], ['ON THE PHONE', 'headset'], ['CLOSED', 'dnd'], ['PRIVATE', 'dnd'], ['DEADLINE', 'dnd'],
   ['BUSY', 'hourglass'], ['BE RIGHT BACK', 'hourglass'], ['FOCUS', 'target'], ['DEEP WORK', 'target'],
   ['LAB', 'flask'], ['IN THE LAB', 'flask'], ['LAB IN USE', 'flask'], ['LAB CLOSED', 'flask'], ['SAMPLE RUNNING', 'flask'], ['實驗室', 'flask'], ['實驗中', 'flask'],
   ['外出中', 'plane'], ['午休中', 'forkknife'], ['請敲門', 'check'], ['稍後回來', 'clock'], ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
   ['AT LUNCH', 'forkknife'], ['OUT TO EAT', 'forkknife'], ['WORKING FROM HOME', 'house'], ['REMOTE', 'house'],
-  ['ON A TRIP', 'plane'], ['ON VACATION', 'plane'], ['OUT OF TOWN', 'plane'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
+  ['ON A TRIP', 'plane'], ['OUT OF TOWN', 'plane'],
+  ['BUSINESS TRIP', 'briefcase'], ['ON A BUSINESS TRIP', 'briefcase'], ['出差中', 'briefcase'],
+  ['VISITING A CLIENT', 'car'], ['AT A CLIENT', 'car'], ['拜訪客戶', 'car'], ['外出拜訪', 'car'],
+  ['AT THE FACTORY', 'factory'], ['AT THE PLANT', 'factory'], ['在工廠', 'factory'], ['廠區支援', 'factory'],
+  ['STEPPED OUT', 'exit'], ['OUT OF THE OFFICE', 'exit'], ['暫時離開', 'exit'], ['離開辦公室', 'exit'],
+  ['ON VACATION', 'palm'], ['ON HOLIDAY', 'palm'], ['休假中', 'palm'], ['年假', 'palm'],
+  ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['病假中', 'thermo'], ['身體不適', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
 ];
 const STATUS_SETS = (() => {
