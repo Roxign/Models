@@ -9,26 +9,14 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
+/* Layout: a sticky 3D preview with the status cards on the left, settings on the right; one column on phones */
 :root {
-  /* Layout: a sticky 3D build window on the left, a scrolling control rail on the right; one column on phones */
-  --bg: #E6E9ED;
-  --panel: #F7F8FA;
-  --soft: #EDF0F3;
-  --ink: #14171B;
-  --muted: #5A636E;
-  --line: #CED4DB;
-  --accent: #2346D6;
-  --accent-ink: #FFFFFF;
-  --accent-soft: rgba(35, 70, 214, 0.10);
-  --stage: #D8DDE3;
-  --warn: #8A4F00;
-  --warn-bg: #FFF0D4;
-  --good: #16714A;
-  --danger: #B42318;
+  --bg: #E6E9ED; --panel: #F7F8FA; --soft: #EDF0F3; --ink: #14171B; --muted: #5A636E; --line: #CED4DB;
+  --accent: #2346D6; --accent-ink: #FFFFFF; --accent-soft: rgba(35, 70, 214, 0.10); --stage: #D8DDE3;
+  --warn: #8A4F00; --warn-bg: #FFF0D4; --good: #16714A; --danger: #B42318;
   --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
   --font-body: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-  --radius: 10px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -48,240 +36,175 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: 14px;
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
-}
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-body); -webkit-font-smoothing: antialiased; }
 button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
+.mono { font-family: var(--font-mono); font-size: 0.95em; }
+.hint { margin: 0; color: var(--muted); font-size: 12.5px; }
 
-/* ---------- top bar ---------- */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 14px 16px 10px;
-}
+/* top bar */
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 14px 16px 10px; }
 .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .brand svg { flex: none; }
-.brand h1 {
-  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750;
-  font-size: 19px; letter-spacing: -0.01em; text-wrap: balance;
-}
+.brand h1 { margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 19px; letter-spacing: -0.01em; }
 .brand p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
 .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.build-state {
-  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
-  display: inline-flex; align-items: center; gap: 6px;
-}
+.build-state { font-family: var(--font-mono); font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .build-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
 .build-state[data-state="busy"]::before { background: var(--warn); animation: pulse 0.9s infinite alternate; }
 .build-state[data-state="error"] { color: var(--danger); }
 .build-state[data-state="error"]::before { background: var(--danger); }
 @keyframes pulse { to { opacity: 0.25; } }
 
+/* buttons */
 .btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
-  padding: 8px 12px; font-weight: 550; font-size: 13px; line-height: 1.2;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--line); background: var(--panel);
+  border-radius: 8px; padding: 8px 12px; font-weight: 550; font-size: 13px; line-height: 1.2;
 }
 .btn:hover { border-color: var(--muted); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.small { padding: 6px 9px; font-size: 12px; }
+.btn.wide { width: 100%; padding-block: 10px; }
+.linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 600; }
+.linkish:hover { text-decoration: underline; }
+.icon-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent); }
+.icon-btn:hover { border-color: var(--muted); }
 
-/* ---------- app grid ---------- */
-.app {
-  display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start;
-  padding-inline: 16px; padding-block: 4px 32px; max-width: 1560px; margin: 0 auto;
-}
+/* page layout */
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; padding-inline: 16px; padding-block: 4px 32px; max-width: 1560px; margin: 0 auto; }
 .stage-col { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.viewport {
-  position: relative; height: min(64vh, 640px); min-height: 320px;
-  border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--stage);
-}
+
+/* 3D viewport */
+.viewport { position: relative; height: min(64vh, 640px); min-height: 320px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--stage); }
 .viewport canvas { display: block; width: 100%; height: 100%; }
 .vp-top { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
 .vp-top > * { pointer-events: auto; }
 .vp-bottom { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; align-items: end; gap: 8px; pointer-events: none; flex-wrap: wrap; }
-.vp-hint, .vp-dims {
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
-  background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px;
-}
+.vp-hint, .vp-dims { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--panel) 82%, transparent); padding: 4px 8px; border-radius: 6px; }
 .vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
-.overlay {
-  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
-  background: color-mix(in srgb, var(--stage) 88%, transparent); color: var(--muted);
-}
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; background: color-mix(in srgb, var(--stage) 88%, transparent); color: var(--muted); }
 .overlay strong { display: block; color: var(--ink); font-family: var(--font-display); font-stretch: 112%; font-size: 15px; margin-bottom: 4px; }
 .error-toast {
-  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); max-width: min(92%, 520px);
-  background: var(--panel); border: 1px solid var(--danger); color: var(--ink); border-radius: 8px;
-  padding: 8px 12px; font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.12);
+  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); max-width: min(92%, 520px); background: var(--panel);
+  border: 1px solid var(--danger); border-radius: 8px; padding: 8px 12px; font-size: 13px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
 }
 
-/* segmented controls */
-.seg { display: inline-flex; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; padding: 2px; gap: 2px; flex-wrap: wrap; }
-.seg button {
-  border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 550; color: var(--muted);
-}
-.seg button[aria-checked="true"], .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+/* form controls */
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; background: var(--soft); border: 1px solid var(--line); border-radius: 8px; }
+.seg button { border: 0; background: transparent; padding: 5px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 550; color: var(--muted); }
+.seg button[aria-checked="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 .vp-top .seg { background: color-mix(in srgb, var(--panel) 85%, transparent); }
-.icon-btn {
-  width: 32px; height: 32px; display: inline-grid; place-items: center; border-radius: 8px;
-  border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 85%, transparent);
-}
-.icon-btn:hover { border-color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.field label, .field .lbl { font-size: 13px; font-weight: 550; }
+.field output { font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
+select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--line); background: var(--soft); border-radius: 8px; padding: 7px 9px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 12px; }
+.spec { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.spec b { font-weight: 500; color: var(--ink); }
+.spec .good { color: var(--good); }
+.spec .bad { color: var(--danger); }
 
-/* sign row: the Base card, then one card per status in the sign's left-to-right order */
+/* status cards: one per label, in the same left-to-right order as the printed sign */
 .statuses { display: flex; flex-direction: column; gap: 10px; }
 .st-head { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; }
-.st-head h2 {
-  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px;
-  letter-spacing: 0.06em; text-transform: uppercase;
-}
+.st-head h2 { margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; }
 .st-head .hint { flex: 1 1 200px; min-width: 0; }
-.st-head .hint b { color: var(--ink); font-weight: 600; }
 .st-actions { display: flex; gap: 6px; align-items: center; }
 .st-head select { width: auto; max-width: 100%; padding-block: 5px; font-size: 12.5px; }
-.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; }
+.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
 .st-card {
-  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px 8px 8px;
-  display: flex; flex-direction: column; gap: 6px; cursor: pointer; min-width: 0; text-align: left;
-  transition: border-color 0.15s, background-color 0.15s;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px 8px 8px; min-width: 0;
+  display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
 }
 .st-card:hover { border-color: var(--muted); }
-.st-card.is-selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-.st-top { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.st-card.is-current { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.st-top { display: flex; align-items: center; gap: 4px; }
 .st-show { width: 26px; height: 32px; border: 0; background: transparent; padding: 0; border-radius: 6px; display: grid; place-items: center; color: var(--muted); flex: none; }
 .st-show .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; }
 .st-card.is-current .st-show { color: var(--accent); }
 .st-card.is-current .st-show .dot { background: currentColor; box-shadow: inset 0 0 0 2.5px var(--panel); }
-.st-glyph {
-  flex: none; width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft);
-  display: grid; place-items: center;
-}
-.st-glyph svg { width: 19px; height: 19px; fill: currentColor; }
-.base-card .st-glyph svg { width: 22px; height: 22px; fill: none; }
-.st-pos { margin-left: auto; font-family: var(--font-mono); font-size: 11px; color: var(--muted); padding-right: 2px; }
-.st-card input { font-family: var(--font-display); font-stretch: 78%; font-weight: 650; font-size: 13.5px; letter-spacing: 0; padding: 7px 6px; }
-.base-title { font-family: var(--font-display); font-stretch: 118%; font-weight: 750; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; padding-left: 4px; }
-.base-sum {
-  display: block; font-family: var(--font-mono); font-size: 12px; color: var(--muted); padding: 7px 8px; border-radius: 8px;
-  background: var(--soft); border: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums;
-}
+.st-top .pick { flex: none; width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); display: grid; place-items: center; padding: 0; }
+.st-top .pick svg { width: 19px; height: 19px; fill: currentColor; }
+.st-top .pick:hover { border-color: var(--muted); }
+.st-tools { margin-left: auto; display: flex; }
+.st-tools button { width: 22px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.st-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
+.st-tools button:disabled { opacity: 0.28; cursor: default; }
+.st-tools svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.st-card input { font-family: var(--font-display); font-stretch: 78%; font-weight: 650; font-size: 13.5px; padding: 7px 6px; }
 .warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .warnings li { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
 
-/* ---------- control rail ---------- */
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; min-width: 0; }
-.section { padding: 16px 18px 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
-.section:first-child { border-top: 0; }
-.section h3 {
-  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px;
-  letter-spacing: 0.06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+/* icon picker */
+.popover {
+  position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 8px; display: grid; grid-template-columns: repeat(5, 44px); gap: 4px;
 }
-.section h3 small { font-family: var(--font-mono); font-stretch: 100%; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11.5px; }
-.hint { margin: 0; color: var(--muted); font-size: 12.5px; }
+.popover button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; padding: 0; }
+.popover button svg { width: 24px; height: 24px; fill: currentColor; }
+.popover button:hover { background: var(--soft); }
+.popover button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.popover .none-label { font-size: 10.5px; color: var(--muted); }
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.field label, .field .lbl { font-size: 13px; font-weight: 550; }
-.num {
-  width: 72px; text-align: right; font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums;
-  border: 1px solid var(--line); background: var(--soft); border-radius: 6px; padding: 3px 6px;
+/* settings panel */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; min-width: 0; overflow: hidden; }
+.section { padding: 16px 18px 18px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px; }
+#settings > .section:first-child { border-top: 0; }
+.section h2 {
+  margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px; letter-spacing: 0.06em;
+  text-transform: uppercase; display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
 }
-.unit { color: var(--muted); font-family: var(--font-mono); font-size: 11.5px; margin-left: 4px; }
-input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
-.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-select, input[type="text"] {
-  border: 1px solid var(--line); background: var(--soft); border-radius: 8px; padding: 7px 9px; width: 100%; min-width: 0;
-}
-.check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; }
-.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.section h2 small { font-family: var(--font-mono); font-stretch: 100%; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--muted); font-size: 11.5px; }
+details.section { display: block; }
+details.section > summary { list-style: none; cursor: pointer; }
+details.section > summary::-webkit-details-marker { display: none; }
+details.section > summary h2 { justify-content: flex-start; gap: 10px; }
+details.section > summary h2::before { content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform 0.15s; }
+details.section[open] > summary h2::before { transform: rotate(45deg); }
+.more-body { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
 
 /* shapes */
 .shape-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.shape-tile {
-  border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 8px 6px 6px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 550; color: var(--muted);
-}
+.shape-tile { border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 550; color: var(--muted); }
 .shape-tile svg { width: 100%; height: 34px; }
-.shape-tile svg path { fill: color-mix(in srgb, currentColor 16%, transparent); stroke: currentColor; stroke-width: 3; vector-effect: non-scaling-stroke; stroke-width: 1.4; }
+.shape-tile svg path { fill: color-mix(in srgb, currentColor 16%, transparent); stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .shape-tile:hover { border-color: var(--muted); }
 .shape-tile[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 
 /* colors */
-.swatches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .swatch { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; font-weight: 550; }
 .swatch input[type="color"] { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); padding: 3px; cursor: pointer; }
 .palette-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .palette-row button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 8px 3px 4px; display: inline-flex; gap: 5px; align-items: center; font-size: 11.5px; }
 .palette-row i { display: inline-flex; }
-.palette-row i b { width: 12px; height: 12px; border-radius: 50%; display: block; margin-right: -3px; border: 1px solid rgba(0,0,0,.2); }
+.palette-row i b { width: 12px; height: 12px; border-radius: 50%; display: block; margin-right: -3px; border: 1px solid rgba(0, 0, 0, 0.2); }
 
-/* export */
-.parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+/* print */
+.parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--line); }
 .parts li:first-child { border-top: 0; }
 .parts .pname { font-weight: 600; font-size: 13px; }
 .parts .pmeta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 12.5px; }
 .steps b { color: var(--ink); font-weight: 600; }
-.mono { font-family: var(--font-mono); font-size: 0.95em; }
-.foot-actions { display: flex; gap: 16px; flex-wrap: wrap; }
-.btn.wide { width: 100%; padding-block: 10px; }
-.linkish { border: 0; background: none; padding: 0; color: var(--accent); font-size: 12.5px; font-weight: 600; }
-.linkish:hover { text-decoration: underline; }
-.spec { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.spec b { font-weight: 500; color: var(--ink); }
-.spec .good { color: var(--good); }
-.spec .bad { color: var(--danger); }
-details.section { display: block; }
-details.section > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-details.section > summary::-webkit-details-marker { display: none; }
-details.section > summary h3 { display: inline-flex; align-items: center; gap: 10px; }
-details.section > summary h3::before {
-  content: ""; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg); transition: transform 0.15s;
-}
-details.section[open] > summary h2::before { transform: rotate(45deg); }
-details.section > summary small { font-family: var(--font-mono); color: var(--muted); font-size: 11.5px; }
-.more-body { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; }
 .files > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); }
 .files[open] > summary { margin-bottom: 8px; }
+.foot-actions { display: flex; gap: 16px; flex-wrap: wrap; }
 
-.ctx-head { padding: 18px 18px 14px; display: flex; flex-direction: column; gap: 4px; }
-.ctx-head h2 { margin: 0; font-family: var(--font-display); font-stretch: 118%; font-weight: 750; font-size: 17px; letter-spacing: -0.005em; text-wrap: balance; }
-.field-stack { display: flex; flex-direction: column; gap: 12px; }
-.icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
-.icon-grid button {
-  border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 9px 4px 7px; color: var(--ink);
-  display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0;
-}
-.icon-grid button svg { width: 24px; height: 24px; fill: currentColor; }
-.icon-grid button span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.icon-grid button .none-mark { font-size: 20px; line-height: 24px; color: var(--muted); }
-.icon-grid button:hover { border-color: var(--muted); }
-.icon-grid button[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.icon-grid button[aria-checked="true"] span { color: var(--accent); }
-.order-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn.danger { color: var(--danger); }
-.btn.danger:hover:not(:disabled) { border-color: var(--danger); }
-.print-section { border-top: 1px solid var(--line); }
 @media (max-width: 980px) {
   .app { grid-template-columns: minmax(0, 1fr); }
   .stage-col { position: static; }
   .viewport { height: 56vh; min-height: 280px; }
 }
 @media (max-width: 560px) {
-  .shape-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .brand p { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -321,12 +244,12 @@ details.section > summary small { font-family: var(--font-mono); color: var(--mu
 </header>
 
 <main class="app">
-  <section class="stage-col" aria-label="Preview and parts">
+  <section class="stage-col" aria-label="Preview and statuses">
     <div class="viewport" id="viewport">
       <div class="vp-top">
         <div class="seg" role="radiogroup" aria-label="Preview mode" id="viewSeg">
-          <button role="radio" data-value="assembled" aria-checked="true">Assembled</button>
-          <button role="radio" data-value="print" aria-checked="false">Print plate</button>
+          <button type="button" role="radio" data-value="assembled">Assembled</button>
+          <button type="button" role="radio" data-value="print">Print plate</button>
         </div>
         <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
@@ -342,12 +265,10 @@ details.section > summary small { font-family: var(--font-mono); color: var(--mu
 
     <section class="statuses" aria-labelledby="statusesTitle">
       <div class="st-head">
-        <h2 id="statusesTitle">Sign</h2>
-        <p class="hint">Pick <b>Base</b> for shape, size and frame, or pick a status to show it and edit it.</p>
+        <h2 id="statusesTitle">Statuses</h2>
+        <p class="hint">Click one to show it on the sign. Type <span class="mono">|</span> for a line break.</p>
         <div class="st-actions">
-          <select id="presetSel" aria-label="Replace the statuses with a preset set">
-            <option value="">Load a preset…</option>
-          </select>
+          <select id="presetSel" aria-label="Replace the statuses with a preset set"><option value="">Load a preset…</option></select>
           <button class="btn small" id="addStatus" type="button">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Add
@@ -360,203 +281,9 @@ details.section > summary small { font-family: var(--font-mono); color: var(--mu
   </section>
 
   <aside class="panel" aria-label="Settings">
-    <!-- Base & frame settings: shown when the Base card is selected -->
-    <div id="ctxBase">
-      <div class="ctx-head">
-        <h2>Base &amp; frame</h2>
-        <p class="hint">Plate shape, size, lettering, the sliding frame and mounting.</p>
-      </div>
-
-      <section class="section">
-        <h3>Shape <small id="shapeName">Rounded</small></h3>
-        <div class="shape-grid" id="shapeGrid"></div>
-      </section>
-
-      <section class="section">
-        <h3>Size</h3>
-        <div class="seg" role="radiogroup" aria-label="Sizing" data-key="sizeMode">
-          <button role="radio" data-value="auto">Fit to text</button>
-          <button role="radio" data-value="manual">Set by hand</button>
-        </div>
-        <div class="field" id="autoOpts">
-          <div class="field-row"><label for="cap">Letter height</label><span class="mono" id="capOut"></span></div>
-          <input type="range" id="cap" data-key="cap" min="3.5" max="10" step="0.5">
-          <p class="hint">The plate shrinks or grows to the smallest size that fits every status at this letter height.</p>
-        </div>
-        <div class="field-stack" id="manualOpts">
-          <div class="field">
-            <div class="field-row"><label for="width">Width</label><span><input class="num" type="number" id="widthNum" data-mirror="width" aria-label="Width in millimetres"><span class="unit">mm</span></span></div>
-            <input type="range" id="width" data-key="width" min="60" max="400" step="1">
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="height">Height</label><span><input class="num" type="number" id="heightNum" data-mirror="height" aria-label="Height in millimetres"><span class="unit">mm</span></span></div>
-            <input type="range" id="height" data-key="height" min="35" max="200" step="1">
-          </div>
-        </div>
-        <div class="field">
-          <label for="bed">Printer bed</label>
-          <select id="bed" data-key="bed">
-            <option value="180">180 × 180 mm (A1 mini, Prusa MINI)</option>
-            <option value="220">220 × 220 mm (Ender 3)</option>
-            <option value="250">250 × 210 mm (Prusa MK4)</option>
-            <option value="256">256 × 256 mm (Bambu X1, P1, A1)</option>
-            <option value="300">300 × 300 mm</option>
-            <option value="350">350 × 350 mm</option>
-          </select>
-        </div>
-        <p class="spec" id="spec">—</p>
-      </section>
-
-      <section class="section">
-        <h3>Labels</h3>
-        <div class="field">
-          <span class="lbl" id="layoutLbl">Layout</span>
-          <div class="seg" role="radiogroup" aria-labelledby="layoutLbl" data-key="layout">
-            <button role="radio" data-value="stack">Icon over text</button>
-            <button role="radio" data-value="side">Icon beside</button>
-            <button role="radio" data-value="text">Text only</button>
-            <button role="radio" data-value="icon">Icon only</button>
-          </div>
-        </div>
-        <div class="grid2">
-          <div class="field">
-            <label for="font">Typeface</label>
-            <select id="font" data-key="font">
-              <option value="helvetiker">Helvetiker Bold</option>
-              <option value="droid">Droid Sans Bold</option>
-              <option value="optimer">Optimer Bold</option>
-              <option value="gentilis">Gentilis Bold</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="header">Header text</label>
-            <input type="text" id="header" data-key="header" maxlength="28" placeholder="Optional, e.g. Room 4B" autocomplete="off">
-          </div>
-        </div>
-        <label class="check"><input type="checkbox" id="caps" data-key="caps"> All capitals</label>
-        <label class="check" id="uniformRow"><input type="checkbox" id="uniform" data-key="uniform"> Same letter size on every status</label>
-      </section>
-
-      <section class="section">
-        <h3>Frame</h3>
-        <div class="grid2">
-          <div class="field">
-            <div class="field-row"><label for="frame">Bar width</label><span class="mono" id="frameOut"></span></div>
-            <input type="range" id="frame" data-key="frame" min="3" max="8" step="0.5">
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="winR">Window corners</label><span class="mono" id="winROut"></span></div>
-            <input type="range" id="winR" data-key="winR" min="0" max="8" step="0.5">
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="tol">Slide clearance</label><span class="mono" id="tolOut"></span></div>
-            <input type="range" id="tol" data-key="tol" min="0.1" max="0.5" step="0.05">
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="railH">Rail height</label><span class="mono" id="railHOut"></span></div>
-            <input type="range" id="railH" data-key="railH" min="2.5" max="6" step="0.5">
-          </div>
-        </div>
-        <p class="hint">Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.</p>
-        <label class="check"><input type="checkbox" id="arrows" data-key="arrows"> Pointer arrows on the frame</label>
-      </section>
-
-      <section class="section">
-        <h3>Mounting</h3>
-        <div class="seg" role="radiogroup" aria-label="Mounting" data-key="mount">
-          <button role="radio" data-value="none">Flat back</button>
-          <button role="radio" data-value="magnet">Magnets</button>
-          <button role="radio" data-value="screw">Screws</button>
-          <button role="radio" data-value="stand">Desk stand</button>
-        </div>
-        <p class="hint" id="mountHint"></p>
-        <div class="grid2" id="magnetOpts">
-          <div class="field">
-            <div class="field-row"><label for="magD">Magnet ⌀</label><span class="mono" id="magDOut"></span></div>
-            <input type="range" id="magD" data-key="magD" min="5" max="20" step="0.5">
-          </div>
-          <div class="field">
-            <div class="field-row"><label for="magH">Magnet height</label><span class="mono" id="magHOut"></span></div>
-            <input type="range" id="magH" data-key="magH" min="1" max="4" step="0.1">
-          </div>
-          <div class="field">
-            <span class="lbl" id="magNLbl">Pockets</span>
-            <div class="seg" role="radiogroup" aria-labelledby="magNLbl" data-key="magN">
-              <button role="radio" data-value="2">2</button>
-              <button role="radio" data-value="4">4</button>
-            </div>
-          </div>
-        </div>
-        <div class="field" id="standOpts">
-          <div class="field-row"><label for="tilt">Lean back</label><span class="mono" id="tiltOut"></span></div>
-          <input type="range" id="tilt" data-key="tilt" min="5" max="25" step="1">
-        </div>
-      </section>
-
-      <section class="section">
-        <h3>Colors <small>preview only</small></h3>
-        <div class="palette-row" id="palettes"></div>
-        <div class="swatches">
-          <label class="swatch">Plate<input type="color" id="colBase" data-key="colBase"></label>
-          <label class="swatch">Labels<input type="color" id="colLabel" data-key="colLabel"></label>
-          <label class="swatch">Frame<input type="color" id="colSlider" data-key="colSlider"></label>
-        </div>
-      </section>
-
-      <details class="section" id="fineTune">
-        <summary><h3>Fine-tuning</h3><small>thickness, relief, edge</small></summary>
-        <div class="more-body">
-          <div class="field">
-            <div class="field-row"><label for="thick">Plate thickness</label><span><input class="num" type="number" id="thickNum" data-mirror="thick" aria-label="Plate thickness in millimetres"><span class="unit">mm</span></span></div>
-            <input type="range" id="thick" data-key="thick" min="2" max="6" step="0.2">
-          </div>
-          <div class="grid2">
-            <div class="field">
-              <span class="lbl" id="reliefLbl">Label relief</span>
-              <div class="seg" role="radiogroup" aria-labelledby="reliefLbl" data-key="relief">
-                <button role="radio" data-value="raised">Raised</button>
-                <button role="radio" data-value="engraved">Engraved</button>
-              </div>
-            </div>
-            <div class="field">
-              <div class="field-row"><label for="reliefH">Depth</label><span class="mono" id="reliefHOut"></span></div>
-              <input type="range" id="reliefH" data-key="reliefH" min="0.4" max="1.6" step="0.1">
-            </div>
-          </div>
-          <label class="check"><input type="checkbox" id="chamfer" data-key="chamfer"> Chamfered plate edge</label>
-        </div>
-      </details>
-    </div>
-
-    <!-- Status settings: shown when a status card is selected -->
-    <div id="ctxStatus" hidden>
-      <div class="ctx-head">
-        <h2 id="stCtxTitle">Status</h2>
-        <p class="hint">Showing on the sign. Edit its text on the card; type <span class="mono">|</span> for a line break.</p>
-      </div>
-      <section class="section">
-        <h3 id="iconGridLbl">Icon</h3>
-        <div class="icon-grid" id="iconGrid" role="radiogroup" aria-labelledby="iconGridLbl"></div>
-      </section>
-      <section class="section">
-        <h3>Position</h3>
-        <div class="order-row">
-          <button class="btn small" id="moveLeft" type="button">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
-            Move left
-          </button>
-          <button class="btn small" id="moveRight" type="button">
-            Move right
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
-          </button>
-          <button class="btn small danger" id="removeStatus" type="button">Remove status</button>
-        </div>
-      </section>
-    </div>
-
-    <!-- Print: always visible -->
-    <section class="section print-section">
-      <h3>Print</h3>
+    <div id="settings"></div>
+    <section class="section">
+      <h2>Print</h2>
       <button class="btn primary wide" id="dlZip2" disabled>Download all parts (.zip)</button>
       <ol class="steps" id="steps"></ol>
       <details class="files">
@@ -572,6 +299,7 @@ details.section > summary small { font-family: var(--font-mono); color: var(--mu
   </aside>
 </main>
 
+<div class="popover" id="iconPopover" role="dialog" aria-label="Choose an icon" hidden></div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -1285,6 +1013,7 @@ function createEngine(wasm) {
 // ---------------------------------------------------------------------------
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/\.0+$/, '');
 const STORE_KEY = 'office-status-slider:v1';
 const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js';
 const FONT_BASE = 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/fonts/';
@@ -1312,14 +1041,84 @@ const DEFAULTS = {
   mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
 };
-const RANGES = { cap: [3.5, 10], width: [60, 400], height: [35, 200], thick: [2, 6], reliefH: [0.4, 1.6], frame: [3, 8], winR: [0, 8], railH: [2.5, 6], tol: [0.1, 0.5], magD: [5, 20], magH: [1, 4], tilt: [5, 25] };
-const CHOICES = { sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'], layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FILES), relief: ['raised', 'engraved'], mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: [180, 220, 250, 256, 300, 350], view: ['assembled', 'print'] };
+
+// Every slider, described once: label, range and how its value reads.
+const mm = (d = 1) => (v) => `${fmt(v, d)} mm`;
+const SLIDERS = {
+  cap: { label: 'Letter height', min: 3.5, max: 10, step: 0.5, out: mm() },
+  width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
+  height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
+  thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, out: mm() },
+  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, out: mm() },
+  frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, out: mm() },
+  winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
+  railH: { label: 'Rail height', min: 2.5, max: 6, step: 0.5, out: mm() },
+  tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, out: mm(2) },
+  magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
+  magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, out: mm() },
+  tilt: { label: 'Lean back', min: 5, max: 25, step: 1, out: (v) => `${v}°` },
+};
+const RANGES = Object.fromEntries(Object.entries(SLIDERS).map(([k, f]) => [k, [f.min, f.max]]));
+const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
+const CHOICES = {
+  sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
+  layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FILES), relief: ['raised', 'engraved'],
+  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'],
+};
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
   magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
 };
+// Conditions for controls that only apply in some modes.
+const WHEN = {
+  auto: (s) => s.sizeMode === 'auto',
+  manual: (s) => s.sizeMode !== 'auto',
+  magnet: (s) => s.mount === 'magnet',
+  stand: (s) => s.mount === 'stand',
+};
+
+// The settings panel, top to bottom. renderPanel() turns this into markup.
+const SECTIONS = [
+  { title: 'Shape', noteId: 'shapeName', items: [{ html: 'shapes' }] },
+  { title: 'Size', items: [
+    { seg: 'sizeMode', aria: 'Sizing', options: [['auto', 'Fit to text'], ['manual', 'Set by hand']] },
+    { slider: 'cap', when: 'auto' },
+    { hint: 'The plate grows or shrinks to the smallest size that fits every status at this letter height.', when: 'auto' },
+    { slider: 'width', when: 'manual' },
+    { slider: 'height', when: 'manual' },
+    { select: 'bed', label: 'Printer bed', options: BEDS },
+    { html: 'spec' },
+  ] },
+  { title: 'Labels', items: [
+    { seg: 'layout', label: 'Layout', options: [['stack', 'Icon over text'], ['side', 'Icon beside'], ['text', 'Text only'], ['icon', 'Icon only']] },
+    { row: [
+      { select: 'font', label: 'Typeface', options: [['helvetiker', 'Helvetiker Bold'], ['droid', 'Droid Sans Bold'], ['optimer', 'Optimer Bold'], ['gentilis', 'Gentilis Bold']] },
+      { text: 'header', label: 'Header text', placeholder: 'Optional, e.g. Room 4B' },
+    ] },
+    { check: 'caps', label: 'All capitals' },
+    { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
+  ] },
+  { title: 'Mounting', items: [
+    { seg: 'mount', aria: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand']] },
+    { hint: '', id: 'mountHint' },
+    { row: [{ slider: 'magD' }, { slider: 'magH' }, { seg: 'magN', label: 'Pockets', options: [[2, '2'], [4, '4']] }], when: 'magnet' },
+    { slider: 'tilt', when: 'stand' },
+  ] },
+  { title: 'Colors', noteText: 'preview only', items: [
+    { html: 'palettes' },
+    { row: [{ color: 'colBase', label: 'Plate' }, { color: 'colLabel', label: 'Labels' }, { color: 'colSlider', label: 'Frame' }], cols: 3 },
+  ] },
+  { title: 'Fine-tuning', collapsed: true, items: [
+    { slider: 'thick' },
+    { row: [{ seg: 'relief', label: 'Label relief', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
+    { row: [{ slider: 'frame' }, { slider: 'winR' }, { slider: 'railH' }, { slider: 'tol' }] },
+    { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
+    { check: 'arrows', label: 'Pointer arrows on the frame' },
+    { check: 'chamfer', label: 'Chamfered plate edge' },
+  ] },
+];
 
 function sanitize(s) {
   const out = structuredClone(DEFAULTS);
@@ -1829,33 +1628,61 @@ function shareUrl() {
 // ---------------------------------------------------------------------------
 let engine = null;
 const iconSvg = {};
-const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/\.0+$/, '');
 
 function svgIcon(name) {
   if (!name || name === 'none' || !iconSvg[name]) return '<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="M-6 0h12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>';
   return `<svg viewBox="-13 -13 26 26" aria-hidden="true"><path d="${iconSvg[name]}"/></svg>`;
 }
 
-const PLATE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><rect x="8.5" y="8.3" width="7" height="7.4" rx="1.2" stroke-width="2.2"/></svg>';
-const statusName = (st, i) => (st.text || '').replace(/\|/g, ' ').trim() || `Status ${i + 1}`;
-// Which card's settings the panel shows: 'base' or a status index.
-let selected = 'base';
+// Settings panel, rendered from SECTIONS.
+function itemHTML(it) {
+  const when = it.when ? ` data-when="${it.when}"` : '';
+  if (it.row) return `<div class="grid" style="--cols:${it.cols || 2}"${when}>${it.row.map(itemHTML).join('')}</div>`;
+  if (it.slider) {
+    const k = it.slider, f = SLIDERS[k];
+    return `<div class="field"${when}><div class="field-row"><label for="${k}">${f.label}</label><output id="${k}Out" for="${k}"></output></div>`
+      + `<input type="range" id="${k}" data-key="${k}" min="${f.min}" max="${f.max}" step="${f.step}"></div>`;
+  }
+  if (it.seg) {
+    const lbl = it.label ? `<span class="lbl" id="${it.seg}Lbl">${it.label}</span>` : '';
+    const name = it.label ? `aria-labelledby="${it.seg}Lbl"` : `aria-label="${it.aria}"`;
+    const opts = it.options.map(([v, t]) => `<button type="button" role="radio" data-value="${v}">${t}</button>`).join('');
+    return `<div class="field"${when}>${lbl}<div class="seg" role="radiogroup" ${name} data-key="${it.seg}">${opts}</div></div>`;
+  }
+  if (it.select) {
+    const opts = it.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+    return `<div class="field"${when}><label for="${it.select}">${it.label}</label><select id="${it.select}" data-key="${it.select}">${opts}</select></div>`;
+  }
+  if (it.text) return `<div class="field"${when}><label for="${it.text}">${it.label}</label><input type="text" id="${it.text}" data-key="${it.text}" maxlength="28" placeholder="${it.placeholder}" autocomplete="off"></div>`;
+  if (it.check) return `<label class="check"${when}><input type="checkbox" id="${it.check}" data-key="${it.check}"> ${it.label}</label>`;
+  if (it.color) return `<label class="swatch"${when}>${it.label}<input type="color" id="${it.color}" data-key="${it.color}"></label>`;
+  if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
+  return { shapes: '<div class="shape-grid" id="shapeGrid"></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
+}
+function renderPanel() {
+  $('#settings').innerHTML = SECTIONS.map((s) => {
+    const note = s.noteId ? ` <small id="${s.noteId}"></small>` : s.noteText ? ` <small>${s.noteText}</small>` : '';
+    const head = `<h2>${s.title}${note}</h2>`, body = s.items.map(itemHTML).join('');
+    return s.collapsed
+      ? `<details class="section"><summary>${head}</summary><div class="more-body">${body}</div></details>`
+      : `<section class="section">${head}${body}</section>`;
+  }).join('');
+}
 
-// The sign row: the Base card, then one card per status in the sign's left-to-right order.
+const TOOL_SVG = {
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+  del: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+const statusName = (st, i) => (st.text || '').replace(/\|/g, ' ').trim() || `status ${i + 1}`;
+
+// One card per status, in the sign's left-to-right order. Clicking a card shows it on the sign; its fields edit it.
 function renderStatuses(focusTarget) {
   const wrap = $('#statusCards');
   const a = document.activeElement;
-  const keep = focusTarget || (a && wrap.contains(a) && a.dataset.role ? { role: a.dataset.role, idx: a.dataset.idx } : null);
+  const keep = focusTarget || (a && wrap.contains(a) && a.dataset.role ? { role: a.dataset.role, idx: +a.dataset.idx } : null);
   const n = state.statuses.length;
-  if (typeof selected === 'number' && selected >= n) selected = n - 1;
   wrap.innerHTML = '';
-  const base = document.createElement('button');
-  base.type = 'button';
-  base.className = 'st-card base-card';
-  base.dataset.role = 'base';
-  base.dataset.idx = 'base';
-  base.innerHTML = `<span class="st-top"><span class="st-glyph">${PLATE_SVG}</span><span class="base-title">Base</span></span><span class="base-sum" id="baseSum"></span>`;
-  wrap.appendChild(base);
   state.statuses.forEach((st, i) => {
     const card = document.createElement('div');
     card.className = 'st-card';
@@ -1863,8 +1690,12 @@ function renderStatuses(focusTarget) {
     card.innerHTML = `
       <div class="st-top">
         <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
-        <span class="st-glyph">${svgIcon(st.icon)}</span>
-        <span class="st-pos" aria-hidden="true">${i + 1}</span>
+        <button type="button" class="pick" data-role="pick" data-idx="${i}" title="Change icon">${svgIcon(st.icon)}</button>
+        <span class="st-tools">
+          <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
+          <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
+          <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
+        </span>
       </div>
       <input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}">`;
     card.querySelector('input').value = st.text;
@@ -1872,126 +1703,73 @@ function renderStatuses(focusTarget) {
     wrap.appendChild(card);
   });
   $('#addStatus').disabled = n >= 6;
-  updateBaseSummary();
-  markCards();
-  renderContext();
+  markCurrent(state.current);
   if (keep) {
-    const el = wrap.querySelector(`[data-role="${keep.role}"][data-idx="${keep.idx}"]`);
+    let el = wrap.querySelector(`[data-role="${keep.role}"][data-idx="${keep.idx}"]`);
+    if (!el || el.disabled) el = wrap.querySelector(`[data-role="show"][data-idx="${Math.min(keep.idx, n - 1)}"]`);
     if (el) el.focus();
   }
 }
 function labelCard(card, st, i) {
-  card.querySelector('[data-role="show"]').setAttribute('aria-label', `Show ${statusName(st, i)} on the sign`);
+  const name = statusName(st, i);
+  card.querySelector('[data-role="show"]').setAttribute('aria-label', `Show ${name} on the sign`);
+  card.querySelector('[data-role="pick"]').setAttribute('aria-label', `Icon for ${name}: ${engine.icons[st.icon] || 'none'}`);
 }
-function markCards() {
-  $$('#statusCards .st-card').forEach((c) => {
-    const idx = c.dataset.idx === 'base' ? 'base' : +c.dataset.idx;
-    c.classList.toggle('is-selected', idx === selected);
-    if (idx === 'base') { c.setAttribute('aria-pressed', String(selected === 'base')); return; }
-    const cur = idx === state.current;
-    c.classList.toggle('is-current', cur);
-    c.querySelector('[data-role="show"]').setAttribute('aria-pressed', String(cur));
+function markCurrent(idx) {
+  $$('#statusCards .st-card').forEach((c, i) => {
+    const on = i === idx;
+    c.classList.toggle('is-current', on);
+    c.querySelector('[data-role="show"]').setAttribute('aria-pressed', String(on));
   });
 }
-function updateBaseSummary() {
-  const el = $('#baseSum');
-  if (!el) return;
-  const shape = engine ? engine.shapes[state.shape] : '';
-  el.textContent = result ? `${Math.round(result.info.plateW)} × ${Math.round(result.info.plateH)} mm` : shape;
-  el.title = result ? `${shape}, ${Math.round(result.info.plateW)} × ${Math.round(result.info.plateH)} mm` : shape;
-}
-// Show status i on the sign (moves the frame). When a status card is being edited, editing follows it.
 function setCurrent(i, focus) {
   i = Math.max(0, Math.min(state.statuses.length - 1, i));
   const moved = i !== state.current;
   state.current = i;
-  if (selected !== 'base') selected = i;
-  markCards();
-  if (moved) renderContext();
+  markCurrent(i);
   if (result) sliderTarget = result.info.cells[i] ?? 0;
   if (focus) { const b = $(`#statusCards [data-role="show"][data-idx="${i}"]`); if (b) b.focus(); }
   if (moved) saveState();
   requestRender();
 }
-function select(target) {
-  selected = target;
-  if (target !== 'base') setCurrent(target);
-  markCards();
-  renderContext();
-}
-function renderContext() {
-  const isBase = selected === 'base';
-  $('#ctxBase').hidden = !isBase;
-  $('#ctxStatus').hidden = isBase;
-  if (isBase) return;
-  const i = selected, st = state.statuses[i], n = state.statuses.length;
-  $('#stCtxTitle').textContent = `Status ${i + 1} of ${n}: ${statusName(st, i)}`;
-  $$('#iconGrid button').forEach((b) => {
-    const on = b.dataset.icon === (st.icon || 'none');
-    b.setAttribute('aria-checked', String(on));
-    b.tabIndex = on ? 0 : -1;
-  });
-  $('#moveLeft').disabled = i === 0;
-  $('#moveRight').disabled = i === n - 1;
-  $('#removeStatus').disabled = n <= 2;
-}
-function renderIconGrid() {
-  $('#iconGrid').innerHTML = [...Object.entries(engine.icons), ['none', 'No icon']]
-    .map(([k, label]) => `<button type="button" role="radio" data-icon="${k}" aria-checked="false" title="${label}">${k === 'none' ? '<span class="none-mark" aria-hidden="true">—</span>' : svgIcon(k)}<span>${label}</span></button>`)
-    .join('');
-}
-function chooseIcon(icon) {
-  if (selected === 'base') return;
-  const i = selected;
-  state.statuses[i].icon = icon;
-  const g = $(`#statusCards .st-card[data-idx="${i}"] .st-glyph`);
-  if (g) g.innerHTML = svgIcon(icon);
-  renderContext();
-  changed();
-}
-$('#iconGrid').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) chooseIcon(b.dataset.icon); });
-$('#iconGrid').addEventListener('keydown', (e) => {
-  const btns = $$('#iconGrid button'), i = btns.indexOf(document.activeElement);
-  if (i < 0) return;
-  const cols = Math.max(1, Math.round($('#iconGrid').clientWidth / btns[0].offsetWidth));
-  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
-  if (!step) return;
-  e.preventDefault();
-  const nb = btns[Math.max(0, Math.min(btns.length - 1, i + step))];
-  chooseIcon(nb.dataset.icon);
-  nb.focus();
-});
-
-function moveStatus(d) {
-  const i = selected, s = state.statuses, j = i + d;
-  if (typeof i !== 'number' || j < 0 || j >= s.length) return;
-  [s[i], s[j]] = [s[j], s[i]];
-  if (state.current === i) state.current = j; else if (state.current === j) state.current = i;
-  selected = j;
-  renderStatuses();
-  const btn = $(d < 0 ? '#moveLeft' : '#moveRight');
-  (btn.disabled ? $(d < 0 ? '#moveRight' : '#moveLeft') : btn).focus();
-  changed();
-}
-$('#moveLeft').addEventListener('click', () => moveStatus(-1));
-$('#moveRight').addEventListener('click', () => moveStatus(1));
-$('#removeStatus').addEventListener('click', () => {
-  const i = selected, s = state.statuses;
-  if (typeof i !== 'number' || s.length <= 2) return;
-  s.splice(i, 1);
-  selected = Math.min(i, s.length - 1);
-  state.current = selected;
-  renderStatuses({ role: 'show', idx: selected });
-  changed();
-});
 
 const cardsEl = $('#statusCards');
 cardsEl.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
   const card = e.target.closest('.st-card');
-  if (card) select(card.dataset.idx === 'base' ? 'base' : +card.dataset.idx);
+  if (!b) { if (card) setCurrent(+card.dataset.idx); return; }
+  const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
+  if (role === 'show') { setCurrent(i); return; }
+  if (role === 'pick') { setCurrent(i); openIconPicker(b, i); return; }
+  let focusTo = null;
+  if (role === 'left' && i > 0) {
+    [s[i - 1], s[i]] = [s[i], s[i - 1]];
+    if (state.current === i) state.current = i - 1; else if (state.current === i - 1) state.current = i;
+    focusTo = { role: 'left', idx: i - 1 };
+  } else if (role === 'right' && i < s.length - 1) {
+    [s[i + 1], s[i]] = [s[i], s[i + 1]];
+    if (state.current === i) state.current = i + 1; else if (state.current === i + 1) state.current = i;
+    focusTo = { role: 'right', idx: i + 1 };
+  } else if (role === 'del' && s.length > 2) {
+    s.splice(i, 1);
+    if (state.current > i || state.current >= s.length) state.current = Math.max(0, state.current - 1);
+    focusTo = { role: 'show', idx: Math.min(i, s.length - 1) };
+  } else return;
+  renderStatuses(focusTo);
+  changed();
+});
+$('#addStatus').addEventListener('click', () => {
+  const s = state.statuses;
+  if (s.length >= 6) return;
+  s.push({ text: 'BACK SOON', icon: 'clock' });
+  state.current = s.length - 1;
+  renderStatuses({ role: 'text', idx: s.length - 1 });
+  const inp = $(`#status-text-${s.length - 1}`);
+  if (inp) inp.select();
+  changed();
 });
 cardsEl.addEventListener('focusin', (e) => {
-  if (e.target.dataset.role === 'text' && selected !== +e.target.dataset.idx) select(+e.target.dataset.idx);
+  if (e.target.dataset.role === 'text') setCurrent(+e.target.dataset.idx);
 });
 cardsEl.addEventListener('input', (e) => {
   const el = e.target;
@@ -1999,30 +1777,55 @@ cardsEl.addEventListener('input', (e) => {
   const i = +el.dataset.idx;
   state.statuses[i].text = el.value;
   labelCard(el.closest('.st-card'), state.statuses[i], i);
-  if (selected === i) renderContext();
   changed();
 });
 cardsEl.addEventListener('keydown', (e) => {
   if (e.target.dataset.role !== 'show') return;
   const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-  if (!d) return;
-  e.preventDefault();
-  const n = state.statuses.length, j = (state.current + d + n) % n;
-  select(j);
-  const b = $(`#statusCards [data-role="show"][data-idx="${j}"]`);
-  if (b) b.focus();
+  if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
 });
-$('#addStatus').addEventListener('click', () => {
-  const s = state.statuses;
-  if (s.length >= 6) return;
-  s.push({ text: 'BACK SOON', icon: 'clock' });
-  selected = s.length - 1;
-  state.current = selected;
-  renderStatuses({ role: 'text', idx: selected });
-  const inp = $(`#status-text-${selected}`);
-  if (inp) inp.select();
+
+// icon picker
+const pop = $('#iconPopover');
+let popFor = null;
+function openIconPicker(btn, idx) {
+  popFor = { btn, idx };
+  const cur = state.statuses[idx].icon;
+  pop.innerHTML = Object.entries(engine.icons).map(([k, label]) => `<button type="button" data-icon="${k}" title="${label}" aria-label="${label}" aria-pressed="${k === cur}">${svgIcon(k)}</button>`).join('')
+    + `<button type="button" data-icon="none" title="No icon" aria-label="No icon" aria-pressed="${cur === 'none'}"><span class="none-label">none</span></button>`;
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.left));
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 6);
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+  const sel = pop.querySelector('[aria-pressed="true"]') || pop.querySelector('button');
+  sel.focus();
+}
+function closeIconPicker(refocus) {
+  if (pop.hidden) return;
+  pop.hidden = true;
+  if (refocus && popFor) popFor.btn.focus();
+  popFor = null;
+}
+pop.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !popFor) return;
+  const idx = popFor.idx;
+  state.statuses[idx].icon = b.dataset.icon;
+  closeIconPicker(false);
+  renderStatuses({ role: 'pick', idx });
   changed();
 });
+pop.addEventListener('keydown', (e) => {
+  const btns = $$('button', pop), i = btns.indexOf(document.activeElement);
+  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 5, ArrowUp: -5 }[e.key];
+  if (step && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + step))].focus(); }
+  if (e.key === 'Escape') closeIconPicker(true);
+});
+document.addEventListener('pointerdown', (e) => { if (!pop.hidden && !pop.contains(e.target) && !(popFor && popFor.btn.contains(e.target))) closeIconPicker(false); });
+window.addEventListener('resize', () => closeIconPicker(false));
 
 function renderPresets() {
   const sel = $('#presetSel');
@@ -2038,7 +1841,6 @@ function renderPresets() {
     if (!p) return;
     state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
     state.current = 0;
-    if (selected !== 'base') selected = 0;
     renderStatuses();
     changed();
   });
@@ -2063,7 +1865,6 @@ function renderShapes() {
 }
 function renderPalettes() {
   const row = $('#palettes');
-  row.innerHTML = '';
   PALETTES.forEach((p) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -2078,39 +1879,24 @@ function renderPalettes() {
   });
 }
 
-// generic controls bound with data-key
+// Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
-const NO_REBUILD = new Set(['bed']);
 function syncControls() {
   for (const el of $$('[data-key]')) {
-    const k = el.dataset.key, v = state[k];
-    if (el.classList.contains('seg')) {
-      $$('button', el).forEach((b) => b.setAttribute('aria-checked', String(String(v) === b.dataset.value)));
-    } else if (el.type === 'checkbox') el.checked = !!v;
+    const v = state[el.dataset.key];
+    if (el.classList.contains('seg')) $$('button', el).forEach((b) => b.setAttribute('aria-checked', String(String(v) === b.dataset.value)));
+    else if (el.type === 'checkbox') el.checked = !!v;
     else el.value = v;
   }
-  for (const el of $$('[data-mirror]')) el.value = state[el.dataset.mirror];
-  $('#frameOut').textContent = fmt(state.frame) + ' mm';
-  $('#winROut').textContent = fmt(state.winR) + ' mm';
-  $('#railHOut').textContent = fmt(state.railH) + ' mm';
-  $('#tolOut').textContent = state.tol.toFixed(2) + ' mm';
-  $('#magDOut').textContent = fmt(state.magD) + ' mm';
-  $('#magHOut').textContent = fmt(state.magH) + ' mm';
-  $('#tiltOut').textContent = state.tilt + '°';
-  $('#reliefHOut').textContent = fmt(state.reliefH) + ' mm';
-  $('#capOut').textContent = fmt(state.cap) + ' mm';
-  $('#autoOpts').hidden = state.sizeMode !== 'auto';
-  $('#manualOpts').hidden = state.sizeMode === 'auto';
-  $('#uniformRow').hidden = state.sizeMode === 'auto';
-  $('#magnetOpts').hidden = state.mount !== 'magnet';
-  $('#standOpts').hidden = state.mount !== 'stand';
+  for (const [k, f] of Object.entries(SLIDERS)) { const o = $(`#${k}Out`); if (o) o.textContent = f.out(state[k]); }
+  for (const el of $$('[data-when]')) el.hidden = !WHEN[el.dataset.when](state);
   $('#mountHint').textContent = MOUNT_HINTS[state.mount];
   $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
 }
 function setKey(k, raw) {
   let v = raw;
-  if (RANGES[k]) { v = +raw; if (!Number.isFinite(v)) return; v = Math.min(RANGES[k][1], Math.max(RANGES[k][0], v)); }
-  else if (k === 'magN' || k === 'bed') v = +raw;
+  if (RANGES[k]) { v = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +raw)); if (!Number.isFinite(v)) return; }
+  else if (typeof CHOICES[k]?.[0] === 'number') v = +raw;
   // switching to manual starts from the size the auto-fit last produced
   if (k === 'sizeMode' && v === 'manual' && result && result.info.auto) {
     state.width = Math.min(RANGES.width[1], Math.max(RANGES.width[0], Math.round(result.info.plateW)));
@@ -2119,25 +1905,21 @@ function setKey(k, raw) {
   state[k] = v;
   syncControls();
   if (COLOR_KEYS.has(k)) { applyColors(); saveState(); return; }
-  if (NO_REBUILD.has(k)) { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
+  if (k === 'bed') { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
   changed();
 }
-for (const el of $$('[data-key]')) {
-  const k = el.dataset.key;
-  if (el.classList.contains('seg')) {
-    el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setKey(k, b.dataset.value); });
-    el.addEventListener('keydown', (e) => {
-      const btns = $$('button', el), i = btns.findIndex((b) => b.getAttribute('aria-checked') === 'true');
-      const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
-      if (d) { e.preventDefault(); const nb = btns[(i + d + btns.length) % btns.length]; setKey(k, nb.dataset.value); nb.focus(); }
-    });
-  } else if (el.type === 'checkbox') el.addEventListener('change', () => setKey(k, el.checked));
-  else if (el.type === 'color') el.addEventListener('input', () => setKey(k, el.value));
-  else el.addEventListener('input', () => setKey(k, el.value));
-}
-for (const el of $$('[data-mirror]')) {
-  el.addEventListener('change', () => setKey(el.dataset.mirror, el.value));
-  el.addEventListener('keydown', (e) => { if (e.key === 'Enter') setKey(el.dataset.mirror, el.value); });
+function bindControls() {
+  for (const el of $$('[data-key]')) {
+    const k = el.dataset.key;
+    if (el.classList.contains('seg')) {
+      el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setKey(k, b.dataset.value); });
+      el.addEventListener('keydown', (e) => {
+        const btns = $$('button', el), i = btns.findIndex((b) => b.getAttribute('aria-checked') === 'true');
+        const d = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+        if (d) { e.preventDefault(); const nb = btns[(i + d + btns.length) % btns.length]; setKey(k, nb.dataset.value); nb.focus(); }
+      });
+    } else el.addEventListener(el.type === 'checkbox' ? 'change' : 'input', () => setKey(k, el.type === 'checkbox' ? el.checked : el.value));
+  }
 }
 $('#viewSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button');
@@ -2155,7 +1937,6 @@ function applyColors() {
   mats.slider.color.set(state.colSlider);
   requestRender();
 }
-
 function setBuildState(kind, text) {
   const el = $('#buildState');
   el.dataset.state = kind;
@@ -2177,17 +1958,16 @@ function updateReadout() {
   $('#spec').innerHTML = `Plate <b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)} · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
     + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
   const warns = [...i.warnings];
-  if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the width or pick a larger bed.`);
+  if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the size or pick a larger bed.`);
   $('#warnings').innerHTML = '';
   for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
   renderExport();
 }
 
 function renderExport() {
-  const files = exportFiles();
   const ul = $('#partsList');
   ul.innerHTML = '';
-  for (const f of files) {
+  for (const f of exportFiles()) {
     const b = boundsOf(f.pos);
     const li = document.createElement('li');
     const grams = f.mesh.vol / 1000 * 1.24;
@@ -2221,13 +2001,12 @@ const fontCache = {};
 function getFont(key) {
   if (!fontCache[key]) {
     fontCache[key] = new Promise((res, rej) => new FontLoader().load(FONT_BASE + FONT_FILES[key], res, undefined, rej))
-      .catch((e) => { delete fontCache[key]; throw new Error('Could not load the typeface. Check your connection and try again.'); });
+      .catch(() => { delete fontCache[key]; throw new Error('Could not load the typeface. Check your connection and try again.'); });
   }
   return fontCache[key];
 }
 
-let rebuildTimer = 0, building = false, pending = false, firstBuild = true;
-let lastFit = null;
+let rebuildTimer = 0, building = false, pending = false, firstBuild = true, lastFit = null;
 function changed() {
   saveState();
   if (!engine) return;
@@ -2241,8 +2020,7 @@ async function rebuild() {
   try {
     const font = await getFont(state.font);
     const t0 = performance.now();
-    const params = { ...state, statuses: state.statuses.map((s) => ({ ...s })) };
-    result = engine.build(params, font);
+    result = engine.build({ ...state, statuses: state.statuses.map((s) => ({ ...s })) }, font);
     const ms = performance.now() - t0;
     if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
     // re-frame the camera only when the view or the plate size changes noticeably, not on every keystroke
@@ -2251,7 +2029,6 @@ async function rebuild() {
       || Math.abs(fit.W - lastFit.W) > lastFit.W * 0.15 || Math.abs(fit.H - lastFit.H) > lastFit.H * 0.15;
     updateScene(result, refit);
     if (refit) lastFit = fit;
-    updateBaseSummary();
     firstBuild = false;
     updateReadout();
     showError('');
@@ -2291,17 +2068,18 @@ $('#resetAll').addEventListener('click', () => {
   if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   syncControls(); renderStatuses(); renderShapes(); applyColors();
   lastFit = null;
-  selected = 'base';
   changed();
 });
 
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-syncControls();
-applyColors();
+renderPanel();
+bindControls();
 renderPresets();
 renderPalettes();
+syncControls();
+applyColors();
 requestAnimationFrame(loop);
 
 (async () => {
@@ -2311,7 +2089,6 @@ requestAnimationFrame(loop);
     wasm.setup();
     engine = createEngine(wasm);
     for (const k of Object.keys(engine.icons)) iconSvg[k] = engine.iconPath(k);
-    renderIconGrid();
     renderShapes();
     renderStatuses();
     $('#overlay').hidden = true;
