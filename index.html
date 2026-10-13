@@ -56,6 +56,9 @@ button { cursor: pointer; }
 .brand svg { flex: none; }
 .brand h1 { margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 19px; letter-spacing: -0.01em; }
 .brand p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+.printer { display: flex; gap: 8px; }
+.printer label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.printer select { width: auto; padding: 5px 8px; font-size: 12.5px; color: var(--ink); }
 .top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .build-state { font-family: var(--font-mono); font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
 .build-state::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); }
@@ -135,23 +138,21 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .st-head .hint { flex: 1 1 200px; min-width: 0; }
 .st-actions { display: flex; gap: 6px; align-items: center; }
 .st-head select { width: auto; max-width: 100%; padding-block: 5px; font-size: 12.5px; }
-.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.st-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
 .st-card {
-  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 6px 8px 8px; min-width: 0;
-  display: flex; flex-direction: column; gap: 6px; cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
+  border: 1px solid var(--line); background: var(--panel); border-radius: 12px; padding: 8px 8px 4px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px; cursor: pointer; transition: border-color 0.15s, background-color 0.15s;
 }
 .st-card:hover { border-color: var(--muted); }
 .st-card.is-current { border-color: var(--hue); background: var(--hue-soft); box-shadow: inset 0 0 0 1px var(--hue); }
-.st-top { display: flex; align-items: center; gap: 4px; }
-.st-show { width: 26px; height: 32px; border: 0; background: transparent; padding: 0; border-radius: 6px; display: grid; place-items: center; color: var(--muted); flex: none; }
-.st-show .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid currentColor; }
-.st-card.is-current .st-show { color: var(--hue); }
-.st-card.is-current .st-show .dot { background: currentColor; box-shadow: inset 0 0 0 2.5px var(--panel); }
-.st-top .pick { flex: none; width: 34px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); display: grid; place-items: center; padding: 0; }
-.st-top .pick svg { width: 19px; height: 19px; fill: currentColor; }
-.st-top .pick:hover { border-color: var(--muted); }
-.st-tools { margin-left: auto; display: flex; }
-.st-tools button { width: 22px; height: 28px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.st-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.st-row .pick { flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--soft); color: var(--muted); display: grid; place-items: center; padding: 0; }
+.st-row .pick svg { width: 20px; height: 20px; fill: currentColor; }
+.st-row .pick:hover { border-color: var(--muted); }
+.st-card.is-current .pick { color: var(--hue); border-color: var(--hue); background: var(--panel); }
+.st-row .combo { flex: 1; min-width: 0; }
+.st-tools { display: flex; justify-content: flex-end; }
+.st-tools button { width: 24px; height: 22px; border: 0; background: transparent; border-radius: 6px; color: var(--muted); display: grid; place-items: center; padding: 0; }
 .st-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
 .st-tools button:disabled { opacity: 0.28; cursor: default; }
 .st-tools svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -307,6 +308,10 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
     </div>
   </div>
   <div class="top-actions">
+    <div class="printer" role="group" aria-label="Printer settings">
+      <label>Nozzle<select id="nozzle" data-key="nozzle" title="Nozzle diameter"><option value="0.2">0.2 mm</option><option value="0.4">0.4 mm</option><option value="0.6">0.6 mm</option><option value="0.8">0.8 mm</option></select></label>
+      <label>Layer<select id="layerH" data-key="layerH" title="Layer height"></select></label>
+    </div>
     <span class="build-state" id="buildState" data-state="busy">Loading engine…</span>
     <button class="btn" id="printOpen" type="button">Print guide</button>
     <button class="btn primary" id="dlZip" disabled>
@@ -566,6 +571,14 @@ function createEngine(wasm) {
       ]).rotate(-45),
     },
     moon: { label: 'Moon', make: (s, w, P) => union([circle(0.44 * s, -0.04 * s, -0.02 * s).subtract(circle(0.36 * s, 0.16 * s, 0.14 * s)), star4(0.13 * s, 0.25 * s, 0.2 * s)]) },
+    flask: {
+      label: 'Lab', make: (s, w, P) => union([
+        stroke([P(-0.12, 0.44), P(-0.12, 0.1), P(-0.4, -0.36), P(-0.36, -0.44), P(0.36, -0.44), P(0.4, -0.36), P(0.12, 0.1), P(0.12, 0.44)], w, true),
+        stroke([P(-0.22, 0.44), P(0.22, 0.44)], w * 1.1),
+        poly([P(-0.28, -0.1), P(0.28, -0.1), P(0.38, -0.33), P(0.33, -0.39), P(-0.33, -0.39), P(-0.38, -0.33)]),
+        circle(0.045 * s, 0.07 * s, 0.22 * s),
+      ]),
+    },
     code: {
       label: 'Code', make: (s, w, P) => union([
         stroke([P(-0.2, 0.26), P(-0.44, 0), P(-0.2, -0.26)], w * 1.1),
@@ -897,6 +910,7 @@ function createEngine(wasm) {
     return { pos, idx: new Uint32Array(g.triVerts), vol: m.volume(), min: Array.from(bb.min), max: Array.from(bb.max) };
   }
 
+  const fmtMm = (v) => String(Math.round(v * 10) / 10);
   function build(p, font) {
     try {
       const warnings = [];
@@ -1041,7 +1055,8 @@ function createEngine(wasm) {
         stand = { tilt: p.tilt, ty, tz };
       }
 
-      if (Number.isFinite(capMin) && capMin < 3.5) warnings.push(`The smallest letters are ${capMin.toFixed(1)} mm tall. Below about 3.5 mm they blur on a 0.4 mm nozzle. Make the plate bigger, use fewer statuses or shorter words, or try another layout.`);
+      const nz = p.nozzle || 0.4;
+      if (Number.isFinite(capMin) && capMin < nz * 8.75 - 0.01) warnings.push(`The smallest letters are ${capMin.toFixed(1)} mm tall. Below about ${fmtMm(nz * 8.75)} mm they blur on a ${nz} mm nozzle. Make the plate bigger, use fewer statuses or shorter words, or try another layout.`);
       if (tol < 0.15) warnings.push('Clearance under 0.15 mm usually needs a very well-calibrated printer, or the frame will not slide.');
 
       const out = {
@@ -1134,22 +1149,44 @@ const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js
 const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
 const FONT_CDN = 'https://cdn.jsdelivr.net/npm/@fontsource/';
 // Noto packages per script (fontsource splits each into slices with a unicode-range). Pinned versions.
-const FONT_FAMILIES = { sans: 'noto-sans', serif: 'noto-serif' };
+// label: shown in the menu; pkg/ver/w: fontsource package, pinned version and weight; fb: Noto family used for scripts the package lacks.
+const FONT_FAMILIES = {
+  sans: { label: 'Noto Sans', pkg: 'noto-sans', ver: '5.3.0', w: 700, fb: 'sans' },
+  serif: { label: 'Noto Serif', pkg: 'noto-serif', ver: '5.3.0', w: 700, fb: 'serif' },
+  roboto: { label: 'Roboto', pkg: 'roboto', ver: '5.3.0', w: 700, fb: 'sans' },
+  inter: { label: 'Inter', pkg: 'inter', ver: '5.3.0', w: 700, fb: 'sans' },
+  montserrat: { label: 'Montserrat', pkg: 'montserrat', ver: '5.3.0', w: 700, fb: 'sans' },
+  poppins: { label: 'Poppins', pkg: 'poppins', ver: '5.3.0', w: 700, fb: 'sans' },
+  oswald: { label: 'Oswald (narrow)', pkg: 'oswald', ver: '5.3.0', w: 700, fb: 'sans' },
+  bebas: { label: 'Bebas Neue (narrow caps)', pkg: 'bebas-neue', ver: '5.3.0', w: 400, fb: 'sans' },
+  slab: { label: 'Roboto Slab', pkg: 'roboto-slab', ver: '5.3.0', w: 700, fb: 'serif' },
+  lora: { label: 'Lora (serif)', pkg: 'lora', ver: '5.3.0', w: 700, fb: 'serif' },
+  mono: { label: 'Roboto Mono', pkg: 'roboto-mono', ver: '5.3.0', w: 700, fb: 'sans' },
+  fredoka: { label: 'Fredoka (rounded)', pkg: 'fredoka', ver: '5.3.0', w: 700, fb: 'sans' },
+  marker: { label: 'Permanent Marker', pkg: 'permanent-marker', ver: '5.3.0', w: 400, fb: 'sans' },
+};
 const FONT_VERSIONS = { '': '5.3.0', tc: '5.3.1', jp: '5.3.1', kr: '5.3.1', hebrew: '5.3.0', thai: '5.3.0' };
-
 const PRESETS = [
   { name: 'Office classic', list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
   { name: 'Hybrid team', list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
   { name: 'Deep work', list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
   { name: 'Studio', list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Research lab', list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
+  { name: 'Meeting room', list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
+  { name: 'Classroom', list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
+  { name: 'Clinic', list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
+  { name: 'Home office', list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
   { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
+  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['通話中', 'headset'], ['請勿打擾', 'dnd']] },
+  { name: '日本語', list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const EXTRA_STATUSES = [
   ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
   ['STEP OUT', 'pin'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
   ['VIDEO CALL', 'headset'], ['ON THE PHONE', 'headset'], ['CLOSED', 'dnd'], ['PRIVATE', 'dnd'], ['DEADLINE', 'dnd'],
   ['BUSY', 'hourglass'], ['BE RIGHT BACK', 'hourglass'], ['FOCUS', 'target'], ['DEEP WORK', 'target'],
-  ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
+  ['LAB', 'flask'], ['IN THE LAB', 'flask'], ['LAB IN USE', 'flask'], ['LAB CLOSED', 'flask'], ['SAMPLE RUNNING', 'flask'], ['實驗室', 'flask'], ['實驗中', 'flask'],
+  ['外出中', 'plane'], ['午休中', 'forkknife'], ['請敲門', 'check'], ['稍後回來', 'clock'], ['BACK SOON', 'clock'], ['BACK AT 1', 'clock'], ['BACK AT 3', 'clock'], ['ON BREAK', 'cup'], ['TEA TIME', 'cup'],
   ['AT LUNCH', 'forkknife'], ['OUT TO EAT', 'forkknife'], ['WORKING FROM HOME', 'house'], ['REMOTE', 'house'],
   ['ON A TRIP', 'plane'], ['ON VACATION', 'plane'], ['OUT OF TOWN', 'plane'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
@@ -1173,33 +1210,54 @@ const DEFAULTS = {
   current: 0, view: 'assembled', page: 'plate', dims: true,
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
-  frame: 4.5, winR: 2, railH: 3.5, tol: 0.25, arrows: true, chamfer: true,
+  nozzle: 0.4, layerH: 0.2,
+  frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, arrows: true, chamfer: true,
   mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
 };
 
 // Every slider, described once: label, range and how its value reads.
 const mm = (d = 1) => (v) => `${fmt(v, d)} mm`;
+// nozzleMin: smallest value as a multiple of the nozzle diameter; layers: values stay whole numbers of layers.
 const SLIDERS = {
-  cap: { label: 'Letter height', min: 3.5, max: 10, step: 0.5, out: mm() },
+  cap: { label: 'Letter height', min: 2, max: 12, step: 0.5, nozzleMin: 8.75, out: mm() },
   width: { label: 'Width', min: 60, max: 400, step: 1, out: mm(0) },
   height: { label: 'Height', min: 35, max: 200, step: 1, out: mm(0) },
-  thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, out: mm() },
-  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, out: mm() },
-  frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, out: mm() },
+  thick: { label: 'Plate thickness', min: 2, max: 6, step: 0.2, layers: true, out: mm() },
+  reliefH: { label: 'Relief depth', min: 0.4, max: 1.6, step: 0.1, layers: true, out: mm() },
+  frame: { label: 'Frame bars', min: 3, max: 8, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 8, step: 0.5, out: mm() },
-  railH: { label: 'Rail height', min: 2.5, max: 6, step: 0.5, out: mm() },
-  tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, out: mm(2) },
+  railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
+  tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
   magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, out: mm() },
   tilt: { label: 'Lean back', min: 5, max: 25, step: 1, out: (v) => `${v}°` },
 };
-const RANGES = Object.fromEntries(Object.entries(SLIDERS).map(([k, f]) => [k, [f.min, f.max]]));
+// Global printer settings. Slider limits and steps follow them.
+const NOZZLES = [0.2, 0.4, 0.6, 0.8];
+const LAYERS = [0.05, 0.08, 0.1, 0.12, 0.15, 0.16, 0.2, 0.24, 0.25, 0.28, 0.3, 0.32, 0.36, 0.4, 0.45, 0.5, 0.6];
+const layerOptions = (n) => LAYERS.filter((l) => l >= n * 0.25 - 1e-9 && l <= n * 0.75 + 1e-9);
+const nearest = (list, v) => list.reduce((a, b) => (Math.abs(b - v) < Math.abs(a - v) ? b : a));
+const rnd = (v) => Math.round(v * 1000) / 1000;
+function limits(k, s = state) {
+  const f = SLIDERS[k], L = s.layerH;
+  let { min, max, step } = f;
+  if (f.nozzleMin) min = Math.max(min, f.nozzleMin * s.nozzle);
+  if (f.layers) { step = L; min = Math.ceil(min / L - 1e-9) * L; max = Math.floor(max / L + 1e-9) * L; }
+  else min = Math.ceil(min / step - 1e-9) * step;
+  if (max < min) max = min;
+  return { min: rnd(min), max: rnd(max), step: rnd(step) };
+}
+function clampSnap(k, v, s = state) {
+  const { min, max, step } = limits(k, s);
+  v = Math.min(max, Math.max(min, v));
+  return rnd(Math.min(max, min + Math.round((v - min) / step) * step));
+}
 const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
+  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], nozzle: NOZZLES, bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -1223,8 +1281,7 @@ const SECTIONS = [
     { html: 'shapes' },
     { sub: 'Size' },
     { seg: 'sizeMode', aria: 'Sizing', options: [['auto', 'Fit to text'], ['manual', 'Set by hand']] },
-    { slider: 'cap', when: 'auto' },
-    { hint: 'The plate grows or shrinks to the smallest size that fits every status at this letter height.', when: 'auto' },
+    { hint: 'The plate grows or shrinks to the smallest size that fits every status. Set the letter height on the Labels tab.', when: 'auto' },
     { slider: 'width', when: 'manual' },
     { slider: 'height', when: 'manual' },
     { select: 'bed', label: 'Printer bed', options: BEDS },
@@ -1243,9 +1300,10 @@ const SECTIONS = [
     { seg: 'layout', label: 'Layout', options: [['stack', 'Icon over text'], ['side', 'Icon beside'], ['text', 'Text only'], ['icon', 'Icon only']] },
     { sub: 'Text' },
     { row: [
-      { select: 'font', label: 'Typeface', options: [['sans', 'Noto Sans Bold'], ['serif', 'Noto Serif Bold']] },
+      { select: 'font', label: 'Typeface', options: Object.entries(FONT_FAMILIES).map(([k, v]) => [k, v.label]) },
       { text: 'header', label: 'Header text', placeholder: 'Optional, e.g. Room 4B' },
     ] },
+    { slider: 'cap', when: 'auto' },
     { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
     { sub: 'Relief' },
     { row: [{ seg: 'relief', label: 'Labels are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
@@ -1264,8 +1322,9 @@ const SECTIONS = [
 function sanitize(s) {
   const out = structuredClone(DEFAULTS);
   if (!s || typeof s !== 'object') return out;
-  for (const k of Object.keys(RANGES)) if (Number.isFinite(+s[k])) out[k] = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +s[k]));
   for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
+  out.layerH = nearest(layerOptions(out.nozzle), Number.isFinite(+s.layerH) ? +s.layerH : out.layerH);
+  for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = clampSnap(k, +s[k], out);
   for (const k of ['uniform', 'arrows', 'chamfer', 'dims']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
   for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
@@ -1800,7 +1859,7 @@ function readmeText() {
     state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
     '',
     'Two colors on a single nozzle',
-    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + 0.2).toFixed(2)} mm layer with 0.2 mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
+    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + state.layerH).toFixed(2)} mm layer with ${state.layerH} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
     i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
     '',
     'Assembly',
@@ -1903,16 +1962,15 @@ function renderStatuses(focusTarget) {
     card.className = 'st-card';
     card.dataset.idx = i;
     card.innerHTML = `
-      <div class="st-top">
-        <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
-        <span class="pick" aria-hidden="true">${svgIcon(st.icon)}</span>
-        <span class="st-tools">
-          <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
-          <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
-          <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
-        </span>
+      <div class="st-row">
+        <button type="button" class="pick" data-role="show" data-idx="${i}" title="Show on the sign">${svgIcon(st.icon)}</button>
+        <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>
       </div>
-      <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>`;
+      <div class="st-tools">
+        <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
+        <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
+        <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
+      </div>`;
     card.querySelector('input').value = st.text;
     labelCard(card, st, i);
     wrap.appendChild(card);
@@ -2093,6 +2151,15 @@ function renderPalettes() {
 // Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
 function syncControls() {
+  const layers = layerOptions(state.nozzle), sel = $('#layerH');
+  if (sel.dataset.for !== String(state.nozzle)) {
+    sel.innerHTML = layers.map((l) => `<option value="${l}">${l} mm</option>`).join('');
+    sel.dataset.for = String(state.nozzle);
+  }
+  for (const k of Object.keys(SLIDERS)) {
+    const el = $(`#${k}`);
+    if (el) { const l = limits(k); el.min = l.min; el.max = l.max; el.step = l.step; }
+  }
   for (const el of $$('[data-key]')) {
     const v = state[el.dataset.key];
     if (el.classList.contains('seg')) $$('button', el).forEach((b) => b.setAttribute('aria-checked', String(String(v) === b.dataset.value)));
@@ -2109,14 +2176,18 @@ function syncControls() {
 }
 function setKey(k, raw) {
   let v = raw;
-  if (RANGES[k]) { v = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +raw)); if (!Number.isFinite(v)) return; }
-  else if (typeof CHOICES[k]?.[0] === 'number') v = +raw;
+  if (SLIDERS[k]) { v = +raw; if (!Number.isFinite(v)) return; v = clampSnap(k, v); }
+  else if (k === 'layerH' || typeof CHOICES[k]?.[0] === 'number') v = +raw;
   // switching to manual starts from the size the auto-fit last produced
   if (k === 'sizeMode' && v === 'manual' && result && result.info.auto) {
-    state.width = Math.min(RANGES.width[1], Math.max(RANGES.width[0], Math.round(result.info.plateW)));
-    state.height = Math.min(RANGES.height[1], Math.max(RANGES.height[0], Math.round(result.info.plateH)));
+    state.width = clampSnap('width', result.info.plateW);
+    state.height = clampSnap('height', result.info.plateH);
   }
   state[k] = v;
+  if (k === 'nozzle' || k === 'layerH') {
+    state.layerH = nearest(layerOptions(state.nozzle), state.layerH);
+    for (const key of Object.keys(SLIDERS)) state[key] = clampSnap(key, state[key]);
+  }
   syncControls();
   if (COLOR_KEYS.has(k)) { applyColors(); saveState(); return; }
   if (k === 'bed') { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
@@ -2180,7 +2251,7 @@ function updateReadout() {
   $('#vpDims').textContent = `${fmt(i.W)} × ${fmt(i.H)} × ${fmt(i.zt)} mm`;
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
   const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
-  const small = i.capMin && i.capMin < 3.5;
+  const small = i.capMin && i.capMin < state.nozzle * 8.75 - 0.01;
   $('#spec').innerHTML = `Plate <b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)} · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
     + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
   const warns = [...i.warnings];
@@ -2211,7 +2282,7 @@ function renderExport() {
   const steps = [
     `<b>Print</b> every part as exported. They are already oriented for printing and need no supports; the frame prints face-down.`,
     i.raised
-      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + 0.2).toFixed(2)} mm</span> layer at 0.2 mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
+      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + state.layerH).toFixed(2)} mm</span> layer at ${state.layerH} mm layer height) and swap back above <span class="mono">${(i.T + i.Lh).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i> and <i>labels</i> together as one object instead.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
     `<b>Assemble:</b> slide the frame into the track from the left end (the end with the small hole), then press in the stop pin.`,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
@@ -2228,21 +2299,21 @@ function renderExport() {
 const cssCache = new Map(), fileCache = new Map();
 let opentypeLib = null;
 const fontError = () => Object.assign(new Error('Could not load the typeface. Check your connection and try again.'), { user: true });
-function pkgFor(ch, family) {
+function scriptSuffix(ch) {
   const cp = ch.codePointAt(0), inR = (a, b) => cp >= a && cp <= b;
-  let suffix = '';
-  if (inR(0x3040, 0x30FF) || inR(0x31F0, 0x31FF)) suffix = 'jp';
-  else if (inR(0xAC00, 0xD7AF) || inR(0x1100, 0x11FF) || inR(0x3130, 0x318F)) suffix = 'kr';
-  else if (inR(0x4E00, 0x9FFF) || inR(0x3400, 0x4DBF) || inR(0xF900, 0xFAFF) || inR(0x3000, 0x303F) || inR(0xFF00, 0xFFEF) || inR(0x2E80, 0x2FDF) || inR(0x20000, 0x2A6DF)) suffix = 'tc';
-  else if (inR(0x0590, 0x05FF)) suffix = 'hebrew';
-  else if (inR(0x0E00, 0x0E7F)) suffix = 'thai';
-  return suffix ? { name: family + '-' + suffix, ver: FONT_VERSIONS[suffix] } : { name: family, ver: FONT_VERSIONS[''] };
+  if (inR(0x3040, 0x30FF) || inR(0x31F0, 0x31FF)) return 'jp';
+  if (inR(0xAC00, 0xD7AF) || inR(0x1100, 0x11FF) || inR(0x3130, 0x318F)) return 'kr';
+  if (inR(0x4E00, 0x9FFF) || inR(0x3400, 0x4DBF) || inR(0xF900, 0xFAFF) || inR(0x3000, 0x303F) || inR(0xFF00, 0xFFEF) || inR(0x2E80, 0x2FDF) || inR(0x20000, 0x2A6DF)) return 'tc';
+  if (inR(0x0590, 0x05FF)) return 'hebrew';
+  if (inR(0x0E00, 0x0E7F)) return 'thai';
+  return '';
 }
-async function loadSlices(pkg) {
-  const key = pkg.name + '@' + pkg.ver;
+const notoPkg = (kind, suffix) => ({ pkg: `noto-${kind}${suffix ? '-' + suffix : ''}`, ver: FONT_VERSIONS[suffix], w: 700 });
+async function loadSlices(p) {
+  const key = `${p.pkg}@${p.ver}/${p.w}`;
   if (!cssCache.has(key)) {
-    const base = `${FONT_CDN}${key}/`;
-    cssCache.set(key, fetch(base + '700.css').then((r) => { if (!r.ok) throw fontError(); return r.text(); }).then((css) => css.split('@font-face').slice(1).map((blk) => {
+    const base = `${FONT_CDN}${p.pkg}@${p.ver}/`;
+    cssCache.set(key, fetch(`${base}${p.w}.css`).then((r) => { if (!r.ok) throw fontError(); return r.text(); }).then((css) => css.split('@font-face').slice(1).map((blk) => {
       const file = /url\(\.\/(files\/[^)]*\.woff)\)/.exec(blk), range = /unicode-range:\s*([^;]+);/.exec(blk);
       if (!file || !range) return null;
       const spans = range[1].split(',').map((t) => t.trim().replace(/^U\+/i, '').split('-').map((h) => parseInt(h, 16))).map(([a, b]) => [a, b ?? a]);
@@ -2261,16 +2332,22 @@ function loadFile(url) {
 // Build the text font for a string. Returns { font, missing }: missing lists characters no loaded font covers.
 async function textFontFor(str, familyKey) {
   if (!opentypeLib) opentypeLib = (await import(OPENTYPE_URL)).default;
-  const family = FONT_FAMILIES[familyKey] || FONT_FAMILIES.sans;
+  const fam = FONT_FAMILIES[familyKey] || FONT_FAMILIES.sans;
   const chars = [...new Set(Array.from((str + 'H? ').normalize('NFC')))];
   const map = new Map(), missing = [];
   await Promise.all(chars.map(async (ch) => {
-    if (ch.codePointAt(0) < 32) return;
     const cp = ch.codePointAt(0);
-    const slice = (await loadSlices(pkgFor(ch, family))).find((sl) => sl.spans.some(([lo, hi]) => cp >= lo && cp <= hi));
-    if (!slice) { missing.push(ch); return; }
-    const font = await loadFile(slice.url);
-    if (font.charToGlyphIndex(ch) > 0 || ch === ' ') map.set(ch, font); else missing.push(ch);
+    if (cp < 32) return;
+    // the chosen family first, then Noto for scripts it does not cover (CJK, Hebrew and Thai always use Noto)
+    const suffix = scriptSuffix(ch);
+    const tries = suffix ? [notoPkg(fam.fb, suffix)] : [{ pkg: fam.pkg, ver: fam.ver, w: fam.w }, notoPkg(fam.fb, '')];
+    for (const p of tries) {
+      const slice = (await loadSlices(p)).find((sl) => sl.spans.some(([lo, hi]) => cp >= lo && cp <= hi));
+      if (!slice) continue;
+      const font = await loadFile(slice.url);
+      if (font.charToGlyphIndex(ch) > 0 || ch === ' ') { map.set(ch, font); return; }
+    }
+    missing.push(ch);
   }));
   return { font: makeTextFont(map), missing: missing.filter((c) => !/\s/.test(c)) };
 }
@@ -2294,10 +2371,9 @@ async function rebuild() {
     result = engine.build({ ...state, statuses: state.statuses.map((s) => ({ ...s })) }, font);
     const ms = performance.now() - t0;
     if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
-    // re-frame the camera only when the view or the plate size changes noticeably, not on every keystroke
+    // the camera is only re-framed on the first build and when the view mode changes; settings never move it
     const fit = { view: state.view, stand: state.mount === 'stand', W: result.info.plateW, H: result.info.plateH };
-    const refit = firstBuild || !lastFit || fit.view !== lastFit.view || fit.stand !== lastFit.stand
-      || Math.abs(fit.W - lastFit.W) > lastFit.W * 0.15 || Math.abs(fit.H - lastFit.H) > lastFit.H * 0.15;
+    const refit = firstBuild || !lastFit || fit.view !== lastFit.view;
     updateScene(result, refit);
     if (refit) lastFit = fit;
     firstBuild = false;
