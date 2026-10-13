@@ -202,6 +202,7 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 
 /* settings: one card per part of the sign, each with its own color */
 .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel > *, #settings > * { flex: none; }
 #settings { display: contents; }
 .section {
   --hue: var(--accent); --hue-soft: var(--accent-soft);
@@ -336,10 +337,9 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       <label>Layer<input id="layerH" data-key="layerH" data-commit="change" type="number" inputmode="decimal" step="any" min="0.005" title="Layer height in mm. Type any value."></label>
       <label class="chk" title="Dynamic layer height: dimensions are not tied to whole layers and the layer height is not checked against the nozzle"><input type="checkbox" id="dyn" data-key="dyn">Dynamic</label>
     </div>
-    <button class="btn" id="printOpen" type="button">Print guide</button>
-    <button class="btn primary" id="dlZip" disabled>
+    <button class="btn primary" id="printOpen" type="button" title="Download the STL files or a 3MF, with print and assembly steps">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 20h16"/></svg>
-      Download STL files
+      Download
     </button>
   </div>
 </header>
@@ -400,7 +400,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 </main>
 
 <dialog id="printDialog" class="hue-print" aria-labelledby="printTitle">
-  <div class="dlg-head"><h2 id="printTitle">Print</h2><button type="button" class="icon-btn" id="printClose" aria-label="Close">✕</button></div>
+  <div class="dlg-head"><h2 id="printTitle">Download &amp; print</h2><button type="button" class="icon-btn" id="printClose" aria-label="Close">✕</button></div>
   <div class="dlg-body">
     <button class="btn primary wide" id="dlZip2" disabled>Download all parts (.zip)</button>
     <button class="btn wide" id="dl3mf" disabled title="One file with the parts laid out on the bed and the preview colors, for Bambu Studio, Orca Slicer and PrusaSlicer">Download as 3MF (one file, with colors)</button>
@@ -712,14 +712,6 @@ function createEngine(wasm) {
         return { cs, body: [-H / 2, H / 2] };
       },
     },
-    // A hanging eyelet above the plate: hang the sign on a knob or hook.
-    tag: {
-      label: 'Hang tag', make: (W, H) => {
-        const ro = Math.min(9, H * 0.14), cy = H / 2 + ro * 0.7;
-        const cs = union([rrect(W, H, Math.min(8, H * 0.15)), circle(ro, 0, cy, 64)]).subtract(circle(ro - 3.5, 0, cy, 64));
-        return { cs, body: [-H / 2, H / 2] };
-      },
-    },
     // Round knob on the right end and a matching socket on the left: signs can be joined side by side.
     puzzle: {
       label: 'Puzzle', make: (W, H) => {
@@ -989,6 +981,12 @@ function createEngine(wasm) {
       const Lh = raised ? p.reliefH : 0, engr = raised ? 0 : Math.min(p.reliefH, T - 1);
       const Rh = p.railH, d = 2.0, Rw = 6, pad = p.pad ?? 2.4, fb = p.frame, fbx = p.frame, play = 0.6, pinR = 2, proud = p.proud ?? 0.8;
       const sh = SHAPES[p.shape].make(W, H);
+      if (p.mount === 'hang') {
+        // an eyelet on top of whatever outline was chosen, centered over its highest point
+        const strip = rect(2, 600, 0, 0).intersect(sh.cs), tb = strip.isEmpty() ? sh.cs.bounds() : strip.bounds();
+        const ro = Math.min(9, H * 0.14), cy = tb.max[1] + ro * 0.7;
+        sh.cs = union([sh.cs, circle(ro, 0, cy, 64)]).subtract(circle(ro - 3.5, 0, cy, 64));
+      }
       const ob = sh.cs.bounds();
 
       // vertical layout
@@ -1373,14 +1371,15 @@ const SHAPE_DEFAULTS = {
   honeycomb: { marginV: 16, marginH: 12 },
 };
 const CHOICES = {
-  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'tag', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
+  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
   magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
+  hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
   stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
 };
 // Conditions for controls that only apply in some modes.
@@ -1400,6 +1399,11 @@ const SECTIONS = [
     { check: 'chamfer', label: 'Chamfered plate edge' },
     { sub: 'Shape', noteId: 'shapeName' },
     { html: 'shapes' },
+    { sub: 'Mounting' },
+    { seg: 'mount', aria: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop']] },
+    { hint: '', id: 'mountHint' },
+    { row: [{ slider: 'magD' }, { slider: 'magH' }, { seg: 'magN', label: 'Pockets', options: [[2, '2'], [4, '4']] }], when: 'magnet' },
+    { slider: 'tilt', when: 'stand' },
     { sub: 'Size' },
     { fit: true },
     { slider: 'width' },
@@ -1407,11 +1411,6 @@ const SECTIONS = [
     { html: 'spec' },
     { sub: 'Margins' },
     { row: [{ slider: 'marginV' }, { slider: 'marginH' }] },
-    { sub: 'Mounting' },
-    { seg: 'mount', aria: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand']] },
-    { hint: '', id: 'mountHint' },
-    { row: [{ slider: 'magD' }, { slider: 'magH' }, { seg: 'magN', label: 'Pockets', options: [[2, '2'], [4, '4']] }], when: 'magnet' },
-    { slider: 'tilt', when: 'stand' },
     { sub: 'Thickness' },
     { slider: 'thick' },
   ] },
@@ -2353,7 +2352,7 @@ function renderPresets() {
 function renderShapes() {
   const grid = $('#shapeGrid');
   grid.innerHTML = '';
-  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'tag', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'];
+  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'];
   for (const [k, label] of Object.entries(engine.shapes).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
@@ -2620,7 +2619,6 @@ async function rebuild() {
     updateReadout();
     showError('');
     setBuildState('ok', `Built in ${Math.round(ms)} ms`);
-    $('#dlZip').disabled = false;
     $('#dlZip2').disabled = false;
     $('#dl3mf').disabled = false;
   } catch (e) {
@@ -2628,7 +2626,6 @@ async function rebuild() {
     showError(e.user ? e.message : 'Something went wrong while building the model: ' + (e.message || e));
     setBuildState('error', e.user ? 'Check the size' : 'Build failed');
     // the preview still shows the last good model; don't let it be exported as if it matched the settings
-    $('#dlZip').disabled = true;
     $('#dlZip2').disabled = true;
     $('#dl3mf').disabled = true;
     $$('#partsList button').forEach((b) => { b.disabled = true; });
@@ -2638,7 +2635,6 @@ async function rebuild() {
   }
 }
 
-$('#dlZip').addEventListener('click', downloadZip);
 $('#dlZip2').addEventListener('click', downloadZip);
 $('#dl3mf').addEventListener('click', download3mf);
 $('#copyLink').addEventListener('click', async () => {
