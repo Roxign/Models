@@ -155,6 +155,11 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .st-tools button:hover:not(:disabled) { background: var(--soft); color: var(--ink); }
 .st-tools button:disabled { opacity: 0.28; cursor: default; }
 .st-tools svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.combo { position: relative; display: flex; }
+.combo input { padding-right: 28px; }
+.combo button { position: absolute; right: 2px; top: 2px; bottom: 2px; width: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); display: grid; place-items: center; padding: 0; }
+.combo button:hover { background: var(--panel); color: var(--ink); }
+.combo svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .st-card input { font-family: var(--font-display); font-stretch: 78%; font-weight: 650; font-size: 13.5px; padding: 7px 6px; }
 .warnings { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .warnings li { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; }
@@ -383,7 +388,6 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
@@ -660,44 +664,30 @@ function createEngine(wasm) {
   };
 
   // ---------- text ----------
-  function cleanRing(pts, ccw) {
+  // Contours keep the font's own winding; CrossSection's NonZero fill rule resolves holes and overlaps.
+  function ringClean(pts) {
     const out = [];
-    for (const v of pts) {
-      const q = [v.x, v.y], l = out[out.length - 1];
-      if (!l || Math.hypot(l[0] - q[0], l[1] - q[1]) > 1e-4) out.push(q);
+    for (const [x, y] of pts) {
+      const l = out[out.length - 1];
+      if (!l || Math.hypot(l[0] - x, l[1] - y) > 1e-4) out.push([x, y]);
     }
-    if (out.length > 2) { const f = out[0], l = out[out.length - 1]; if (Math.hypot(f[0] - l[0], f[1] - l[1]) < 1e-4) out.pop(); }
-    if (out.length < 3) return null;
-    let a = 0;
-    for (let i = 0; i < out.length; i++) { const p = out[i], q = out[(i + 1) % out.length]; a += p[0] * q[1] - q[0] * p[1]; }
-    if ((a > 0) !== ccw) out.reverse();
-    return out;
+    if (out.length > 2) { const a = out[0], l = out[out.length - 1]; if (Math.hypot(a[0] - l[0], a[1] - l[1]) < 1e-4) out.pop(); }
+    return out.length >= 3 ? out : null;
   }
   function textLine(font, str, size) {
     const polys = [];
-    for (const shp of font.generateShapes(str, size)) {
-      const { shape, holes } = shp.extractPoints(8);
-      const o = cleanRing(shape, true);
-      if (o) polys.push(o);
-      for (const h of holes) { const r = cleanRing(h, false); if (r) polys.push(r); }
-    }
-    return polys.length ? CS(polys) : null;
+    for (const r of font.contours(str, size)) { const c = ringClean(r); if (c) polys.push(c); }
+    return polys.length ? CS(polys).simplify(0.004 * size) : null;
   }
-  const capCache = new Map();
   function capRef(font) {
-    if (!capCache.has(font)) {
+    if (font._cap == null) {
       const c = textLine(font, 'H', 10);
       const b = c && c.bounds();
-      capCache.set(font, b ? b.max[1] - b.min[1] : 7.2);
+      font._cap = b ? b.max[1] - b.min[1] : 7.2;
     }
-    return capCache.get(font);
+    return font._cap;
   }
-  function advWidth(font, str) {
-    const d = font.data, res = d.resolution || 1000;
-    let w = 0;
-    for (const ch of str) { const g = d.glyphs[ch] || d.glyphs['?']; w += g ? g.ha : res * 0.6; }
-    return w / res;
-  }
+  const advWidth = (font, str) => font.advance(str);
   function lineOptions(font, text, single) {
     if (text.includes('|')) return [text.split('|').map((s) => s.trim()).filter(Boolean)];
     const words = text.split(/\s+/).filter(Boolean);
@@ -752,7 +742,7 @@ function createEngine(wasm) {
     const gap = p.layout === 'side' ? Math.max(1.8, c * 0.5) : Math.max(1.6, c * 0.45);
     return { cap: c, s, gap, hdrCap: clamp(c * 1.3, 4, 12) };
   }
-  const labelText = (st, p) => { const raw = (st.text || '').trim(); return p.caps ? raw.toUpperCase() : raw; };
+  const labelText = (st) => (st.text || '').trim();
   const hasText = (t) => t.replace(/\|/g, '').trim().length > 0;
 
   function cellContent(st, font, cw, ch, p, capLimit = Infinity) {
@@ -855,7 +845,7 @@ function createEngine(wasm) {
     let hh = 0, hdrW = 0;
     if (headerText) {
       hh = A.hdrCap / 0.62;
-      const m = measureLines(font, [p.caps ? headerText.toUpperCase() : headerText]);
+      const m = measureLines(font, [headerText]);
       hdrW = m ? m.w * A.hdrCap / capRef(font) : 0;
     }
     // rail half-length needed for that window width (inverse of the window formula in build)
@@ -956,7 +946,7 @@ function createEngine(wasm) {
       if (headerText) {
         const [h0, h1] = hdrZone, zh = h1 - h0, my = (h0 + h1) / 2;
         const hdrMax = auto ? Math.min(autoMetrics(p).hdrCap, zh * 0.62) : Math.min(10, zh * 0.62);
-        const tb = fitText(font, p.caps ? headerText.toUpperCase() : headerText, Math.min(2 * X0, W * 0.86), zh * 0.72, hdrMax, true);
+        const tb = fitText(font, headerText, Math.min(2 * X0, W * 0.86), zh * 0.72, hdrMax, true);
         if (tb.cs) {
           let k = 1, hcs = tb.cs.translate([0, my]);
           for (let i = 0; i < 12 && hcs.offset(1.4, 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.9; hcs = tb.cs.scale(k).translate([0, my]); }
@@ -1086,6 +1076,51 @@ function createEngine(wasm) {
     shapePath(kind) { try { return svgPath(SHAPES[kind].make(200, 72).cs); } finally { free(); } },
   };
 }
+// Text font: draws each character with the opentype.js font that covers it (charFonts: Map char -> Font).
+function makeTextFont(charFonts) {
+  const prep = (str) => {
+    let chars = Array.from(String(str).normalize('NFC'));
+    if (chars.some((c) => c >= '\u0590' && c <= '\u05FF')) chars = chars.reverse(); // Hebrew reads right to left
+    return chars;
+  };
+  const flatten = (cmds, size, ox) => {
+    const rings = [];
+    let cur = null, px = 0, py = 0;
+    const pt = (x, y) => { cur.push([x, -y]); px = x; py = y; };
+    for (const c of cmds) {
+      if (c.type === 'M') { if (cur && cur.length) rings.push(cur); cur = []; pt(c.x, c.y); }
+      else if (c.type === 'L') pt(c.x, c.y);
+      else if (c.type === 'Q') {
+        const x0 = px, y0 = py;
+        for (let i = 1; i <= 6; i++) { const t = i / 6, u = 1 - t; pt(u * u * x0 + 2 * u * t * c.x1 + t * t * c.x, u * u * y0 + 2 * u * t * c.y1 + t * t * c.y); }
+      } else if (c.type === 'C') {
+        const x0 = px, y0 = py;
+        for (let i = 1; i <= 8; i++) { const t = i / 8, u = 1 - t; pt(u * u * u * x0 + 3 * u * u * t * c.x1 + 3 * u * t * t * c.x2 + t * t * t * c.x, u * u * u * y0 + 3 * u * u * t * c.y1 + 3 * u * t * t * c.y2 + t * t * t * c.y); }
+      } else if (c.type === 'Z') { if (cur && cur.length) rings.push(cur); cur = null; }
+    }
+    if (cur && cur.length) rings.push(cur);
+    return rings;
+  };
+  return {
+    contours(str, size) {
+      const out = [];
+      let x = 0;
+      for (const ch of prep(str)) {
+        const f = charFonts.get(ch);
+        if (!f) { x += size * 0.5; continue; }
+        const g = f.charToGlyph(ch);
+        out.push(...flatten(g.getPath(x, 0, size).commands, size));
+        x += g.advanceWidth * size / f.unitsPerEm;
+      }
+      return out;
+    },
+    advance(str) {
+      let w = 0;
+      for (const ch of prep(str)) { const f = charFonts.get(ch); w += f ? f.charToGlyph(ch).advanceWidth / f.unitsPerEm : 0.5; }
+      return w;
+    },
+  };
+}
 // ==ENGINE-END==
 
 // ---------------------------------------------------------------------------
@@ -1096,8 +1131,11 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/\.0+$/, '');
 const STORE_KEY = 'office-status-slider:v1';
 const MANIFOLD_URL = 'https://cdn.jsdelivr.net/npm/manifold-3d@3.0.0/manifold.js';
-const FONT_BASE = 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/fonts/';
-const FONT_FILES = { helvetiker: 'helvetiker_bold.typeface.json', optimer: 'optimer_bold.typeface.json', gentilis: 'gentilis_bold.typeface.json', droid: 'droid/droid_sans_bold.typeface.json' };
+const OPENTYPE_URL = 'https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js';
+const FONT_CDN = 'https://cdn.jsdelivr.net/npm/@fontsource/';
+// Noto packages per script (fontsource splits each into slices with a unicode-range). Pinned versions.
+const FONT_FAMILIES = { sans: 'noto-sans', serif: 'noto-serif' };
+const FONT_VERSIONS = { '': '5.3.0', tc: '5.3.1', jp: '5.3.1', kr: '5.3.1', hebrew: '5.3.0', thai: '5.3.0' };
 
 const PRESETS = [
   { name: 'Office classic', list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
@@ -1134,7 +1172,7 @@ const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
   current: 0, view: 'assembled', page: 'plate', dims: true,
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
-  layout: 'stack', font: 'helvetiker', caps: true, uniform: true, relief: 'raised', reliefH: 0.8, header: '',
+  layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   frame: 4.5, winR: 2, railH: 3.5, tol: 0.25, arrows: true, chamfer: true,
   mount: 'none', magD: 10, magH: 2, magN: 2, tilt: 15,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
@@ -1160,7 +1198,7 @@ const RANGES = Object.fromEntries(Object.entries(SLIDERS).map(([k, f]) => [k, [f
 const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
-  layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FILES), relief: ['raised', 'engraved'],
+  layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
   mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
 };
 const MOUNT_HINTS = {
@@ -1205,10 +1243,9 @@ const SECTIONS = [
     { seg: 'layout', label: 'Layout', options: [['stack', 'Icon over text'], ['side', 'Icon beside'], ['text', 'Text only'], ['icon', 'Icon only']] },
     { sub: 'Text' },
     { row: [
-      { select: 'font', label: 'Typeface', options: [['helvetiker', 'Helvetiker Bold'], ['droid', 'Droid Sans Bold'], ['optimer', 'Optimer Bold'], ['gentilis', 'Gentilis Bold']] },
+      { select: 'font', label: 'Typeface', options: [['sans', 'Noto Sans Bold'], ['serif', 'Noto Serif Bold']] },
       { text: 'header', label: 'Header text', placeholder: 'Optional, e.g. Room 4B' },
     ] },
-    { check: 'caps', label: 'All capitals' },
     { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
     { sub: 'Relief' },
     { row: [{ seg: 'relief', label: 'Labels are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
@@ -1229,7 +1266,7 @@ function sanitize(s) {
   if (!s || typeof s !== 'object') return out;
   for (const k of Object.keys(RANGES)) if (Number.isFinite(+s[k])) out[k] = Math.min(RANGES[k][1], Math.max(RANGES[k][0], +s[k]));
   for (const k of Object.keys(CHOICES)) if (s[k] != null && CHOICES[k].map(String).includes(String(s[k]))) out[k] = typeof CHOICES[k][0] === 'number' ? +s[k] : s[k];
-  for (const k of ['caps', 'uniform', 'arrows', 'chamfer', 'dims']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  for (const k of ['uniform', 'arrows', 'chamfer', 'dims']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
   for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
   if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
@@ -1870,13 +1907,12 @@ function renderStatuses(focusTarget) {
         <button type="button" class="st-show" data-role="show" data-idx="${i}" title="Show on the sign"><span class="dot"></span></button>
         <span class="pick" aria-hidden="true">${svgIcon(st.icon)}</span>
         <span class="st-tools">
-          <button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button>
           <button type="button" data-role="left" data-idx="${i}" aria-label="Move left" title="Move left" ${i === 0 ? 'disabled' : ''}>${TOOL_SVG.left}</button>
           <button type="button" data-role="right" data-idx="${i}" aria-label="Move right" title="Move right" ${i === n - 1 ? 'disabled' : ''}>${TOOL_SVG.right}</button>
           <button type="button" data-role="del" data-idx="${i}" aria-label="Remove" title="Remove" ${n <= 2 ? 'disabled' : ''}>${TOOL_SVG.del}</button>
         </span>
       </div>
-      <input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}">`;
+      <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="28" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>`;
     card.querySelector('input').value = st.text;
     labelCard(card, st, i);
     wrap.appendChild(card);
@@ -1958,6 +1994,7 @@ cardsEl.addEventListener('input', (e) => {
   changed();
 });
 cardsEl.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowDown' && e.target.dataset.role === 'text') { e.preventDefault(); openSetPicker(e.target.nextElementSibling, +e.target.dataset.idx); return; }
   if (e.target.dataset.role !== 'show') return;
   const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
   if (d) { e.preventDefault(); setCurrent((state.current + d + state.statuses.length) % state.statuses.length, true); }
@@ -2147,6 +2184,7 @@ function updateReadout() {
   $('#spec').innerHTML = `Plate <b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)} · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
     + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
   const warns = [...i.warnings];
+  if (textMissing.length) warns.unshift(`These characters have no printable outline here and were skipped: ${[...new Set(textMissing)].join(' ')}. Arabic and Indic scripts need text shaping, which this page does not do.`);
   if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the size or pick a larger bed.`);
   $('#warnings').innerHTML = '';
   for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
@@ -2186,15 +2224,58 @@ function renderExport() {
 // ---------------------------------------------------------------------------
 // Build pipeline
 // ---------------------------------------------------------------------------
-const fontCache = {};
-function getFont(key) {
-  if (!fontCache[key]) {
-    fontCache[key] = new Promise((res, rej) => new FontLoader().load(FONT_BASE + FONT_FILES[key], res, undefined, rej))
-      .catch(() => { delete fontCache[key]; throw new Error('Could not load the typeface. Check your connection and try again.'); });
+// Fonts are fetched per character: find the script's package, then the slice whose unicode-range holds the character.
+const cssCache = new Map(), fileCache = new Map();
+let opentypeLib = null;
+const fontError = () => Object.assign(new Error('Could not load the typeface. Check your connection and try again.'), { user: true });
+function pkgFor(ch, family) {
+  const cp = ch.codePointAt(0), inR = (a, b) => cp >= a && cp <= b;
+  let suffix = '';
+  if (inR(0x3040, 0x30FF) || inR(0x31F0, 0x31FF)) suffix = 'jp';
+  else if (inR(0xAC00, 0xD7AF) || inR(0x1100, 0x11FF) || inR(0x3130, 0x318F)) suffix = 'kr';
+  else if (inR(0x4E00, 0x9FFF) || inR(0x3400, 0x4DBF) || inR(0xF900, 0xFAFF) || inR(0x3000, 0x303F) || inR(0xFF00, 0xFFEF) || inR(0x2E80, 0x2FDF) || inR(0x20000, 0x2A6DF)) suffix = 'tc';
+  else if (inR(0x0590, 0x05FF)) suffix = 'hebrew';
+  else if (inR(0x0E00, 0x0E7F)) suffix = 'thai';
+  return suffix ? { name: family + '-' + suffix, ver: FONT_VERSIONS[suffix] } : { name: family, ver: FONT_VERSIONS[''] };
+}
+async function loadSlices(pkg) {
+  const key = pkg.name + '@' + pkg.ver;
+  if (!cssCache.has(key)) {
+    const base = `${FONT_CDN}${key}/`;
+    cssCache.set(key, fetch(base + '700.css').then((r) => { if (!r.ok) throw fontError(); return r.text(); }).then((css) => css.split('@font-face').slice(1).map((blk) => {
+      const file = /url\(\.\/(files\/[^)]*\.woff)\)/.exec(blk), range = /unicode-range:\s*([^;]+);/.exec(blk);
+      if (!file || !range) return null;
+      const spans = range[1].split(',').map((t) => t.trim().replace(/^U\+/i, '').split('-').map((h) => parseInt(h, 16))).map(([a, b]) => [a, b ?? a]);
+      return { url: base + file[1], spans };
+    }).filter(Boolean)).catch((e) => { cssCache.delete(key); throw e.user ? e : fontError(); }));
   }
-  return fontCache[key];
+  return cssCache.get(key);
+}
+function loadFile(url) {
+  if (!fileCache.has(url)) {
+    fileCache.set(url, fetch(url).then((r) => { if (!r.ok) throw fontError(); return r.arrayBuffer(); }).then((buf) => opentypeLib.parse(buf))
+      .catch((e) => { fileCache.delete(url); throw e.user ? e : fontError(); }));
+  }
+  return fileCache.get(url);
+}
+// Build the text font for a string. Returns { font, missing }: missing lists characters no loaded font covers.
+async function textFontFor(str, familyKey) {
+  if (!opentypeLib) opentypeLib = (await import(OPENTYPE_URL)).default;
+  const family = FONT_FAMILIES[familyKey] || FONT_FAMILIES.sans;
+  const chars = [...new Set(Array.from((str + 'H? ').normalize('NFC')))];
+  const map = new Map(), missing = [];
+  await Promise.all(chars.map(async (ch) => {
+    if (ch.codePointAt(0) < 32) return;
+    const cp = ch.codePointAt(0);
+    const slice = (await loadSlices(pkgFor(ch, family))).find((sl) => sl.spans.some(([lo, hi]) => cp >= lo && cp <= hi));
+    if (!slice) { missing.push(ch); return; }
+    const font = await loadFile(slice.url);
+    if (font.charToGlyphIndex(ch) > 0 || ch === ' ') map.set(ch, font); else missing.push(ch);
+  }));
+  return { font: makeTextFont(map), missing: missing.filter((c) => !/\s/.test(c)) };
 }
 
+let textMissing = [];
 let rebuildTimer = 0, building = false, pending = false, firstBuild = true, lastFit = null;
 function changed() {
   saveState();
@@ -2207,7 +2288,8 @@ async function rebuild() {
   if (building) { pending = true; return; }
   building = true;
   try {
-    const font = await getFont(state.font);
+    const { font, missing } = await textFontFor(state.statuses.map((x) => x.text).join('') + state.header, state.font);
+    textMissing = missing;
     const t0 = performance.now();
     result = engine.build({ ...state, statuses: state.statuses.map((s) => ({ ...s })) }, font);
     const ms = performance.now() - t0;
@@ -2273,7 +2355,7 @@ requestAnimationFrame(loop);
 
 (async () => {
   try {
-    const [{ default: Module }] = await Promise.all([import(MANIFOLD_URL), getFont(state.font)]);
+    const [{ default: Module }] = await Promise.all([import(MANIFOLD_URL)]);
     const wasm = await Module();
     wasm.setup();
     engine = createEngine(wasm);
