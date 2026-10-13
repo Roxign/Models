@@ -427,7 +427,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <button class="icon-btn" id="palToggle" title="Preview colors" aria-label="Preview colors" aria-expanded="false" aria-controls="palPop">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.6-2.2-.4-1.3.4-2.3 1.7-2.3H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>
         </button>
-        <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="true">
+        <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>
         </button>
         <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
@@ -442,7 +442,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       </div>
       <div class="vp-bottom">
         <span class="vp-hint" id="vpHint">Drag the frame to change status · drag empty space to orbit</span>
-        <span class="vp-right"><span class="build-state" id="buildState" data-state="busy">Loading engine…</span><span class="vp-dims" id="vpDims">—</span></span>
+        <span class="vp-right"><span class="build-state" id="buildState" data-state="busy">Loading engine…</span></span>
       </div>
       <ul class="warnings" id="warnings"></ul>
       <div class="error-toast" id="errorToast" role="alert" hidden></div>
@@ -692,10 +692,11 @@ function createEngine(wasm) {
       ]),
     },
   };
+  let minLine = 0.8; // set per build: the thinnest line worth drawing, two nozzle widths
   const iconCS = (name, s) => {
     const def = ICONS[name];
     if (!def) return null;
-    const w = Math.max(1.2, s * 0.095);
+    const w = Math.max(1.2, minLine, s * 0.095);
     return def.make(s, w, (x, y) => [x * s, y * s]);
   };
 
@@ -936,27 +937,30 @@ function createEngine(wasm) {
 
   // Vertical layout of the track inside a plate of height H. hh overrides the header band height.
   // Name tag rail: two lipped rails along a header band; a separate flat tag slides in from the left.
-  const TAG_RW = 2.4;
+  const tagRw = (p) => Math.max(2.4, 3 * (p.nozzle || 0.4));
   const tagOv = (htag) => Math.min(1.2, htag * 0.4);
   // band height: the letters with room for descenders (1.45 x the letter height), the lips, and the two rails with their clearance
-  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * (1.2 + 0.3) + 2 * (TAG_RW + (p.tol ?? 0.25));
+  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * (1.2 + 0.3) + 2 * (tagRw(p) + (p.tol ?? 0.25));
   // Where the tag sits in the header band: centre line, tag half-height, lip overhang and the channel half-width.
   function tagDims(p, hdrZone) {
     const [h0, h1] = hdrZone, tol = p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25);
-    const htag = zoneH / 2 - TAG_RW - tol;
+    const htag = zoneH / 2 - tagRw(p) - tol;
     return { ym: (h0 + h1) / 2, htag, ov: tagOv(htag), wb: htag + tol };
   }
   function vLayout(p, sh, H, hh) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
     if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + 11);
+    // the cubicle hooks clip over the plate's top edge: keep the top 11 mm clear (shapes with a crown keep it free instead)
+    const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
+    if (hooked && !sh.crown) b1 = Math.min(b1, sh.body[1] - 11);
     let hdrZone = null;
     if (p.statusOn === false) {
       const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2;
       return { hrTot, yc, yR: 0, wh: 0, hdrZone: [b0, b1], clear: p.marginH ?? 1.5 };
     }
     if ((p.header || '').trim() || p.nameRail) {
-      if (sh.crown && !(p.nameRail && sh.bumpy)) hdrZone = sh.crown.slice();
+      if (sh.crown && !(p.nameRail && sh.bumpy) && !hooked) hdrZone = sh.crown.slice();
       else { const z = hh || clamp(H * 0.17, 8, 16); hdrZone = [b1 - z, b1]; b1 -= z + 1; }
     }
     const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2, yR = hrTot - 6;
@@ -1093,18 +1097,19 @@ function createEngine(wasm) {
   // Bevel for the final merged body: a stepped envelope, intersected with the body, that shrinks the outline by up to cT
   // over the last cT of plate height (the plate's top edge) and by cR more over the last cR of the rails, so rails that reach
   // the outline are bevelled too.
-  function bevelEnvelope(cs, T, zTop, cT, cR) {
-    const slices = [[-1, T - cT, 0]];
-    for (let i = 0; i < 3; i++) slices.push([T - cT + (i * cT) / 3, T - cT + ((i + 1) * cT) / 3, ((i + 1) * cT) / 3]);
+  // steps: how many slices each part of the bevel is cut into (one per layer, or 3 with dynamic layers)
+  function bevelEnvelope(cs, T, zTop, cT, cR, steps = (h) => 3) {
+    const slices = [[-1, T - cT, 0]], nT = steps(cT), nR = steps(cR);
+    for (let i = 0; i < nT; i++) slices.push([T - cT + (i * cT) / nT, T - cT + ((i + 1) * cT) / nT, ((i + 1) * cT) / nT]);
     if (cR > 0.1) {
       slices.push([T, zTop - cR, cT]);
-      for (let i = 0; i < 3; i++) slices.push([zTop - cR + (i * cR) / 3, zTop - cR + ((i + 1) * cR) / 3, cT + ((i + 1) * cR) / 3]);
+      for (let i = 0; i < nR; i++) slices.push([zTop - cR + (i * cR) / nR, zTop - cR + ((i + 1) * cR) / nR, cT + ((i + 1) * cR) / nR]);
       slices.push([zTop, zTop + 1, cT + cR]);
     } else slices.push([T, zTop + 1, cT]);
     const parts = [];
     for (const [z0, z1, off] of slices) {
       const foot = off > 0 ? cs.offset(-off, 'Round', 2, 32) : cs;
-      if (!foot.isEmpty()) parts.push(foot.extrude(z1 - z0 + 0.01).translate([0, 0, z0]));
+      if (!foot.isEmpty()) parts.push(foot.extrude(z1 - z0).translate([0, 0, z0]));
     }
     return Manifold.union(parts);
   }
@@ -1126,10 +1131,17 @@ function createEngine(wasm) {
       let W = p.width, H = p.height, hh = 0;
       if (auto) ({ W, H, hh } = autoSize(p, font));
       else if (p.nameRail) hh = nameBandH(p);
-      const T = p.thick;
+      // Printer rules: every height the printer builds layer by layer is a whole number of layers (unless the layer height is
+      // dynamic), and every wall is at least two nozzle widths.
+      const LH = p.layerH || 0.2, NZ = p.nozzle || 0.4, dyn = !!p.dyn;
+      const lz = (v, n = 1) => (dyn ? Math.max(v, 0.05) : Math.max(n, Math.round(v / LH - 1e-6)) * LH);
+      const lzDown = (v) => (dyn ? v : Math.max(1, Math.floor(v / LH + 1e-6)) * LH);
+      const lw = (v) => Math.max(v, 2 * NZ);
+      minLine = 2 * NZ;
+      const T = lz(p.thick, 2);
       const tol = p.tol, raised = p.relief === 'raised';
-      const Lh = raised ? p.reliefH : 0, engr = raised ? 0 : Math.min(p.reliefH, T - 1);
-      const Rh = p.railH, d = 2.0, Rw = 6, pad = p.pad ?? 2.4, fb = p.frame, fbx = p.frame, play = 0.6, proud = p.proud ?? 0.8;
+      const Lh = raised ? lz(p.reliefH) : 0, engr = raised ? 0 : Math.min(lz(p.reliefH), T - lz(1));
+      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fb = p.frame, fbx = p.frame, play = 0.6, proud = lz(p.proud ?? 0.8, 0);
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
@@ -1194,10 +1206,11 @@ function createEngine(wasm) {
       const labelsCS = union(labelParts);
 
       // base body: plate + dovetail rails, closed at the left end and open at the right, + mounting
-      const z0 = T - 0.02, z1 = T + Rh, chf = 0.8;
+      const z0 = 0, z1 = T + Rh, chf = 0.8;
       const yi = yR, yo = yR + Rw;
-      const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d]]);
-      const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
+      // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
+      const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
+      const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
       // Bordered shapes keep the rails to the track. On the others the rails run out to the edge (less the side margin) and follow
       // the outline; the left end is filled solid and the right end stays open for the frame.
@@ -1212,7 +1225,7 @@ function createEngine(wasm) {
       let body = Manifold.union([sh.cs.extrude(T), ...rails]);
 
       if (p.mount === 'magnet') {
-        const r = p.magD / 2 + 0.1, depth = Math.min(p.magH + 0.2, T - 0.6);
+        const r = p.magD / 2 + 0.1, depth = Math.min(lz(p.magH + 0.2), T - lz(0.6));
         if (p.magH + 0.2 > T - 0.6) warnings.push(`Magnet pockets are limited to ${depth.toFixed(1)} mm deep by the ${T} mm plate. Use thinner magnets or a thicker plate.`);
         const xs = magXs, pts = p.magN === 4 ? [[-xs, yc + hrTot * 0.42], [xs, yc + hrTot * 0.42], [-xs, yc - hrTot * 0.42], [xs, yc - hrTot * 0.42]] : [[-xs, yc], [xs, yc]];
         for (const [x, y] of pts) body = body.subtract(Manifold.cylinder(depth + 0.01, r, r, 56).translate([x, y, -0.01]));
@@ -1230,21 +1243,37 @@ function createEngine(wasm) {
 
       if (p.mount === 'none' && p.tape) {
         // a shallow recess on the back for a double-sided tape pad
-        const dep = Math.min(0.6, T - 0.6);
+        const dep = Math.min(lz(0.6), T - lz(0.6));
         if (dep >= 0.2) body = body.subtract(sh.cs.offset(-4, 'Round', 2, 24).extrude(dep + 0.01).translate([0, 0, -0.01]));
         else warnings.push('The plate is too thin for a tape recess.');
+      }
+      // where the cubicle hooks clip on: x, the top of the plate there, and their width
+      const hookAt = [];
+      if (p.mount === 'cubicle' || p.mount === 'cubrail') {
+        const hw = lz(p.hookW ?? 20), xh = Math.max(hw, Math.min(W * 0.3, (statusOn ? X : X0) * 0.8));
+        for (const sx of [-1, 1]) {
+          const xf = sx * xh, strip = rect(hw, H * 3, xf, 0).intersect(sh.cs);
+          hookAt.push({ xf, hw, yT: strip.isEmpty() ? ob.max[1] : strip.bounds().max[1] });
+        }
       }
       if (p.shape === 'classic') {
         // the bead is left open from the right edge along the track (and the tag band), where the frame and the tag slide in
         const toRight = (x0, h, y) => rect(xb - x0, h, (x0 + xb) / 2, y), off = (d) => sh.cs.offset(d, 'Round', 2, 24);
-        let bead = union([off(-2.2).subtract(off(-3.4)), off(-4.6).subtract(off(-5.4))]);
+        let bead = union([off(-2.2).subtract(off(-2.2 - lw(1.2))), off(-4.6).subtract(off(-4.6 - lw(0.8)))]);
         if (statusOn) bead = bead.subtract(toRight(-X - 1.5, 2 * hrTot + 3, yc));
         if (hdrZone && p.nameRail) bead = bead.subtract(toRight(-X - 1.5, hdrZone[1] - hdrZone[0] + 1, (hdrZone[0] + hdrZone[1]) / 2));
         else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
-        body = body.add(bead.extrude(0.82).translate([0, 0, T - 0.02]));
+        for (const h of hookAt) bead = bead.subtract(rect(h.hw + 3, 14, h.xf, h.yT - 6));
+        body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, T - 0.02]));
       }
       if (p.shape === 'honeycomb') {
-        const R = 2.6, wall = 1.2, sp = Math.sqrt(3) * R + wall, rowH = sp * Math.sqrt(3) / 2, m = 2.5, g = 2.5;
+        const R = 2.6, Rx = R * Math.cos(30 * D2R), m = 2.5, g = 2, sp0 = Math.sqrt(3) * R + lw(1.2);
+        // Beside the track only a narrow strip is left. Pick the spacing (never tighter than the wall allows) so that both
+        // staggered rows land in it; then the holes run down the sides without gaps, like along the top and bottom.
+        let sp = sp0;
+        const sa = X + g + Rx, sb = W / 2 - m - Rx;
+        for (let t = sp0; t < sp0 * 1.3; t += 0.01) { const k = Math.ceil(sa / (t / 2) - 1e-9); if ((k + 1) * t / 2 <= sb) { sp = t; break; } }
+        const rowH = sp * Math.sqrt(3) / 2;
         const hx = W / 2 - m, hy = H / 2 - m, rc = Math.max(0, Math.min(10, H * 0.2) - m);
         const excl = [];
         if (p.mount === 'screw') for (const sx of [-1, 1]) excl.push([sx * (X + 5.5), yc, 7]);
@@ -1275,14 +1304,14 @@ function createEngine(wasm) {
       // as one even frame, round corners included. The tag has the same gap at both ends, so it is symmetric whenever the plate is.
       let tagAll = null, tagBody = null, tagText = null, tagT = 0;
       if (p.nameRail) {
-        const { ym, htag, ov, wb } = tagDims(p, hdrZone), rw = TAG_RW;
-        const tt = Math.max(0.3, p.tagT ?? 1.6), lipH = 0.8, stop = rw, gap = 0.3;
+        const { ym, htag, ov, wb } = tagDims(p, hdrZone), rw = tagRw(p);
+        const tt = lz(p.tagT ?? 1.6, 2), lipH = lz(0.8), stop = rw, gap = Math.max(0.3, tol);
         if (htag < ov + 2) throw new UserError('The header band is too short for the name tag rail. Increase the plate height.');
         tagT = tt;
-        const zS = T, zl = zS + tt + 0.2, zTop = zl + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
-        const up = poly([[ym + wb, zS - 0.02], [ym + wb + rw, zS - 0.02], [ym + wb + rw, zTop], [ym + wb - ov, zTop], [ym + wb - ov, zl], [ym + wb, zl]]);
-        const dn = poly([[ym - wb, zS - 0.02], [ym - wb, zl], [ym - wb + ov, zl], [ym - wb + ov, zTop], [ym - wb - rw, zTop], [ym - wb - rw, zS - 0.02]]);
-        const wallOf = (cs) => cs.extrude(zTop - zS + 0.02).translate([0, 0, zS - 0.02]);
+        const zS = T, zl = zS + tt + lz(0.2), zTop = zl + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
+        const up = poly([[ym + wb, 0], [ym + wb + rw, 0], [ym + wb + rw, zTop], [ym + wb - ov, zTop], [ym + wb - ov, zl], [ym + wb, zl]]);
+        const dn = poly([[ym - wb, zS - 0.02], [ym - wb, zl], [ym - wb + ov, zl], [ym - wb + ov, zTop], [ym - wb - rw, zTop], [ym - wb - rw, 0]]);
+        const wallOf = (cs) => cs.extrude(zTop);
         const row = (cs, y) => cs.intersect(rect(xb - xa, 0.2, (xa + xb) / 2, y));
         // following the outline only works where it crosses the whole band in one piece; otherwise keep to the track
         const oneSpan = [yLo + 0.2, ym - htag, ym, ym + htag, yHi - 0.2].every((y) => row(edge, y).toPolygons().length === 1);
@@ -1318,7 +1347,7 @@ function createEngine(wasm) {
               tagText = tcs.extrude(Lh).translate([0, 0, zS + tt]);
               tagAll = tagBody.add(tcs.extrude(Lh + 0.02).translate([0, 0, zS + tt - 0.02]));
             } else {
-              const dep = Math.min(p.reliefH, tt * 0.6);
+              const dep = Math.min(lz(p.reliefH), lzDown(tt * 0.6));
               tagBody = tagBody.subtract(tcs.extrude(dep + 1).translate([0, 0, zS + tt - dep]));
               tagAll = tagBody;
             }
@@ -1326,8 +1355,8 @@ function createEngine(wasm) {
         }
       }
       if (p.bevel > 0) {
-        const zTop = body.boundingBox().max[2], cT = Math.min(p.bevel, T * 0.8), cR = Math.min(p.bevel, (zTop - T) * 0.8);
-        body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR));
+        const zTop = body.boundingBox().max[2], cT = Math.min(lz(p.bevel), lzDown(T * 0.8)), cR = zTop - T > LH ? Math.min(lz(p.bevel), lzDown((zTop - T) * 0.8)) : 0;
+        body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR, (h) => (dyn ? 3 : Math.max(1, Math.round(h / LH)))));
       }
       let labels = null, base = body;
       if (labelsCS) {
@@ -1341,7 +1370,7 @@ function createEngine(wasm) {
       }
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const zb = T + tol, zt = statusOn ? T + Rh + proud : Math.max(body.boundingBox().max[2], T + Lh, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const ztS = T + Rh + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1350,7 +1379,8 @@ function createEngine(wasm) {
         slider = slider.subtract(rrect(ww, wh, p.winR, 0, yc).extrude(zt - zb + 2).translate([0, 0, zb - 1]));
         if (raised) {
           const ph = wh / 2 - pad + 0.8;
-          slider = slider.subtract(rect(Sx + 2, 2 * ph, 0, yc).extrude(T + Lh + tol + 0.15 - (zb - 1)).translate([0, 0, zb - 1]));
+          const zp = zt - lzDown(zt - (T + Lh + tol + 0.15));
+          slider = slider.subtract(rect(Sx + 2, 2 * ph, 0, yc).extrude(zp - (zb - 1)).translate([0, 0, zb - 1]));
         }
       }
 
@@ -1367,12 +1397,35 @@ function createEngine(wasm) {
           const xf = sx * Math.min(W * 0.28, X * 0.75);
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
-          const hF = (ybL - ybG) * ca + floor + 7.5;
+          const hF = lz((ybL - ybG) * ca + floor + 7.5);
           const zMid = -(ybL - ybG) * sa + T * ca / 2;
           const zFront = zMid + ff, zBack = zMid - fbk;
           feet.push(extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot));
         }
         stand = { tilt: p.tilt, ty, tz };
+      }
+
+      // Cubicle hooks: two printed hooks clip over the plate's top edge and hang over the top of a cubicle panel (an upside-down J),
+      // or over the front lip of a cubicle's accessory rail. Built in sign coordinates; each prints on its side.
+      let hooks = [], hookEnv = null;
+      if (p.mount === 'cubicle' || p.mount === 'cubrail') {
+        const cub = p.mount === 'cubicle', t = Math.max(3, 6 * NZ), lipF = Math.max(2, 4 * NZ), clipH = 7.5, g = 1;
+        const P = cub ? (p.cubP ?? 55) : (p.railLipT ?? 3), back = cub ? (p.hookBack ?? 25) : Math.max(3, (p.railLipH ?? 10) - 1);
+        const drop = p.hookDrop ?? 5, hw = lz(p.hookW ?? 20), zBk = -t - g - P;
+        const R2 = (y0, y1, z0, z1) => rect(y1 - y0, z1 - z0, (y0 + y1) / 2, (z0 + z1) / 2);
+        const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]);
+        // both hooks hang from the same panel top (or rail lip), set by the higher of the two clip points
+        const yP = Math.max(...hookAt.map((h) => h.yT)) + drop, yU = yP + g / 2, yPanel = yP;
+        for (const { xf, yT } of hookAt) {
+          const prof = union([
+            R2(yT - clipH, yT + 0.2 + t, -t, T + 0.2 + lipF), // clip around the plate's top edge (the plate is cut out of it below)
+            R2(yT, yU + t, -t, 0), // front leg, between the plate and the panel
+            R2(yU, yU + t, zBk - t, 0), // over the top
+            R2(yP - back, yU + t, zBk - t, zBk), // down the back
+          ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
+          hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot));
+        }
+        hookEnv = { kind: p.mount, yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2, back, lipH: p.railLipH ?? 10, t, g };
       }
 
       const nz = p.nozzle || 0.4;
@@ -1389,10 +1442,11 @@ function createEngine(wasm) {
           tagBody: tagAll && tagText ? meshData(tagBody) : null,
           tagText: tagText ? meshData(tagText) : null,
           feet: feet.map(meshData),
+          hooks: hooks.map(meshData),
         },
         info: {
           W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, engr, raised, zt, zb, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
-          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, warnings, pitch, plateW: W, plateH: H, auto,
+          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, pitch, plateW: W, plateH: H, auto,
         },
       };
       return out;
@@ -1542,12 +1596,12 @@ const PALETTES = [
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
-  current: 0, view: 'assembled', page: 'plate', dims: true,
+  current: 0, view: 'assembled', page: 'plate', showDims: false,
   shape: 'rail', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 1.2, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 6.5,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railLipT: 3, railLipH: 10, hookDrop: 5, hookW: 20, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider,
 };
@@ -1567,7 +1621,7 @@ const SLIDERS = {
   railH: { label: 'Rail height', min: 2.4, max: 6, step: 0.5, layers: true, out: mm() },
   tol: { label: 'Slide clearance', min: 0.1, max: 0.5, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   magD: { label: 'Magnet ⌀', min: 5, max: 20, step: 0.5, out: mm() },
-  magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, out: mm() },
+  magH: { label: 'Magnet height', min: 1, max: 4, step: 0.1, layers: true, out: mm() },
   tilt: { label: 'Lean back', min: 0, max: 25, step: 1, unit: '°', out: (v) => `${v}°` },
   magInset: { label: 'Distance from the ends', min: 6, max: 60, step: 1, out: mm(0) },
   screwD: { label: 'Screw hole diameter', min: 2, max: 8, step: 0.2, out: mm() },
@@ -1576,9 +1630,15 @@ const SLIDERS = {
   footF: { label: 'Foot extension, forward', min: 0, max: 60, step: 1, out: mm(0) },
   footB: { label: 'Foot extension, backward', min: 0, max: 120, step: 1, out: mm(0) },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 20, step: 0.5, out: mm() },
-  bevel: { label: 'Bevel size', min: 0, max: 3, step: 0.1, out: mm() },
-  tagT: { label: 'Tag thickness', min: 0.4, max: 4, step: 0.1, out: mm() },
-  proud: { label: 'Frame extrusion', min: 0, max: 4, step: 0.1, out: mm() },
+  bevel: { label: 'Bevel size', min: 0, max: 3, step: 0.1, layers: true, zero: true, out: mm() },
+  tagT: { label: 'Tag thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
+  proud: { label: 'Frame extrusion', min: 0, max: 4, step: 0.1, layers: true, zero: true, out: mm() },
+  cubP: { label: 'Panel thickness', min: 20, max: 100, step: 1, out: mm(0) },
+  hookBack: { label: 'Hook length down the back', min: 8, max: 80, step: 1, out: mm(0) },
+  railLipT: { label: 'Rail lip thickness', min: 1, max: 12, step: 0.5, out: mm() },
+  railLipH: { label: 'Rail lip height', min: 4, max: 30, step: 0.5, out: mm() },
+  hookDrop: { label: 'Sign top below the top of the panel', min: 0, max: 120, step: 1, out: mm(0) },
+  hookW: { label: 'Hook width', min: 10, max: 40, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 20, step: 0.5, out: mm() },
   marginH: { label: 'Side margin', min: 0, max: 20, step: 0.5, out: mm() },
   pad: { label: 'Text padding', min: 0, max: 8, step: 0.2, out: mm() },
@@ -1600,7 +1660,15 @@ function limits(k, s = state) {
   if (max < min) max = min;
   return { min: rnd(min), max: rnd(max), step: rnd(step) };
 }
-function freeClamp(k, v) { return Math.min(SLIDERS[k].max * 4, Math.max(FLOORS[k] || 0, Math.round(v * 100) / 100)); }
+// Typed values may go past the bar's ends, but still follow the printer: a floor of so many nozzle widths, and whole
+// layers for heights (zero stays allowed where the slider starts at zero).
+function freeClamp(k, v, s = state) {
+  const f = SLIDERS[k];
+  v = Math.min(f.max * 4, Math.max(FLOORS[k] || 0, v));
+  if (f.nozzleMin) v = Math.max(v, f.nozzleMin * s.nozzle);
+  if (f.layers && !s.dyn) v = f.zero && v < s.layerH / 2 ? 0 : Math.max(1, Math.round(v / s.layerH)) * s.layerH;
+  return Math.round(v * 1000) / 1000;
+}
 function clampSnap(k, v, s = state) {
   const { min, max, step } = limits(k, s);
   v = Math.min(max, Math.max(min, v));
@@ -1617,7 +1685,7 @@ const SHAPE_DEFAULTS = {
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand', 'hang'], magN: [2, 4], hangN: [1, 2], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'name', 'frame'], nameMode: ['off', 'plate', 'tag'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'name', 'frame'], nameMode: ['off', 'plate', 'tag'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -1625,6 +1693,8 @@ const MOUNT_HINTS = {
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
   stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
+  cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is.',
+  cubrail: 'Two hooks clip onto the top edge of the sign and hook over the front lip of the accessory rail on a cubicle panel. Measure how thick and how tall the lip is.',
 };
 // Conditions for controls that only apply in some modes.
 const WHEN = {
@@ -1638,6 +1708,9 @@ const WHEN = {
   nostatus: (s) => !s.statusOn,
   screw: (s) => s.mount === 'screw',
   hang: (s) => s.mount === 'hang',
+  cubicle: (s) => s.mount === 'cubicle',
+  cubrail: (s) => s.mount === 'cubrail',
+  hooked: (s) => s.mount === 'cubicle' || s.mount === 'cubrail',
   none: (s) => s.mount === 'none',
   dyn: (s) => !!s.dyn,
 };
@@ -1649,7 +1722,7 @@ const SECTIONS = [
     { slider: 'bevel' },
     { group: 'Shape & mounting', items: [
       { html: 'shapes' },
-      { seg: 'mount', label: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop']] },
+      { seg: 'mount', label: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop'], ['cubicle', 'Cubicle hook'], ['cubrail', 'Cubicle rail']] },
       { hint: '', id: 'mountHint' },
       { slider: 'magD', when: 'magnet' },
       { slider: 'magH', when: 'magnet' },
@@ -1663,6 +1736,12 @@ const SECTIONS = [
       { slider: 'footB', when: 'stand' },
       { slider: 'hangHole', when: 'hang' },
       { seg: 'hangN', label: 'Loops', options: [[1, 'One'], [2, 'Two']], when: 'hang' },
+      { slider: 'cubP', when: 'cubicle' },
+      { slider: 'hookBack', when: 'cubicle' },
+      { slider: 'railLipT', when: 'cubrail' },
+      { slider: 'railLipH', when: 'cubrail' },
+      { slider: 'hookDrop', when: 'hooked' },
+      { slider: 'hookW', when: 'hooked' },
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
     ] },
     { group: 'Size', items: [
@@ -1725,10 +1804,10 @@ function sanitize(s) {
   if (Number.isFinite(+s.layerH)) out.layerH = +s.layerH;
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
-  for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = freeClamp(k, +s[k]);
+  for (const k of Object.keys(SLIDERS)) out[k] = freeClamp(k, Number.isFinite(+s[k]) ? +s[k] : out[k], out);
   if (s.chamfer === true && s.bevel == null) out.bevel = 1.2;
   if (Number.isFinite(+s.footD) && s.footF == null && s.footB == null) { out.footF = Math.round(+s.footD * 0.42); out.footB = Math.round(+s.footD * 0.58); }
-  for (const k of ['uniform', 'dims', 'tape', 'statusOn']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  for (const k of ['uniform', 'showDims', 'tape', 'statusOn']) if (typeof s[k] === 'boolean') out[k] = s[k];
   // designs saved before the Name tab: the tag switch and a typed header become the name mode
   if (s.nameMode == null) out.nameMode = s.nameRail ? 'tag' : (typeof s.header === 'string' && s.header.trim() ? 'plate' : 'off');
   if (!out.statusOn && out.nameMode === 'off') out.statusOn = true;
@@ -1807,7 +1886,9 @@ scene.add(wall, ground);
 const signGroup = new THREE.Group();
 const feetGroup = new THREE.Group();
 const printGroup = new THREE.Group();
-scene.add(signGroup, feetGroup, printGroup);
+const envGroup = new THREE.Group(); // the cubicle panel or rail the hooks hang on; left out when the camera frames the model
+const envMat = new THREE.MeshStandardMaterial({ color: 0x9aa1a9, roughness: 0.9, metalness: 0 });
+scene.add(signGroup, feetGroup, printGroup, envGroup);
 
 let result = null;
 let sliderMesh = null;
@@ -1889,7 +1970,7 @@ function addDimensions(info) {
   showDimensions();
 }
 function showDimensions() {
-  for (const o of dimRefs) o.visible = state.dims;
+  for (const o of dimRefs) o.visible = state.showDims;
   requestRender();
 }
 
@@ -1907,6 +1988,7 @@ function clearGroup(g) {
 const PRINT_XF = {
   slider: (info) => (x, y, z) => [x, -y, info.zt - z],
   foot: () => (x, y, z) => [x, -z, y],
+  hook: () => (x, y, z) => [z, y, -x],
 };
 function printPositions(mesh, xf) {
   const p = new Float32Array(mesh.pos.length);
@@ -1938,6 +2020,23 @@ function updateScene(res, refit) {
     tagGroup.position.x = Math.min(tagOut, tagMax);
     signGroup.add(tagGroup);
   }
+  for (const h of parts.hooks) signGroup.add(makeMesh(geometryFrom(h), mats.base));
+  clearGroup(envGroup);
+  if (info.hookEnv) {
+    const e = info.hookEnv, wd = info.W + 160, box = (y0, y1, z0, z1) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(wd, y1 - y0, z1 - z0), envMat);
+      m.position.set((info.ox0 + info.ox1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      m.receiveShadow = true;
+      envGroup.add(m);
+    };
+    if (e.kind === 'cubicle') box(e.yTop - 400, e.yTop, e.zBack, e.zFront);
+    else {
+      const zPanel = e.zBack - e.t - e.g;
+      box(e.yTop - e.lipH, e.yTop, e.zBack, e.zFront); // the rail's front lip
+      box(e.yTop - e.lipH - 3, e.yTop - e.lipH, zPanel, e.zFront); // the bottom of the rail channel
+      box(e.yTop - 400, e.yTop + 40, zPanel - 30, zPanel); // the panel behind it
+    }
+  }
   sliderMesh = null;
   if (parts.slider) {
     sliderMesh = makeMesh(geometryFrom(parts.slider), mats.slider);
@@ -1961,7 +2060,7 @@ function updateScene(res, refit) {
   const mk = (mesh, mat, xf, overlay, overlayMat) => ({ mesh, mat, xf, overlay, overlayMat });
   const rows = [[mk(parts.body, mats.base, null, parts.labels, mats.label)]];
   if (parts.tag) rows.push([parts.tagBody ? mk(parts.tagBody, mats.tag, null, parts.tagText, mats.label) : mk(parts.tag, mats.tag, null)]);
-  const small = [...(parts.slider ? [mk(parts.slider, mats.slider, PRINT_XF.slider(info))] : []), ...parts.feet.map((x) => mk(x, mats.base, PRINT_XF.foot()))];
+  const small = [...(parts.slider ? [mk(parts.slider, mats.slider, PRINT_XF.slider(info))] : []), ...parts.feet.map((x) => mk(x, mats.base, PRINT_XF.foot())), ...parts.hooks.map((x) => mk(x, mats.base, PRINT_XF.hook()))];
   if (small.length) rows.push(small);
   const placed = [];
   let top = 0;
@@ -2006,8 +2105,9 @@ function applyView(refit) {
   signGroup.visible = assembled;
   feetGroup.visible = assembled;
   printGroup.visible = !assembled;
-  const standing = assembled && result && result.info.stand;
-  wall.visible = assembled && !standing;
+  const standing = assembled && result && result.info.stand, hooked = !!(result && result.info.hookEnv);
+  envGroup.visible = assembled;
+  wall.visible = assembled && !standing && !hooked;
   ground.visible = !!standing;
   if (result) {
     const info = result.info;
@@ -2256,6 +2356,7 @@ function exportFiles() {
       add('tagText', 'name_tag_text', 'Name tag text (multi-color)', parts.tagText, centre(parts.tagText.pos, ref));
     }
   }
+  parts.hooks.forEach((f, i) => add('hook' + i, `cubicle_hook_${i ? 'right' : 'left'}`, `Cubicle hook, ${i ? 'right' : 'left'}`, f, centre(printPositions(f, PRINT_XF.hook()))));
   parts.feet.forEach((f, i) => add('foot' + i, `desk_foot_${i ? 'right' : 'left'}`, `Desk foot, ${i ? 'right' : 'left'}`, f, centre(printPositions(f, PRINT_XF.foot()))));
   return files;
 }
@@ -2269,7 +2370,7 @@ function download3mf() {
   const groups = [{ name: 'Base', parts: by.labels ? [['Base body', by.body, 0], ['Labels', by.labels, 1]] : [['Base', by.base, 0]] },
     ...(by.slider ? [{ name: 'Frame', parts: [['Frame', by.slider, 2]] }] : []),
     ...(by.tag ? [{ name: 'Name tag', parts: by.tagBody ? [['Name tag body', by.tagBody, 3], ['Name tag text', by.tagText, 1]] : [['Name tag', by.tag, 3]] }] : []),
-    ...files.filter((x) => x.key.startsWith('foot')).map((x) => ({ name: x.label, parts: [[x.label, x, 0]] }))];
+    ...files.filter((x) => x.key.startsWith('foot') || x.key.startsWith('hook')).map((x) => ({ name: x.label, parts: [[x.label, x, 0]] }))];
   const size = (g) => { const b = boundsOf(g.parts[0][1].pos); return [b.max[0] - b.min[0], b.max[1] - b.min[1]]; };
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed, gap = 8;
   const base = size(groups[0]), tagG = groups.find((g) => g.name === 'Name tag'), rest = groups.slice(1).filter((g) => g !== tagG), restW = rest.reduce((a, g) => a + size(g)[0], 0) + gap * Math.max(0, rest.length - 1);
@@ -2326,6 +2427,7 @@ function readmeText() {
     result.parts.slider ? '- frame_slider: printed face-down.' : null,
     result.parts.tag ? '- name_tag: the slide-in name tag, printed flat. Print a new one with another name for each person.' : null,
     state.mount === 'stand' ? '- desk_foot_left / desk_foot_right.' : null,
+    result.parts.hooks.length ? '- cubicle_hook_left / cubicle_hook_right: printed on their side.' : null,
     '',
     'Two colors on a single nozzle',
     i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + i.Lh).toFixed(2)} mm.` : '- Not needed: labels are engraved.',
@@ -2738,7 +2840,7 @@ function syncControls() {
     else if (el.type === 'checkbox') el.checked = !!v;
     else el.value = v;
   }
-  for (const k of Object.keys(SLIDERS)) { const o = $(`#${k}Out`); if (o && document.activeElement !== o) o.value = Math.round(state[k] * 100) / 100; }
+  for (const k of Object.keys(SLIDERS)) { const o = $(`#${k}Out`); if (o && document.activeElement !== o) o.value = Math.round(state[k] * 1000) / 1000; }
   for (const el of $$('[data-when]')) el.hidden = !WHEN[el.dataset.when](state);
   for (const t of $$('#settings [role="tab"]')) { const on = t.dataset.page === state.page; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; }
   for (const p of $$('#settings [role="tabpanel"]')) p.hidden = p.id !== `page-${state.page}`;
@@ -2746,7 +2848,7 @@ function syncControls() {
   $('label[for="hcap"]').textContent = 'Letter height';
   $('.statuses').hidden = !state.statusOn;
   $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
-  $('#dimsToggle').setAttribute('aria-pressed', String(state.dims));
+  $('#dimsToggle').setAttribute('aria-pressed', String(state.showDims));
 }
 function setKey(k, raw, free) {
   let v = raw;
@@ -2763,6 +2865,8 @@ function setKey(k, raw, free) {
   if (k === 'nameMode' && v !== 'off' && !(state.header || '').trim()) setTimeout(() => $('#header')?.focus(), 0);
   if (k === 'nozzle' || k === 'layerH' || k === 'dyn') {
     normalizePrinter(state);
+    // every setting follows the new nozzle and layer height
+    for (const sk of Object.keys(SLIDERS)) state[sk] = freeClamp(sk, state[sk]);
   }
   syncControls();
   if (COLOR_KEYS.has(k)) { applyColors(); saveState(); return; }
@@ -2800,7 +2904,7 @@ $('#printOpen').addEventListener('click', () => printDlg.showModal());
 $('#printClose').addEventListener('click', () => printDlg.close());
 printDlg.addEventListener('click', (e) => { if (e.target === printDlg) printDlg.close(); });
 $('#dimsToggle').addEventListener('click', () => {
-  state.dims = !state.dims;
+  state.showDims = !state.showDims;
   syncControls();
   showDimensions();
   saveState();
@@ -2827,7 +2931,6 @@ function showError(msg) {
 function updateReadout() {
   if (!result) return;
   const i = result.info;
-  $('#vpDims').textContent = `${fmt(i.W)} × ${fmt(i.H)} × ${fmt(i.zt)} mm`;
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
   const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
   const small = i.capMin && i.capMin < state.nozzle * 8.75 - 0.01;
@@ -2866,6 +2969,7 @@ function renderExport() {
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     result.parts.slider ? `<b>Assemble:</b> slide the frame into the track from the right end, the open end. Nothing holds it there but the fit of the dovetail, so don't push it past the last status.` : null,
     state.mount === 'magnet' ? `<b>Magnets:</b> glue ${state.magN} × ⌀${fmt(state.magD)} × ${fmt(state.magH)} mm magnets into the back pockets.` : null,
+    result.parts.hooks.length ? `<b>Hooks:</b> push both hooks down onto the sign's top edge, then hang them over ${state.mount === 'cubicle' ? 'the top of the cubicle panel' : 'the lip of the cubicle rail'}. They print on their side, so the bend is as strong as it can be.` : null,
     state.mount === 'stand' ? `<b>Stand:</b> push the plate's bottom edge into both feet, leaning back ${state.tilt}°.` : null,
     result.parts.slider ? `<b>Fit:</b> clearance is ${state.tol.toFixed(2)} mm. If the frame binds, add 0.05 mm and reprint only the frame.` : null,
   ].filter(Boolean);
