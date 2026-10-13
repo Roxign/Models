@@ -962,13 +962,21 @@ function createEngine(wasm) {
     return { W: Math.min(500, Math.ceil(W)), H: Math.min(300, Math.ceil(H)), hh };
   }
 
-  function chamferPlate(cs, T, on) {
-    if (!on) return cs.extrude(T);
-    const cd = Math.min(1.2, T * 0.35), n = 3, step = cd / n;
-    const parts = [cs.extrude(T - cd)];
-    for (let i = 0; i < n; i++) {
-      const z0 = T - cd + i * step - 0.01;
-      parts.push(cs.offset(-(i + 1) * step, 'Round', 2, 32).extrude(T - cd + (i + 1) * step - z0).translate([0, 0, z0]));
+  // Bevel for the final merged body: a stepped envelope, intersected with the body, that shrinks the outline by up to cT
+  // over the last cT of plate height (the plate's top edge) and by cR more over the last cR of the rails, so rails that reach
+  // the outline are bevelled too.
+  function bevelEnvelope(cs, T, zTop, cT, cR) {
+    const slices = [[-1, T - cT, 0]];
+    for (let i = 0; i < 3; i++) slices.push([T - cT + (i * cT) / 3, T - cT + ((i + 1) * cT) / 3, ((i + 1) * cT) / 3]);
+    if (cR > 0.1) {
+      slices.push([T, zTop - cR, cT]);
+      for (let i = 0; i < 3; i++) slices.push([zTop - cR + (i * cR) / 3, zTop - cR + ((i + 1) * cR) / 3, cT + ((i + 1) * cR) / 3]);
+      slices.push([zTop, zTop + 1, cT + cR]);
+    } else slices.push([T, zTop + 1, cT]);
+    const parts = [];
+    for (const [z0, z1, off] of slices) {
+      const foot = off > 0 ? cs.offset(-off, 'Round', 2, 32) : cs;
+      if (!foot.isEmpty()) parts.push(foot.extrude(z1 - z0 + 0.01).translate([0, 0, z0]));
     }
     return Manifold.union(parts);
   }
@@ -1061,7 +1069,7 @@ function createEngine(wasm) {
       const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, (xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-      let body = Manifold.union([chamferPlate(sh.cs, T, p.chamfer), extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block]);
+      let body = Manifold.union([sh.cs.extrude(T), extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block]);
       const xPin = -(xR + pinR + 0.4);
       body = body.subtract(Manifold.cylinder(T + 2, pinR + 0.08, pinR + 0.08, 40).translate([xPin, yc, -1]));
 
@@ -1153,6 +1161,10 @@ function createEngine(wasm) {
             }
           }
         }
+      }
+      if (p.chamfer) {
+        const zTop = body.boundingBox().max[2], cT = Math.min(1.2, T * 0.35), cR = Math.min(1.2, (zTop - T) * 0.35);
+        body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR));
       }
       let labels = null, base = body;
       if (labelsCS) {
@@ -1472,7 +1484,7 @@ const WHEN = {
 // the rest render as cards below. hue: the page's color; color: the part's preview color.
 const SECTIONS = [
   { tab: true, title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
-    { check: 'chamfer', label: 'Chamfered plate edge' },
+    { check: 'chamfer', label: 'Bevelled edges', title: 'Bevels the outer edge of the whole merged base: the plate edge and the rails and other features that reach it' },
     { group: 'Shape & mounting', items: [
       { html: 'shapes' },
       { seg: 'mount', label: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop']] },
