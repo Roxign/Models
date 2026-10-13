@@ -13,7 +13,7 @@ The page lets you design the sign in your browser and download print-ready STL f
 - **Size:** by default the plate fits itself to your text at the letter height you choose. You can also set width and height by hand. Either way it's checked against your printer's bed size.
 - **Labels and frame:** layout, typeface (13 to choose from), raised or engraved text, optional header text, frame bar width, window corners and slide clearance. Text prints exactly as typed and supports Latin, Greek, Cyrillic, Vietnamese, Traditional Chinese, Japanese, Korean, Hebrew and Thai. Arabic and Indic scripts need text shaping and are not supported.
 - **Mounting:** flat back (optionally with a recess for a tape pad), magnet pockets (size, count and distance from the ends), screw holes (hole and head diameter), desk-stand feet (lean, width, and separate forward and backward extension), or a **hang loop** (one or two eyelets above any shape). Shape and mounting work together: changing either one changes the final model.
-- **Name tag rail:** on the Labels tab, a slide-in rail above the track and a separate flat tag that carries the header text. Change the name, download again and print a new tag for the next person; the sign itself stays the same.
+- **Name tag rail:** on the Labels tab, a slide-in rail above the track and a separate flat tag that carries the header text. The tag runs the full length of the plate and follows its outline at the open end, whatever the shape. Change the name, download again and print a new tag for the next person; the sign itself stays the same.
 
 ## Printing
 

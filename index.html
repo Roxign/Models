@@ -4,7 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Office Status Slider</title>
-<meta name="description" content="Design a 3D-printable office status sign with a sliding frame, preview it in 3D and download STL files.">
+<meta name="description" content="Design a 3D-printable office status sign with a sliding frame and an optional slide-in name tag. Preview it in 3D and download STL or 3MF files.">
+<meta name="theme-color" content="#14171B">
+<link rel="canonical" href="https://roxign.github.io/Models/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!-- link preview when the page is shared -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Office Status Slider">
+<meta property="og:title" content="Office Status Slider">
+<meta property="og:description" content="Design a 3D-printable office status sign with a sliding frame and an optional slide-in name tag. Preview it in 3D and download STL or 3MF files.">
+<meta property="og:url" content="https://roxign.github.io/Models/">
+<meta property="og:image" content="https://roxign.github.io/Models/og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A dark door sign with four status windows (Available, In a meeting, On a call, Do not disturb) and an orange sliding frame around Available.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Office Status Slider">
+<meta name="twitter:description" content="Design a 3D-printable office status sign with a sliding frame and an optional slide-in name tag. Preview it in 3D and download STL or 3MF files.">
+<meta name="twitter:image" content="https://roxign.github.io/Models/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -1127,27 +1147,36 @@ function createEngine(wasm) {
       }
       let tagAll = null, tagBody = null, tagText = null;
       if (p.nameRail) {
-        const [h0, h1] = hdrZone, zoneH = h1 - h0, ym = (h0 + h1) / 2, rw = TAG_RW;
+        const [h0, h1] = hdrZone, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.4), ym = (h0 + h1) / 2, rw = TAG_RW;
         const htag = zoneH / 2 - rw - tol, ov = tagOv(htag), tt = Math.max(0.3, p.tagT ?? 1.6), lipH = 0.8, wb = htag + tol;
         if (htag < ov + 2) throw new UserError('The header band is too short for the name tag rail. Increase the plate height.');
-        const bb = rect(W * 3, Math.max(1, zoneH - 1), 0, ym).intersect(sh.cs).bounds();
-        const half = Math.min(-bb.min[0], bb.max[0]) - 1;
-        if (half < 20) throw new UserError('The plate is too narrow for the name tag rail.');
+        // measure the outline along the top, middle and bottom rows of the band
+        const rowsB = [ym - htag, ym, ym + htag].map((y) => { const c = rect(W * 3, 0.4, 0, y).intersect(sh.cs); return c.isEmpty() ? null : c.bounds(); }).filter(Boolean);
+        if (rowsB.length < 3) throw new UserError('The name tag rail needs a full-width band in the plate. Increase the height or pick another shape.');
+        const xOutL = Math.min(...rowsB.map((b) => b.min[0])), xOutR = Math.max(...rowsB.map((b) => b.max[0])), xCoreL = Math.max(...rowsB.map((b) => b.min[0]));
+        if (xOutR - xCoreL < 40) throw new UserError('The plate is too narrow for the name tag rail.');
         const zS = T, zl = zS + tt + 0.2, stop = 2.4;
         const up = poly([[ym + wb, zS - 0.02], [ym + wb + rw, zS - 0.02], [ym + wb + rw, zl + lipH], [ym + wb - ov, zl + lipH], [ym + wb - ov, zl], [ym + wb, zl]]);
         const dn = poly([[ym - wb, zS - 0.02], [ym - wb, zl], [ym - wb + ov, zl], [ym - wb + ov, zl + lipH], [ym - wb - rw, zl + lipH], [ym - wb - rw, zS - 0.02]]);
-        const wall = rect(stop, 2 * (wb + rw), -half + stop / 2, ym).extrude(zl + lipH - zS + 0.02).translate([0, 0, zS - 0.02]);
-        body = body.add(Manifold.union([extrudeX(up, -half, half), extrudeX(dn, -half, half), wall]));
-        const tl = 2 * half - stop - 0.3, cx = (-half + stop + 0.3 + half) / 2;
-        tagBody = rrect(tl, 2 * htag, 0.8, cx, ym).extrude(tt).translate([0, 0, zS]);
+        const wall = rect(stop, 2 * (wb + rw), xCoreL + stop / 2, ym).extrude(zl + lipH - zS + 0.02).translate([0, 0, zS - 0.02]);
+        const prism = sh.cs.extrude(zl + lipH + 2).translate([0, 0, -1]);
+        body = body.add(Manifold.union([extrudeX(up, xOutL - 1, xOutR + 1), extrudeX(dn, xOutL - 1, xOutR + 1), wall]).intersect(prism));
+        const x0 = xCoreL + stop + 0.3;
+        const tagCS = rect(xOutR + 2 - x0, 2 * htag, (x0 + xOutR + 2) / 2, ym).intersect(sh.cs.offset(-0.2, 'Round', 2, 16));
+        if (tagCS.isEmpty()) throw new UserError('The name tag does not fit this shape. Increase the plate size.');
+        const tb0 = tagCS.bounds(), cx = (tb0.min[0] + tb0.max[0]) / 2, tl = tb0.max[0] - tb0.min[0];
+        tagBody = tagCS.extrude(tt).translate([0, 0, zS]);
         tagAll = tagBody;
         if (headerText) {
           const room = 2 * (htag - ov - 0.3);
-          const tb = fitText(font, headerText, tl - 4, room, Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), room * 0.8), true);
+          const tb = fitText(font, headerText, tl - 6, room, Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), room * 0.8), true);
           if (tb.cs) {
-            const tcs = tb.cs.translate([cx, ym]);
-            hdrCap = tb.cap;
-            capMin = Math.min(capMin, tb.cap);
+            // keep the letters inside the tag, away from slanted or curved ends
+            const safe = tagCS.offset(-1.5, 'Round', 2, 16);
+            let k = 1, tcs = tb.cs.translate([cx, ym]);
+            for (let i = 0; i < 14 && tcs.subtract(safe).area() > 0.05; i++) { k *= 0.92; tcs = tb.cs.scale(k).translate([cx, ym]); }
+            hdrCap = tb.cap * k;
+            capMin = Math.min(capMin, tb.cap * k);
             if (raised) {
               tagText = tcs.extrude(Lh).translate([0, 0, zS + tt]);
               tagAll = tagBody.add(tcs.extrude(Lh + 0.02).translate([0, 0, zS + tt - 0.02]));
