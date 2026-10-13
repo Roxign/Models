@@ -66,6 +66,8 @@ button { cursor: pointer; }
 .group > .sub { margin: 0; color: var(--hue); }
 input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+input:disabled { opacity: 0.5; cursor: not-allowed; }
+.field:has(input:disabled) > .field-row label { opacity: 0.6; }
 .printer input:disabled { opacity: 0.5; cursor: not-allowed; }
 .printer .chk { gap: 4px; }
 .printer .chk input { accent-color: var(--accent); margin: 0; }
@@ -1399,9 +1401,9 @@ const SECTIONS = [
     { sub: 'Shape', noteId: 'shapeName' },
     { html: 'shapes' },
     { sub: 'Size' },
-    { seg: 'sizeMode', aria: 'Sizing', options: [['auto', 'Fit to text', 'The plate grows or shrinks to the smallest size that fits every status. Set the letter height on the Labels tab.'], ['manual', 'Set by hand', 'Type or drag the width and height yourself. Starts from the size Fit to text calculated.']] },
-    { slider: 'width', when: 'manual' },
-    { slider: 'height', when: 'manual' },
+    { fit: true },
+    { slider: 'width' },
+    { slider: 'height' },
     { html: 'spec' },
     { sub: 'Margins' },
     { row: [{ slider: 'marginV' }, { slider: 'marginH' }] },
@@ -2081,6 +2083,7 @@ function itemHTML(it) {
   if (it.text) return `<div class="field"${when}><label for="${it.text}">${it.label}</label><input type="text" id="${it.text}" data-key="${it.text}" maxlength="28" placeholder="${it.placeholder}" autocomplete="off"></div>`;
   if (it.check) return `<label class="check"${when}><input type="checkbox" id="${it.check}" data-key="${it.check}"> ${it.label}</label>`;
   if (it.color) return `<label class="swatch"${when}>${it.label}<input type="color" id="${it.color}" data-key="${it.color}"></label>`;
+  if (it.fit) return '<label class="check" title="On: the plate grows or shrinks to the smallest size that fits every status (letter height is on the Labels tab), and width and height are locked to the result. Off: type or drag the size yourself, starting from the last result."><input type="checkbox" id="fit"> Fit to text <span class="hint">(locks width and height)</span></label>';
   if (it.group) return `<div class="group"${when}><h3 class="sub">${it.group}</h3>${it.items.map(itemHTML).join('')}</div>`;
   if (it.sub) return `<h3 class="sub"${when}>${it.sub}${it.noteId ? ` <small id="${it.noteId}"></small>` : ''}</h3>`;
   if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
@@ -2387,6 +2390,9 @@ function renderPalettes() {
 // Controls bound with data-key read and write state[key].
 const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider']);
 function syncControls() {
+  const fitOn = state.sizeMode === 'auto';
+  $('#fit').checked = fitOn;
+  for (const k of ['width', 'height']) { $('#' + k).disabled = fitOn; $('#' + k + 'Out').disabled = fitOn; }
   $('#layerH').disabled = !!state.dyn;
   for (const k of Object.keys(SLIDERS)) {
     const el = $(`#${k}`);
@@ -2425,6 +2431,7 @@ function setKey(k, raw, free) {
   changed();
 }
 function bindControls() {
+  $('#fit').addEventListener('change', (e) => setKey('sizeMode', e.target.checked ? 'auto' : 'manual'));
   for (const el of $$('[data-num]')) el.addEventListener('change', () => setKey(el.dataset.num, el.value, true));
   for (const el of $$('[data-key]')) {
     const k = el.dataset.key;
@@ -2484,12 +2491,10 @@ function updateReadout() {
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed;
   const fitsBed = (i.W <= bedW - 4 && i.H <= bedD - 4) || (i.H <= bedW - 4 && i.W <= bedD - 4);
   const small = i.capMin && i.capMin < state.nozzle * 8.75 - 0.01;
-  $('#spec').innerHTML = `Plate <b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)} · letters <b class="${small ? 'bad' : ''}">${i.capMin ? fmt(i.capMin) + ' mm' : '—'}</b><br>`
-    + `<span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'Fits' : 'Too big for'} the ${bedW} × ${bedD} mm bed</span>`;
+  $('#spec').innerHTML = `<b>${fmt(i.W)} × ${fmt(i.H)} mm</b> · window ${fmt(i.ww)} × ${fmt(i.wh)}${small ? ` · <b class="bad">letters ${fmt(i.capMin)} mm</b>` : ''} · <span class="${fitsBed ? 'good' : 'bad'}">${fitsBed ? 'fits' : 'too big for'} ${bedW} × ${bedD} bed</span>`;
   const warns = [...i.warnings];
   if (!state.dyn) { const { lo, hi } = layerRange(state.nozzle); if (state.layerH < lo - 1e-6 || state.layerH > hi + 1e-6) warns.push(`A ${state.layerH} mm layer is outside the usual ${lo}–${hi} mm for a ${state.nozzle} mm nozzle (25–75% of its width). Turn on Dynamic to skip this check.`); }
   if (textMissing.length) warns.unshift(`These characters have no printable outline here and were skipped: ${[...new Set(textMissing)].join(' ')}. Arabic and Indic scripts need text shaping, which this page does not do.`);
-  if (!fitsBed) warns.unshift(`The base is ${fmt(i.W)} × ${fmt(i.H)} mm, which does not fit a ${bedW} × ${bedD} mm bed. Reduce the size or pick a larger bed.`);
   $('#warnings').innerHTML = '';
   for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
   renderExport();
@@ -2605,6 +2610,7 @@ async function rebuild() {
     result = engine.build({ ...state, statuses: state.statuses.map((s) => ({ ...s })) }, font);
     const ms = performance.now() - t0;
     if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
+    if (result.info.auto) { state.width = Math.round(result.info.plateW * 10) / 10; state.height = Math.round(result.info.plateH * 10) / 10; syncControls(); }
     // the camera is only re-framed on the first build and when the view mode changes; only switching the desk stand or the view mode does
     const fit = { view: state.view, stand: state.mount === 'stand', W: result.info.plateW, H: result.info.plateH };
     const refit = firstBuild || !lastFit || fit.view !== lastFit.view || fit.stand !== lastFit.stand;
