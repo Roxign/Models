@@ -9,7 +9,7 @@ The page lets you design the sign in your browser and download print-ready STL f
 ## What you can change
 
 - **Statuses:** 2–6 labels with your own text and 16 icons (meeting, call, focus, lab, lunch, remote, travel and more), or pick from 50 ready-made statuses and a dozen preset sets.
-- **Shape:** rounded, pill, badge, ticket, cloud, speech bubble, scallop, wave or arch, plus three designs: **Rail only** (just the rail, frame and the smallest back panel), **Classic** (English door-plate style with a raised double bead and serif lettering) and **Honeycomb** (a hexagon-perforated border, light and quick to print).
+- **Shape:** 19 designs. **Rail only** is the default (just the rail, frame and the smallest back panel). Others: rounded, pill, **Classic** (English door-plate style with a raised double bead and serif lettering), **Honeycomb** (hexagon-perforated border), arrow, lozenge, banner, **hang tag** (eyelet for a hook or knob), **puzzle** (jigsaw ends so signs can join), pixel, folder, cat ears, ticket, cloud, speech bubble, scallop, wave and arch.
 - **Size:** by default the plate fits itself to your text at the letter height you choose. You can also set width and height by hand. Either way it's checked against your printer's bed size.
 - **Labels and frame:** layout, typeface (13 to choose from), raised or engraved text, optional header text, frame bar width, window corners and slide clearance. Text prints exactly as typed and supports Latin, Greek, Cyrillic, Vietnamese, Traditional Chinese, Japanese, Korean, Hebrew and Thai. Arabic and Indic scripts need text shaping and are not supported.
 - **Mounting:** flat back for tape, magnet pockets, screw holes or desk-stand feet.
