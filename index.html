@@ -191,15 +191,12 @@ body.dragging-card { user-select: none; cursor: grabbing; }
   position: fixed; z-index: 20; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18); padding: 8px; display: grid; grid-template-columns: repeat(5, 44px); gap: 4px;
 }
-.popover button { width: 44px; height: 44px; border-radius: 8px; border: 1px solid transparent; background: transparent; display: grid; place-items: center; padding: 0; }
-.popover button svg { width: 24px; height: 24px; fill: currentColor; }
-.popover button:hover { background: var(--soft); }
-.popover button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .shape-pop { --hue: var(--plate); --hue-soft: var(--plate-soft); display: block; width: min(460px, calc(100vw - 24px)); max-height: min(70vh, 520px); overflow-y: auto; padding: 10px; }
-.shape-pop .shape-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.shape-pop .shape-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.shape-pop .shape-tile { padding: 10px 6px 8px; gap: 6px; font-size: 12px; text-align: center; line-height: 1.2; }
 .shape-btn { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--line); background: var(--soft); border-radius: 8px; padding: 5px 10px; font-weight: 600; font-size: 13px; text-align: left; }
 .shape-btn:hover { border-color: var(--muted); }
-.shape-btn svg { width: 58px; height: 28px; flex: none; }
+.shape-btn svg { width: 76px; height: 38px; flex: none; }
 .shape-btn svg path { fill: color-mix(in srgb, var(--plate) 18%, transparent); stroke: var(--plate); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .shape-btn .chev { margin-left: auto; color: var(--muted); }
 .set-pop { grid-template-columns: 1fr; width: 220px; max-height: min(60vh, 360px); overflow-y: auto; gap: 2px; }
@@ -256,7 +253,7 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 /* shapes */
 .shape-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .shape-tile { border: 1px solid var(--line); background: var(--soft); border-radius: 9px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 550; color: var(--muted); }
-.shape-tile svg { width: 100%; height: 34px; }
+.shape-tile svg { width: 100%; height: 54px; }
 .shape-tile svg path { fill: color-mix(in srgb, currentColor 16%, transparent); stroke: currentColor; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
 .shape-tile:hover { border-color: var(--muted); }
 .shape-tile[aria-pressed="true"] { border-color: var(--hue); color: var(--hue); background: var(--hue-soft); }
@@ -923,8 +920,8 @@ function createEngine(wasm) {
       const area = (N * (CW + 2 * pad + p.frame) + 24) * (CH + 2 * pad + 2 * p.frame + 20);
       if (!best || area < best.area - 1e-6) best = { area, CW, CH };
     }
-    const wwReq = Math.max(best.CW, 10) + 2 * pad + 0.4;
-    const whReq = Math.max(best.CH, 8) + 2 * pad + 0.4;
+    const wwReq = Math.max(best.CW + 2 * pad + 0.4, 14.2);
+    const whReq = Math.max(best.CH + 2 * pad + 0.4, 12.2);
     const headerText = (p.header || '').trim();
     let hh = 0, hdrW = 0;
     if (headerText || p.nameRail) {
@@ -1162,8 +1159,8 @@ function createEngine(wasm) {
           }
         }
       }
-      if (p.chamfer) {
-        const zTop = body.boundingBox().max[2], cT = Math.min(1.2, T * 0.35), cR = Math.min(1.2, (zTop - T) * 0.35);
+      if (p.bevel > 0) {
+        const zTop = body.boundingBox().max[2], cT = Math.min(p.bevel, T * 0.8), cR = Math.min(p.bevel, (zTop - T) * 0.8);
         body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR));
       }
       let labels = null, base = body;
@@ -1203,14 +1200,14 @@ function createEngine(wasm) {
         const ty = floor - ybG * ca, tz = ybG * sa;
         const M = [1, 0, 0, 0, 0, ca, -sa, 0, 0, sa, ca, 0, 0, ty, tz, 1];
         const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]).transform(M);
-        const fl = p.footW ?? 22, fd = p.footD ?? clamp(H * 0.5, 34, 64);
+        const fl = p.footW ?? 22, ff = p.footF ?? 12, fbk = p.footB ?? 38, fd = ff + fbk;
         for (const sx of [-1, 1]) {
           const xf = sx * Math.min(W * 0.28, X * 0.75);
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
           const hF = (ybL - ybG) * ca + floor + 7.5;
           const zMid = -(ybL - ybG) * sa + T * ca / 2;
-          const zFront = zMid + fd * 0.42, zBack = zMid - fd * 0.58;
+          const zFront = zMid + ff, zBack = zMid - fbk;
           feet.push(extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot));
         }
         stand = { tilt: p.tilt, ty, tz };
@@ -1388,8 +1385,8 @@ const DEFAULTS = {
   shape: 'rail', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 1.2, bed: 256,
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 6.5,
-  frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, chamfer: false,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footD: 45, hangHole: 10, hangN: 1, tape: false,
+  frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, hangHole: 10, hangN: 1, tape: false,
   nameRail: false, tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider,
 };
@@ -1415,8 +1412,10 @@ const SLIDERS = {
   screwD: { label: 'Screw hole diameter', min: 2, max: 8, step: 0.2, out: mm() },
   screwHead: { label: 'Screw head diameter', min: 4, max: 16, step: 0.2, out: mm() },
   footW: { label: 'Foot width', min: 10, max: 60, step: 1, out: mm(0) },
-  footD: { label: 'Foot depth', min: 20, max: 100, step: 1, out: mm(0) },
+  footF: { label: 'Foot extension, forward', min: 0, max: 60, step: 1, out: mm(0) },
+  footB: { label: 'Foot extension, backward', min: 0, max: 120, step: 1, out: mm(0) },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 20, step: 0.5, out: mm() },
+  bevel: { label: 'Bevel size', min: 0, max: 3, step: 0.1, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 4, step: 0.1, out: mm() },
   proud: { label: 'Frame extrusion', min: 0, max: 4, step: 0.1, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 20, step: 0.5, out: mm() },
@@ -1426,7 +1425,7 @@ const SLIDERS = {
 // Global printer settings. Slider limits and steps follow them.
 const NOZZLES = [0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8, 1];
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
-const FLOORS = { cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footD: 10 };
+const FLOORS = { cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -1448,9 +1447,9 @@ function clampSnap(k, v, s = state) {
 }
 const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
 // Picking a design can set related options; moving to a normal shape puts the neutral values back.
-const SHAPE_NEUTRAL = { thick: 3, marginV: 0, marginH: 0, chamfer: true };
+const SHAPE_NEUTRAL = { thick: 3, marginV: 0, marginH: 0 };
 const SHAPE_DEFAULTS = {
-  rail: { thick: 1.2, marginV: 0, marginH: 0, chamfer: false },
+  rail: { thick: 1.2, marginV: 0, marginH: 0 },
   classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#B5893A', colLabel: '#2A1E10', colSlider: '#6E4A1F' },
   honeycomb: { marginV: 16, marginH: 12 },
 };
@@ -1484,7 +1483,7 @@ const WHEN = {
 // the rest render as cards below. hue: the page's color; color: the part's preview color.
 const SECTIONS = [
   { tab: true, title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
-    { check: 'chamfer', label: 'Bevelled edges', title: 'Bevels the outer edge of the whole merged base: the plate edge and the rails and other features that reach it' },
+    { slider: 'bevel' },
     { group: 'Shape & mounting', items: [
       { html: 'shapes' },
       { seg: 'mount', label: 'Mounting', options: [['none', 'Flat back'], ['magnet', 'Magnets'], ['screw', 'Screws'], ['stand', 'Desk stand'], ['hang', 'Hang loop']] },
@@ -1497,7 +1496,8 @@ const SECTIONS = [
       { slider: 'screwHead', when: 'screw' },
       { slider: 'tilt', when: 'stand' },
       { slider: 'footW', when: 'stand' },
-      { slider: 'footD', when: 'stand' },
+      { slider: 'footF', when: 'stand' },
+      { slider: 'footB', when: 'stand' },
       { slider: 'hangHole', when: 'hang' },
       { seg: 'hangN', label: 'Loops', options: [[1, 'One'], [2, 'Two']], when: 'hang' },
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
@@ -1558,7 +1558,7 @@ function sanitize(s) {
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
   for (const k of Object.keys(SLIDERS)) if (Number.isFinite(+s[k])) out[k] = freeClamp(k, +s[k]);
-  for (const k of ['uniform', 'chamfer', 'dims', 'nameRail', 'tape']) if (typeof s[k] === 'boolean') out[k] = s[k];
+  for (const k of ['uniform', 'dims', 'nameRail', 'tape']) if (typeof s[k] === 'boolean') out[k] = s[k];
   if (typeof s.header === 'string') out.header = s.header.slice(0, 28);
   for (const k of ['colBase', 'colLabel', 'colSlider']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
   if (Array.isArray(s.statuses) && s.statuses.length >= 2) {
@@ -1774,56 +1774,37 @@ function updateScene(res, refit) {
     signGroup.position.set(0, 0, 0);
   }
 
-  // print plate layout: parts laid flat, base on top row, small parts below
+  // print plate layout in rows, each centered under the plate and aligned with it: base, then the name tag, then frame, pin and feet
   const bed = state.bed, bedD = bed === 250 ? 210 : bed;
-  const items = [
-    { mesh: parts.body, mat: mats.base, xf: null, key: 'body' },
-    { mesh: parts.slider, mat: mats.slider, xf: PRINT_XF.slider(info) },
-    { mesh: parts.pin, mat: mats.base, xf: null },
-    ...(parts.tag ? [{ mesh: parts.tag, mat: mats.slider, xf: null }] : []),
-    ...parts.feet.map((f) => ({ mesh: f, mat: mats.base, xf: PRINT_XF.foot() })),
-  ];
-  let rowY = null, cursorX = 0, rowH = 0;
+  const mk = (mesh, mat, xf, overlay, overlayMat) => ({ mesh, mat, xf, overlay, overlayMat });
+  const rows = [[mk(parts.body, mats.base, null, parts.labels, mats.label)]];
+  if (parts.tag) rows.push([parts.tagBody ? mk(parts.tagBody, mats.slider, null, parts.tagText, mats.label) : mk(parts.tag, mats.slider, null)]);
+  rows.push([mk(parts.slider, mats.slider, PRINT_XF.slider(info)), mk(parts.pin, mats.base, null), ...parts.feet.map((x) => mk(x, mats.base, PRINT_XF.foot()))]);
   const placed = [];
-  items.forEach((it, i) => {
-    const pos = printPositions(it.mesh, it.xf);
-    const b = boundsOf(pos);
-    const w = b.max[0] - b.min[0], h = b.max[1] - b.min[1];
-    if (i === 0) { placed.push({ it, pos, b, x: -w / 2, y: 0, w, h }); rowY = -(h / 2) - 8; return; }
-    if (i === 1) { cursorX = -placed[0].w / 2; }
-    placed.push({ it, pos, b, x: cursorX, y: rowY - h, w, h });
-    cursorX += w + 8;
-    rowH = Math.max(rowH, h);
-  });
+  let top = 0;
+  for (const row of rows) {
+    const cells = row.map((it) => { const pos = printPositions(it.mesh, it.xf), b = boundsOf(pos); return { it, pos, b, w: b.max[0] - b.min[0], h: b.max[1] - b.min[1] }; });
+    let x = -(cells.reduce((a, c) => a + c.w, 0) + 8 * (cells.length - 1)) / 2;
+    for (const c of cells) { c.x = x; c.y = top - c.h; placed.push(c); x += c.w + 8; }
+    top -= Math.max(...cells.map((c) => c.h)) + 8;
+  }
   // centre the whole layout on the bed
-  const allMinX = Math.min(...placed.map((q) => q.x)), allMaxX = Math.max(...placed.map((q) => q.x + q.w));
-  const allMaxY = placed[0].h / 2, allMinY = Math.min(...placed.map((q) => q.y));
-  const offX = -(allMinX + allMaxX) / 2, offY = -(allMinY + allMaxY) / 2;
+  const offX = -(Math.min(...placed.map((q) => q.x)) + Math.max(...placed.map((q) => q.x + q.w))) / 2;
+  const offY = -(Math.min(...placed.map((q) => q.y)) + 0) / 2;
   for (const q of placed) {
-    const g = new THREE.BufferGeometry();
-    const pos = q.pos;
-    for (let i = 0; i < pos.length; i += 3) {
-      pos[i] += -q.b.min[0] + q.x + offX;
-      pos[i + 1] += q === placed[0] ? -(q.b.min[1] + q.b.max[1]) / 2 + offY : -q.b.min[1] + q.y + offY;
-      pos[i + 2] += -q.b.min[2];
-    }
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setIndex(new THREE.BufferAttribute(q.it.mesh.idx, 1));
-    const geo = toCreasedNormals(g, THREE.MathUtils.degToRad(32));
-    const m = makeMesh(geo, q.it.mat);
-    m.rotation.x = -Math.PI / 2;
-    printGroup.add(m);
-    if (q.it.key === 'body' && parts.labels) {
-      const lpos = new Float32Array(parts.labels.pos);
-      const dx = -q.b.min[0] + q.x + offX, dy = -(q.b.min[1] + q.b.max[1]) / 2 + offY, dz = -q.b.min[2];
-      for (let i = 0; i < lpos.length; i += 3) { lpos[i] += dx; lpos[i + 1] += dy; lpos[i + 2] += dz; }
-      const lg = new THREE.BufferGeometry();
-      lg.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
-      lg.setIndex(new THREE.BufferAttribute(parts.labels.idx, 1));
-      const lm = makeMesh(toCreasedNormals(lg, THREE.MathUtils.degToRad(32)), mats.label);
-      lm.rotation.x = -Math.PI / 2;
-      printGroup.add(lm);
-    }
+    const dx = -q.b.min[0] + q.x + offX, dy = -q.b.min[1] + q.y + offY, dz = -q.b.min[2];
+    const place = (mesh, srcPos, mat) => {
+      const pos = new Float32Array(srcPos);
+      for (let i = 0; i < pos.length; i += 3) { pos[i] += dx; pos[i + 1] += dy; pos[i + 2] += dz; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      g.setIndex(new THREE.BufferAttribute(mesh.idx, 1));
+      const m = makeMesh(toCreasedNormals(g, THREE.MathUtils.degToRad(32)), mat);
+      m.rotation.x = -Math.PI / 2;
+      printGroup.add(m);
+    };
+    place(q.it.mesh, q.pos, q.it.mat);
+    if (q.it.overlay) place(q.it.overlay, q.it.overlay.pos, q.it.overlayMat);
   }
   const bedMesh = new THREE.Mesh(new THREE.BoxGeometry(bed, 1.5, bedD), new THREE.MeshStandardMaterial({ color: 0x34373c, roughness: 0.85 }));
   bedMesh.position.y = -0.76;
@@ -2094,10 +2075,12 @@ function download3mf() {
     ...files.filter((x) => x.key.startsWith('foot')).map((x) => ({ name: x.label, parts: [[x.label, x, 0]] }))];
   const size = (g) => { const b = boundsOf(g.parts[0][1].pos); return [b.max[0] - b.min[0], b.max[1] - b.min[1]]; };
   const bedW = state.bed, bedD = state.bed === 250 ? 210 : state.bed, gap = 8;
-  const base = size(groups[0]), rest = groups.slice(1), restW = rest.reduce((a, g) => a + size(g)[0], 0) + gap * Math.max(0, rest.length - 1);
+  const base = size(groups[0]), tagG = groups.find((g) => g.name === 'Name tag'), rest = groups.slice(1).filter((g) => g !== tagG), restW = rest.reduce((a, g) => a + size(g)[0], 0) + gap * Math.max(0, rest.length - 1);
   let x = -restW / 2;
   groups[0].at = [0, 0];
-  for (const g of rest) { const [w, h] = size(g); g.at = [x + w / 2, -(base[1] / 2) - gap - h / 2]; x += w + gap; }
+  let rowTop = -(base[1] / 2) - gap;
+  if (tagG) { const [, th] = size(tagG); tagG.at = [0, rowTop - th / 2]; rowTop -= th + gap; }
+  for (const g of rest) { const [w, h] = size(g); g.at = [x + w / 2, rowTop - h / 2]; x += w + gap; }
   const esc = (t) => String(t).replace(/[<>&"]/g, '');
   let id = 1;
   const res = [`<basematerials id="1">${mats.map(([n, c]) => `<base name="${n}" displaycolor="${c.toUpperCase()}FF"/>`).join('')}</basematerials>`], items = [];
@@ -2205,7 +2188,7 @@ function itemHTML(it) {
   if (it.group) return `<div class="group"${when}><h3 class="sub">${it.group}</h3>${it.items.map(itemHTML).join('')}</div>`;
   if (it.sub) return `<h3 class="sub"${when}>${it.sub}${it.noteId ? ` <small id="${it.noteId}"></small>` : ''}</h3>`;
   if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
-  return { shapes: '<div class="field"><span class="lbl">Shape</span><button type="button" class="shape-btn" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-104 -58 208 100" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
+  return { shapes: '<div class="field"><span class="lbl">Shape</span><button type="button" class="shape-btn" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-106 -54 212 108" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
 }
 const tagHTML = (s) => `<span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24">${s.glyph}</svg></span>`;
 function renderPanel() {
@@ -2476,7 +2459,7 @@ function renderShapes() {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
     b.setAttribute('aria-pressed', String(state.shape === k));
-    b.innerHTML = `<svg viewBox="-104 -58 208 100" aria-hidden="true"><path d="${engine.shapePath(k)}"/></svg><span>${label}</span>`;
+    b.innerHTML = `<svg viewBox="-106 -54 212 108" aria-hidden="true"><path d="${engine.shapePath(k)}"/></svg><span>${label}</span>`;
     b.addEventListener('click', () => {
       const prev = state.shape;
       state.shape = k;
@@ -2502,11 +2485,13 @@ function openShapePop() {
   const b = $('#shapeBtn');
   shapePop.hidden = false;
   b.setAttribute('aria-expanded', 'true');
+  // open on whichever side of the button has more room, and shrink (scrolling inside) to fit it
+  shapePop.style.maxHeight = '';
   const r = b.getBoundingClientRect(), pw = shapePop.offsetWidth, ph = shapePop.offsetHeight;
   shapePop.style.left = Math.max(12, Math.min(window.innerWidth - pw - 12, r.left)) + 'px';
-  let top = r.bottom + 6;
-  if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 6);
-  shapePop.style.top = top + 'px';
+  const below = window.innerHeight - r.bottom - 18, above = r.top - 18;
+  if (ph <= below || below >= above) { shapePop.style.top = r.bottom + 6 + 'px'; shapePop.style.maxHeight = Math.max(160, Math.min(ph, below)) + 'px'; }
+  else { const h = Math.max(160, Math.min(ph, above)); shapePop.style.maxHeight = h + 'px'; shapePop.style.top = r.top - h - 6 + 'px'; }
   (shapePop.querySelector('[aria-pressed="true"]') || shapePop.querySelector('button')).focus();
 }
 function closeShapePop(refocus) {
