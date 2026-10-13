@@ -182,18 +182,29 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .sec-head small { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
 .sec-tag { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--hue); color: var(--panel); display: grid; place-items: center; }
 .sec-tag svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.part-color { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); cursor: pointer; }
-.part-color input { width: 26px; height: 26px; padding: 0; border: 2px solid var(--panel); border-radius: 50%; box-shadow: 0 0 0 1px var(--line); cursor: pointer; background: none; }
-.part-color input::-webkit-color-swatch-wrapper { padding: 0; }
-.part-color input::-webkit-color-swatch { border: 0; border-radius: 50%; }
-.part-color input::-moz-color-swatch { border: 0; border-radius: 50%; }
-.section input[type="range"], .section .check input { accent-color: var(--hue); }
-.section .seg button[aria-checked="true"] { color: var(--hue); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 45%, transparent), 0 1px 2px rgba(0, 0, 0, 0.1); }
+:is(.section, .page) input[type="range"], :is(.section, .page) .check input { accent-color: var(--hue); }
+:is(.section, .page) .seg button[aria-checked="true"] { color: var(--hue); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 45%, transparent), 0 1px 2px rgba(0, 0, 0, 0.1); }
 .sub { margin: 6px 0 -4px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .sub small { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; text-transform: none; }
-details.more > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--hue); width: fit-content; }
-details.more[open] > summary { margin-bottom: 12px; }
-.more-body { display: flex; flex-direction: column; gap: 12px; }
+/* settings pages: one tab per part of the sign */
+.pages { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--soft); border-bottom: 1px solid var(--line); }
+.tab {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; padding: 10px 6px 8px;
+  border: 0; border-bottom: 3px solid transparent; margin-bottom: -1px; background: transparent; color: var(--muted);
+  font-family: var(--font-display); font-stretch: 118%; font-weight: 750; font-size: 12.5px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.tab .sec-tag { width: 24px; height: 24px; opacity: 0.5; transition: opacity 0.15s; }
+.tab:hover { color: var(--ink); }
+.tab:hover .sec-tag { opacity: 0.8; }
+.tab[aria-selected="true"] { color: var(--hue); background: var(--hue-soft); border-bottom-color: var(--hue); }
+.tab[aria-selected="true"] .sec-tag { opacity: 1; }
+.page { padding: 6px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.color-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 550; }
+.color-row input { width: 30px; height: 30px; padding: 0; border: 2px solid var(--panel); border-radius: 50%; box-shadow: 0 0 0 1px var(--line); cursor: pointer; background: none; }
+.color-row input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-row input::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.color-row input::-moz-color-swatch { border: 0; border-radius: 50%; }
 
 /* shapes */
 .shape-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -1056,7 +1067,7 @@ const PALETTES = [
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
-  current: 0, view: 'assembled',
+  current: 0, view: 'assembled', page: 'plate',
   shape: 'rounded', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 3, bed: 256,
   layout: 'stack', font: 'helvetiker', caps: true, uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   frame: 4.5, winR: 2, railH: 3.5, tol: 0.25, arrows: true, chamfer: true,
@@ -1085,7 +1096,7 @@ const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rounded', 'pill', 'badge', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FILES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'],
+  mount: ['none', 'magnet', 'screw', 'stand'], magN: [2, 4], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['plate', 'labels', 'frame'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -1101,10 +1112,10 @@ const WHEN = {
   stand: (s) => s.mount === 'stand',
 };
 
-// The settings panel, top to bottom, one card per part of the sign. renderPanel() turns this into markup.
-// hue: the card's color; color: the preview filament color picked in the card header.
+// The settings panel. Sections with tab: true become pages behind Plate | Labels | Frame tabs;
+// the rest render as cards below. hue: the page's color; color: the part's preview color.
 const SECTIONS = [
-  { title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
+  { tab: true, title: 'Plate', hue: 'plate', color: 'colBase', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
     { sub: 'Shape', noteId: 'shapeName' },
     { html: 'shapes' },
     { sub: 'Size' },
@@ -1120,24 +1131,32 @@ const SECTIONS = [
     { hint: '', id: 'mountHint' },
     { row: [{ slider: 'magD' }, { slider: 'magH' }, { seg: 'magN', label: 'Pockets', options: [[2, '2'], [4, '4']] }], when: 'magnet' },
     { slider: 'tilt', when: 'stand' },
-    { more: 'More plate options', items: [{ slider: 'thick' }, { check: 'chamfer', label: 'Chamfered plate edge' }] },
+    { sub: 'Thickness & edge' },
+    { slider: 'thick' },
+    { check: 'chamfer', label: 'Chamfered plate edge' },
   ] },
-  { title: 'Labels', hue: 'labels', color: 'colLabel', glyph: '<path d="M5 19 12 5l7 14M8 14h8"/>', items: [
+  { tab: true, title: 'Labels', hue: 'labels', color: 'colLabel', glyph: '<path d="M5 19 12 5l7 14M8 14h8"/>', items: [
+    { sub: 'Style' },
     { seg: 'layout', label: 'Layout', options: [['stack', 'Icon over text'], ['side', 'Icon beside'], ['text', 'Text only'], ['icon', 'Icon only']] },
+    { sub: 'Text' },
     { row: [
       { select: 'font', label: 'Typeface', options: [['helvetiker', 'Helvetiker Bold'], ['droid', 'Droid Sans Bold'], ['optimer', 'Optimer Bold'], ['gentilis', 'Gentilis Bold']] },
       { text: 'header', label: 'Header text', placeholder: 'Optional, e.g. Room 4B' },
     ] },
     { check: 'caps', label: 'All capitals' },
     { check: 'uniform', label: 'Same letter size on every status', when: 'manual' },
-    { more: 'More label options', items: [{ row: [{ seg: 'relief', label: 'Relief', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] }] },
+    { sub: 'Relief' },
+    { row: [{ seg: 'relief', label: 'Labels are', options: [['raised', 'Raised'], ['engraved', 'Engraved']] }, { slider: 'reliefH' }] },
   ] },
-  { title: 'Frame', hue: 'frame', color: 'colSlider', glyph: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/>', items: [
-    { row: [{ slider: 'frame' }, { slider: 'winR' }, { slider: 'tol' }, { slider: 'railH' }] },
-    { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
+  { tab: true, title: 'Frame', hue: 'frame', color: 'colSlider', glyph: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6" rx="1"/>', items: [
+    { sub: 'Window' },
+    { row: [{ slider: 'frame' }, { slider: 'winR' }] },
     { check: 'arrows', label: 'Pointer arrows on the frame' },
+    { sub: 'Fit' },
+    { row: [{ slider: 'tol' }, { slider: 'railH' }] },
+    { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
   ] },
-  { title: 'Preview colors', items: [{ html: 'palettes' }, { hint: 'Change a single part with the Color dot in its section. Colors only affect the preview; STL files have no color.' }] },
+  { title: 'Preview colors', items: [{ html: 'palettes' }, { hint: 'Change a single part at the bottom of its page. Colors only affect the preview; STL files have no color.' }] },
 ];
 
 function sanitize(s) {
@@ -1677,20 +1696,34 @@ function itemHTML(it) {
   if (it.check) return `<label class="check"${when}><input type="checkbox" id="${it.check}" data-key="${it.check}"> ${it.label}</label>`;
   if (it.color) return `<label class="swatch"${when}>${it.label}<input type="color" id="${it.color}" data-key="${it.color}"></label>`;
   if (it.sub) return `<h3 class="sub"${when}>${it.sub}${it.noteId ? ` <small id="${it.noteId}"></small>` : ''}</h3>`;
-  if (it.more) return `<details class="more"${when}><summary>${it.more}</summary><div class="more-body">${it.items.map(itemHTML).join('')}</div></details>`;
   if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
   return { shapes: '<div class="shape-grid" id="shapeGrid"></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
 }
+const tagHTML = (s) => `<span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24">${s.glyph}</svg></span>`;
 function renderPanel() {
-  $('#settings').innerHTML = SECTIONS.map((s) => {
-    const tag = s.glyph ? `<span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24">${s.glyph}</svg></span>` : '';
-    const color = s.color
-      ? `<label class="part-color" title="${s.title} color in the preview">Color<input type="color" id="${s.color}" data-key="${s.color}" aria-label="${s.title} color (preview only)"></label>`
-      : '';
-    const head = `<div class="sec-head">${tag}<h2>${s.title}</h2>${color}</div>`;
-    return `<section class="section${s.hue ? ' hue-' + s.hue : ''}">${head}${s.items.map(itemHTML).join('')}</section>`;
-  }).join('');
+  const pages = SECTIONS.filter((s) => s.tab), cards = SECTIONS.filter((s) => !s.tab);
+  const tabs = pages.map((s) => `<button type="button" role="tab" class="tab hue-${s.hue}" id="tab-${s.hue}" data-page="${s.hue}" aria-controls="page-${s.hue}">${tagHTML(s)}<span>${s.title}</span></button>`).join('');
+  const bodies = pages.map((s) => `<div class="page hue-${s.hue}" role="tabpanel" id="page-${s.hue}" aria-labelledby="tab-${s.hue}">${s.items.map(itemHTML).join('')}`
+    + `<div class="color-row"><label for="${s.color}">${s.title} color in the preview</label><input type="color" id="${s.color}" data-key="${s.color}"></div></div>`).join('');
+  $('#settings').innerHTML = `<div class="pages"><div class="tabs" role="tablist" aria-label="Settings">${tabs}</div>${bodies}</div>`
+    + cards.map((s) => `<section class="section"><div class="sec-head"><h2>${s.title}</h2></div>${s.items.map(itemHTML).join('')}</section>`).join('');
 }
+function setPage(page, focus) {
+  state.page = page;
+  syncControls();
+  saveState();
+  if (focus) $(`#tab-${page}`).focus();
+}
+$('#settings').addEventListener('click', (e) => { const t = e.target.closest('[role="tab"]'); if (t) setPage(t.dataset.page); });
+$('#settings').addEventListener('keydown', (e) => {
+  const t = e.target.closest('[role="tab"]');
+  if (!t) return;
+  const tabs = $$('#settings [role="tab"]'), i = tabs.indexOf(t);
+  const j = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (j == null) return;
+  e.preventDefault();
+  setPage(tabs[(j + tabs.length) % tabs.length].dataset.page, true);
+});
 
 const TOOL_SVG = {
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
@@ -1913,6 +1946,8 @@ function syncControls() {
   }
   for (const [k, f] of Object.entries(SLIDERS)) { const o = $(`#${k}Out`); if (o) o.textContent = f.out(state[k]); }
   for (const el of $$('[data-when]')) el.hidden = !WHEN[el.dataset.when](state);
+  for (const t of $$('#settings [role="tab"]')) { const on = t.dataset.page === state.page; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; }
+  for (const p of $$('#settings [role="tabpanel"]')) p.hidden = p.id !== `page-${state.page}`;
   $('#mountHint').textContent = MOUNT_HINTS[state.mount];
   $$('#viewSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === state.view)));
 }
