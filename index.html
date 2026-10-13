@@ -212,7 +212,7 @@ select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--
 .tab[aria-selected="true"] { color: var(--hue); background: var(--hue-soft); border-bottom-color: var(--hue); }
 .tab[aria-selected="true"] .sec-tag { opacity: 1; }
 .page { padding: 6px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
-.color-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; font-weight: 550; }
+.color-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 2px; padding: 8px 0 14px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 550; }
 .color-row input { width: 30px; height: 30px; padding: 0; border: 2px solid var(--panel); border-radius: 50%; box-shadow: 0 0 0 1px var(--line); cursor: pointer; background: none; }
 .color-row input::-webkit-color-swatch-wrapper { padding: 0; }
 .color-row input::-webkit-color-swatch { border: 0; border-radius: 50%; }
@@ -1813,8 +1813,8 @@ const tagHTML = (s) => `<span class="sec-tag" aria-hidden="true"><svg viewBox="0
 function renderPanel() {
   const pages = SECTIONS.filter((s) => s.tab), cards = SECTIONS.filter((s) => !s.tab);
   const tabs = pages.map((s) => `<button type="button" role="tab" class="tab hue-${s.hue}" id="tab-${s.hue}" data-page="${s.hue}" aria-controls="page-${s.hue}">${tagHTML(s)}<span>${s.title}</span></button>`).join('');
-  const bodies = pages.map((s) => `<div class="page hue-${s.hue}" role="tabpanel" id="page-${s.hue}" aria-labelledby="tab-${s.hue}">${s.items.map(itemHTML).join('')}`
-    + `<div class="color-row"><label for="${s.color}">${s.title} color in the preview</label><input type="color" id="${s.color}" data-key="${s.color}"></div></div>`).join('');
+  const bodies = pages.map((s) => `<div class="page hue-${s.hue}" role="tabpanel" id="page-${s.hue}" aria-labelledby="tab-${s.hue}">`
+    + `<div class="color-row"><label for="${s.color}">${s.title} color in the preview</label><input type="color" id="${s.color}" data-key="${s.color}"></div>${s.items.map(itemHTML).join('')}</div>`).join('');
   $('#settings').innerHTML = `<div class="pages"><div class="tabs" role="tablist" aria-label="Settings">${tabs}</div>${bodies}</div>`
     + cards.map((s) => `<section class="section"><div class="sec-head"><h2>${s.title}</h2></div>${s.items.map(itemHTML).join('')}</section>`).join('');
 }
