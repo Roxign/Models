@@ -113,7 +113,7 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
 /* the build time, beside the view buttons; a fixed width so the buttons never shift */
 .vp-tools { align-items: center; }
 /* view cube, after Bambu Studio's: turns with the view; click a face to look straight at it */
-.viewport .view-cube { position: absolute; top: 50px; right: 8px; width: 84px; height: 84px; cursor: pointer; touch-action: none; }
+.viewport .view-cube { width: 36px; height: 36px; flex: none; cursor: pointer; touch-action: none; }
 .vp-tools .build-state { width: 118px; justify-content: flex-end; white-space: nowrap; overflow: hidden; font-size: 11px; padding: 0 4px; text-shadow: 0 0 6px var(--stage); }
 /* size and warnings in the top bar, always in view */
 .fit-status { position: relative; display: flex; align-items: center; gap: 6px; }
@@ -325,7 +325,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   .fit-status { order: 3; }
   .warn-pop { left: 0; right: auto; }
   .vp-tools .build-state { width: 14px; font-size: 0; padding: 0; } /* just the dot on phones */
-  .viewport .view-cube { width: 64px; height: 64px; top: 48px; }
+  .viewport .view-cube { width: 38px; height: 38px; }
   .vp-top .seg { flex-wrap: nowrap; }
   .vp-top .seg button { padding: 7px 9px; white-space: nowrap; }
   .st-head .hint { display: none; }
@@ -420,12 +420,12 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>
         </button>
+        <canvas class="view-cube" id="viewCube" aria-label="View cube: click a face to look straight at it"></canvas>
         <button class="icon-btn" id="resetView" title="Reset view (back to 3D)" aria-label="Reset view">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
         </button>
         </div>
       </div>
-      <canvas class="view-cube" id="viewCube" aria-label="View cube: click a face to look straight at it"></canvas>
       <div class="pal-pop" id="palPop" hidden>
         <strong>Preview colors</strong>
         <div class="pal-colors">
@@ -1009,10 +1009,10 @@ function createEngine(wasm) {
   // The tag rail is a dovetail like the status track: the tag's long edges are cut at 45° through its whole thickness and the
   // rails lean over them at the same angle, so nothing overhangs flat when it prints. The tag's top face shows in full.
   // Band height: the letters with room for descenders (1.45 x the letter height), the 45° edges, the rails and their clearance.
-  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + (p.namePad ?? 1)) + 2 * (tagRw(p) + 1.42 * (p.tol ?? 0.25));
+  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + (p.namePad ?? 1)) + 2 * (tagRw(p) + 1.42 * (p.tagTol ?? p.tol ?? 0.25));
   // Where the tag sits in the header band: centre line, half-height of its bottom face and of the channel at the bottom.
   function tagDims(p, hdrZone) {
-    const [h0, h1] = hdrZone, tol = p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25), c = tol * Math.SQRT2;
+    const [h0, h1] = hdrZone, tol = p.tagTol ?? p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25), c = tol * Math.SQRT2;
     const htag = zoneH / 2 - tagRw(p) - c;
     return { ym: (h0 + h1) / 2, htag, wb: htag + c };
   }
@@ -1059,7 +1059,7 @@ function createEngine(wasm) {
   // keepX: on bordered shapes the tag runs along the track, from -keepX to keepX.
   function tagTextHalf(p, sh, hdrZone, W, keepX) {
     const { ym, htag } = tagDims(p, hdrZone), u = p.tagT ?? 1.6, htop = htag - u;
-    const face = tagRw(p) + Math.max(0.3, (p.tol ?? 0.25) * Math.SQRT2) + u; // the top face's inset from the outline
+    const face = tagRw(p) + Math.max(0.3, (p.tagTol ?? p.tol ?? 0.25) * Math.SQRT2) + u; // the top face's inset from the outline
     const npad = p.namePad ?? 1, side = npad + 2;
     if (keepX != null) return keepX - face - side;
     // the side margin is sideways only, so a name band that runs along a straight top edge keeps its full height
@@ -1229,7 +1229,7 @@ function createEngine(wasm) {
       const Lh = raised ? lz(p.reliefH) : 0, engr = raised ? 0 : Math.min(lz(p.reliefH), T - lz(1));
       // the name has its own thickness (raised) or depth (engraved)
       const Ln = raised ? lz(p.nameReliefH ?? p.reliefH) : 0, engrN = raised ? 0 : Math.min(lz(p.nameReliefH ?? p.reliefH), T - lz(1));
-      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fbx = p.frame, play = 0.6, proud = lz(p.proud ?? 0.8, 0);
+      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fbx = p.frame, play = 0.6, proudIn = dyn ? (p.proud ?? 0.8) : Math.round((p.proud ?? 0.8) / LH) * LH;
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
@@ -1407,7 +1407,7 @@ function createEngine(wasm) {
         // slide under the leaning rails and its ends are bevelled the same way, and at the closed (left) end the stop leans
         // over the tag's end like the rails do. Seen from the front the border is then the same width all round, round
         // corners included, and nothing overhangs flat.
-        const tt = lz(p.tagT ?? 1.6, 2), u = tt, lipH = lz(0.8), gap = Math.max(0.3, tol * Math.SQRT2), htop = htag - u;
+        const tt = lz(p.tagT ?? 1.6, 2), u = tt, lipH = lz(0.8), gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
         if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
         tagT = tt;
         // the tag's rails reach the common rail height when there is a status track, or their own height without one
@@ -1484,7 +1484,7 @@ function createEngine(wasm) {
       }
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1529,7 +1529,7 @@ function createEngine(wasm) {
         const cub = p.mount === 'cubicle', t = Math.max(3, 6 * NZ), lipF = Math.max(2, 4 * NZ), clipH = 7.5, g = 1;
         const P = p.cubP ?? 55, back = p.hookBack ?? 25;
         const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 10), zBk = -t - g - P;
-        const R2 = (y0, y1, z0, z1) => rect(y1 - y0, z1 - z0, (y0 + y1) / 2, (z0 + z1) / 2);
+        const R2 = (y0, y1, z0, z1) => rect(Math.max(0.01, Math.abs(y1 - y0)), Math.max(0.01, Math.abs(z1 - z0)), (y0 + y1) / 2, (z0 + z1) / 2);
         const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]);
         // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each reaches past the 0.2 mm
         // clearance into the sign by half the squeeze, so the clip pinches the plate and the hook does not wobble or slide.
@@ -1771,7 +1771,7 @@ const DEFAULTS = {
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGrip: 0.1, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -1788,10 +1788,11 @@ const SLIDERS = {
   frame: { label: 'Frame bars', min: 3, max: 15, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 15, step: 0.5, out: mm() },
   railH: { label: 'Rail height', min: 2.4, max: 10, step: 0.5, layers: true, out: mm() },
+  tagTol: { label: 'Tag slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   tol: { label: 'Slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   magD: { label: 'Magnet ⌀', min: 5, max: 40, step: 0.5, out: mm() },
   magH: { label: 'Magnet height', min: 1, max: 10, step: 0.1, layers: true, out: mm() },
-  tilt: { label: 'Lean back', min: 0, max: 45, step: 1, unit: '°', out: (v) => `${v}°` },
+  tilt: { label: 'Lean back', min: -20, max: 45, step: 1, unit: '°', out: (v) => `${v}°` },
   magInset: { label: 'Distance from the ends', min: 6, max: 150, step: 1, out: mm(0) },
   screwD: { label: 'Screw hole diameter', min: 2, max: 12, step: 0.2, out: mm() },
   screwHead: { label: 'Screw head diameter', min: 4, max: 24, step: 0.2, out: mm() },
@@ -1799,18 +1800,18 @@ const SLIDERS = {
   footF: { label: 'Foot extension, forward', min: 0, max: 120, step: 1, out: mm(0) },
   footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
-  bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, zero: true, out: mm() },
+  bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
   namePad: { label: 'Name margin', min: 0, max: 20, step: 0.2, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
-  proud: { label: 'Frame extrusion', min: 0, max: 8, step: 0.1, layers: true, zero: true, out: mm() },
+  proud: { label: 'Frame extrusion', min: -2, max: 8, step: 0.1, layers: true, signed: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
   hookBack: { label: 'Hook length down the back', min: 8, max: 150, step: 1, out: mm(0) },
   railOpen: { label: 'Rail slot height', min: 4, max: 40, step: 0.1, out: mm() },
   railLip: { label: 'Lip depth (slot to hollow)', min: 0.2, max: 10, step: 0.1, out: mm() },
   railExt: { label: 'Hollow past the slot, up and down', min: 0.5, max: 20, step: 0.1, out: mm() },
   railCav: { label: 'Hollow depth behind the lips', min: 0.4, max: 20, step: 0.1, out: mm() },
-  railDrop: { label: 'Sign top below the rail slot', min: 0, max: 300, step: 1, out: mm(0) },
-  hookDrop: { label: 'Sign top below the top of the panel', min: 0, max: 300, step: 1, out: mm(0) },
+  railDrop: { label: 'Sign top below the rail slot', min: -100, max: 300, step: 1, out: mm(0) },
+  hookDrop: { label: 'Sign top below the top of the panel', min: -100, max: 300, step: 1, out: mm(0) },
   hookGrip: { label: 'Clip squeeze on the sign', min: 0, max: 1.5, step: 0.05, out: mm(2) },
   hookW: { label: 'Hook width', min: 10, max: 80, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 50, step: 0.5, out: mm() },
@@ -1818,7 +1819,8 @@ const SLIDERS = {
   pad: { label: 'Text padding', min: 0, max: 20, step: 0.2, out: mm() },
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
-const FLOORS = { cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
+// lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
+const FLOORS = { tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -1833,12 +1835,12 @@ function limits(k, s = state) {
   return { min: rnd(min), max: rnd(max), step: rnd(step) };
 }
 // Typed values may go past the bar's ends, but still follow the printer: a floor of so many nozzle widths, and whole
-// layers for heights (zero stays allowed where the slider starts at zero).
+// layers for heights (settings marked signed may also be zero or below).
 function freeClamp(k, v, s = state) {
   const f = SLIDERS[k];
-  v = Math.min(f.max * 4, Math.max(FLOORS[k] || 0, v));
+  v = Math.min(f.max * 4, Math.max(FLOORS[k] ?? 0, v));
   if (f.nozzleMin) v = Math.max(v, f.nozzleMin * s.nozzle);
-  if (f.layers && !s.dyn) v = f.zero && v < s.layerH / 2 ? 0 : Math.max(1, Math.round(v / s.layerH)) * s.layerH;
+  if (f.layers && !s.dyn) v = f.signed ? Math.round(v / s.layerH) * s.layerH : Math.max(1, Math.round(v / s.layerH)) * s.layerH;
   return Math.round(v * 1000) / 1000;
 }
 function clampSnap(k, v, s = state) {
@@ -1865,7 +1867,7 @@ const MOUNT_HINTS = {
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
   stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
-  cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is.',
+  cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is. A negative drop hangs the sign higher than the panel.',
   cubrail: 'For a C-shaped rail: each hook ends in a thin tab. Hold the sign up a little, push the tabs into the slot and let go; the tabs drop behind the lower lip. It slides along the rail. Measure the slot and the hollow behind it.',
 };
 // Conditions for controls that only apply in some modes.
@@ -1968,6 +1970,7 @@ const SECTIONS = [
       { slider: 'namePad' },
       { slider: 'nameReliefH' },
       { slider: 'tagT', when: 'tag' },
+      { slider: 'tagTol', when: 'tag' },
     ] },
     { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move.', when: 'tag' },
   ] },
@@ -3162,8 +3165,8 @@ const faceMats = FACE_KEYS.map((k) => {
   const g = c.getContext('2d');
   g.fillStyle = '#eef0f3'; g.fillRect(0, 0, 128, 128);
   g.strokeStyle = '#8f98a3'; g.lineWidth = 6; g.strokeRect(3, 3, 122, 122);
-  g.fillStyle = '#28303a'; g.font = '700 25px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(k.toUpperCase(), 64, 66);
+  g.fillStyle = '#28303a'; g.font = '800 64px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText({ front: 'F', back: 'B', top: 'T', bottom: 'BT', left: 'L', right: 'R' }[k], 64, 68);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return new THREE.MeshBasicMaterial({ map: t });
