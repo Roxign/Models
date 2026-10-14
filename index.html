@@ -1060,7 +1060,7 @@ function createEngine(wasm) {
   function tagTextHalf(p, sh, hdrZone, W, keepX) {
     const { ym, htag } = tagDims(p, hdrZone), u = p.tagT ?? 1.6, htop = htag - u;
     const face = tagRw(p) + Math.max(0.3, (p.tagTol ?? p.tol ?? 0.25) * Math.SQRT2) + u; // the top face's inset from the outline
-    const npad = p.namePad ?? 1, side = npad + 2;
+    const npad = Math.max(0, p.namePad ?? 1), side = npad + 2;
     if (keepX != null) return keepX - face - side;
     // the side margin is sideways only, so a name band that runs along a straight top edge keeps its full height
     return bandHalf(hErode(hErode(sh.cs, p.marginH ?? 0).offset(-face, 'Round', 2, 16), side), ym - (htop - npad), ym + (htop - npad), W);
@@ -1233,6 +1233,8 @@ function createEngine(wasm) {
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
+      // each eyelet's part outside the plate's own outline, and where it joins the plate; it takes the thickness it joins
+      const hangRings = [];
       if (p.mount === 'hang') {
         // eyelets on top of whatever outline was chosen, each centered over the outline's height at its position
         const re = Math.max(1.5, (p.hangHole ?? 10) / 2), ro = Math.max(re + 3.5, (re + 0.8) / 0.7);
@@ -1241,6 +1243,8 @@ function createEngine(wasm) {
           const strip = rect(2, 600, x, 0).intersect(sh.cs), tb = strip.isEmpty() ? sh.cs.bounds() : strip.bounds(), cy = tb.max[1] + ro * 0.7;
           eyes.push(circle(ro, x, cy, 64)); holes.push(circle(re, x, cy, 64));
         }
+        const own = sh.cs, holesCS = union(holes);
+        eyes.forEach((e, i) => { const x = xs[i], yJ = e.bounds().min[1]; hangRings.push({ cs: e.subtract(holesCS).subtract(own), x, y: Math.max(yJ, own.intersect(rect(2, 600, x, 0)).bounds().max[1]) }); });
         sh.cs = union([sh.cs, ...eyes]).subtract(union(holes));
       }
       const ob = sh.cs.bounds();
@@ -1265,6 +1269,10 @@ function createEngine(wasm) {
       const cells = Array.from({ length: N }, (_, i) => (i - (N - 1) / 2) * pitch);
 
       // labels
+      if (statusOn && pad < 0) {
+        const pmin = Math.min(0, Math.max((1 - fbx) / 2, 1.6 - fbx));
+        if (pad < pmin - 1e-6) throw new UserError(`With a ${fmtMm(fbx)} mm frame the text padding can go down to ${fmtMm(pmin)} mm. Below that the letters would run into the next status or under the rails.`);
+      }
       const cw = ww - 2 * pad, ch = wh - 2 * pad;
       const labelParts = [], nameParts = [];
       let contents = statusOn ? p.statuses.map((st) => cellContent(st, font, cw, ch, p)) : [];
@@ -1383,7 +1391,7 @@ function createEngine(wasm) {
           const dx = Math.max(Math.abs(x) - (hx - rc), 0), dy = Math.max(Math.abs(y) - (hy - rc), 0);
           if (dx * dx + dy * dy > rc * rc || Math.abs(x) > hx || Math.abs(y) > hy) return false;
           if (Math.abs(x) < X + g && Math.abs(y - yc) < hrTot + g) return false;
-          if (hdrZone && Math.abs(x) < X0 + g && y > hdrZone[0] - g && y < hdrZone[1] + g) return false;
+          if (hdrZone && Math.abs(x) < X0 + g && y > hdrZone[0] - g && (p.nameRail || y < hdrZone[1] + g)) return false;
           return !excl.some(([ex, ey, er]) => Math.hypot(x - ex, y - ey) < er + R);
         };
         const rings = [];
@@ -1400,7 +1408,7 @@ function createEngine(wasm) {
       // stops at the left end. Where the rails run to the edge, the stop follows the outline at the same distance in from it as
       // the rails along the top (a solid wall the rail's width, with a lip over the tag like the rails'), so the border reads
       // as one even frame, round corners included. The tag has the same gap at both ends, so it is symmetric whenever the plate is.
-      let tagAll = null, tagBody = null, tagText = null, tagT = 0;
+      let tagAll = null, tagBody = null, tagText = null, tagT = 0, railTopZ = statusOn ? z1 : T;
       if (p.nameRail) {
         const { ym, htag, wb } = tagDims(p, hdrZone), rw = tagRw(p);
         // u: height of the 45° undercut, the tag's whole thickness. The tag is a 45° dovetail on every side: its long edges
@@ -1434,6 +1442,12 @@ function createEngine(wasm) {
         stopParts.push(band.intersect(E.subtract(inset(rw + u))).intersect(left).extrude(zTop - zS - u).translate([0, 0, zS + u]));
         const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), ...(shared ? [] : [extrudeX(dn, follow ? xa : -X, follow ? xb : X)])]);
         body = body.add((follow ? rails.intersect(inEdge(zTop)) : rails).add(Manifold.union(stopParts)));
+        // The upper rail runs out to the outline above it (along the track's length on bordered shapes): no strip of bare plate
+        // along the top, and the cubicle hooks clip over the full thickness of plate and rail.
+        const yUp = ym + wb + rw - 0.01, yEnd = ob.max[1] + 2, fx0 = follow ? xa : -X, fx1 = follow ? xb : X;
+        const fillCS = edge.intersect(rect(fx1 - fx0, yEnd - yUp, (fx0 + fx1) / 2, (yUp + yEnd) / 2));
+        if (!fillCS.isEmpty()) body = body.add(fillCS.extrude(zTop));
+        railTopZ = Math.max(railTopZ, zTop);
         // the top face, all of it visible: where the name goes
         const tagCS = rect(xb - xa + 4, 2 * htop, (xa + xb) / 2, ym).intersect(inset(rw + gap + u));
         const topCS = tagCS;
@@ -1466,6 +1480,14 @@ function createEngine(wasm) {
             }
           }
         }
+      }
+      // A ring that joins a rail at the top edge (or the tag's rail run out to it) is as thick as the rail; one that joins
+      // bare plate stays as thick as the plate.
+      for (const r of hangRings) {
+        if (r.cs.isEmpty()) continue;
+        const zJ = body.intersect(Manifold.cube([1, 0.7, 400]).translate([r.x - 0.5, r.y - 1, -1])).boundingBox().max[2];
+        const zR = Math.min(railTopZ, Number.isFinite(zJ) ? zJ : T);
+        if (zR > T + 0.01) body = body.add(r.cs.extrude(zR));
       }
       if (p.bevel > 0) {
         const zTop = body.boundingBox().max[2], cT = Math.min(lz(p.bevel), lzDown(T * 0.8)), cR = zTop - T > LH ? Math.min(lz(p.bevel), lzDown((zTop - T) * 0.8)) : 0;
@@ -1530,14 +1552,17 @@ function createEngine(wasm) {
         const P = p.cubP ?? 55, back = p.hookBack ?? 25;
         const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 10), zBk = -t - g - P;
         const R2 = (y0, y1, z0, z1) => rect(Math.max(0.01, Math.abs(y1 - y0)), Math.max(0.01, Math.abs(z1 - z0)), (y0 + y1) / 2, (z0 + z1) / 2);
-        const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]);
+        // the clip wraps the full thickness under it: the plate, or plate and rail where the name tag's rail runs to the top edge
+        const zAt = (xf, yT) => Math.max(T, base.intersect(Manifold.cube([hw + 1, clipH + 1.5, 400]).translate([xf - hw / 2 - 0.5, yT - clipH - 0.5, -1])).boundingBox().max[2]);
+        const slotCS = sh.cs.offset(0.2, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 0.4).translate([0, 0, -0.2]);
+        for (const h of hookAt) h.zc = zAt(h.xf, h.yT);
         // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each reaches past the 0.2 mm
         // clearance into the sign by half the squeeze, so the clip pinches the plate and the hook does not wobble or slide.
         const squeeze = Math.max(0, p.hookGrip ?? 0.1), rr = Math.max(0.8, 2 * NZ);
-        const gripRidges = (xf, yT) => {
+        const gripRidges = (xf, yT, zc) => {
           if (squeeze < 0.01) return Manifold.union([]);
           const e = squeeze / 2, y = yT - 4;
-          return extrudeX(union([circle(rr, y, T + rr - e, 24), circle(rr, y, -rr + e, 24)]), xf - hw / 2 + 1, xf + hw / 2 - 1);
+          return extrudeX(union([circle(rr, y, zc + rr - e, 24), circle(rr, y, -rr + e, 24)]), xf - hw / 2 + 1, xf + hw / 2 - 1);
         };
         // both hooks hang from the same panel top (or rail slot), set by the higher of the two clip points
         const yP = Math.max(...hookAt.map((h) => h.yT)) + drop, yU = yP + g / 2, yPanel = yP;
@@ -1551,25 +1576,25 @@ function createEngine(wasm) {
           if (open - 2 * cy < ext + 1) throw new UserError('The rail slot is too short for its hollow. Check the slot height and how far the hollow reaches past it.');
           if (flag < 0.3) throw new UserError('The hollow behind the rail lips is too shallow for a tab. Check the hollow depth.');
           if (flag < 2 * NZ - 0.01) warnings.push(`The tab that goes into the rail is only ${fmtMm(flag)} mm thick, less than two ${NZ} mm nozzle lines. Print the hooks with a finer nozzle, or check the hollow depth.`);
-          for (const { xf, yT } of hookAt) {
+          for (const { xf, yT, zc } of hookAt) {
             const body2 = union([
-              R2(yT - clipH, yT + 0.2 + t, -t, T + 0.2 + lipF), // clip around the plate's top edge
+              R2(yT - clipH, yT + 0.2 + t, -t, zc + 0.2 + lipF), // clip around the plate's top edge
               R2(yT, ft + 1.5, -t, 0), // front leg, up the face of the rail
             ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
             // neck through the slot and the tab behind the lips: sharp corners, so nothing rubs on the lips
             const prof = union([body2, R2(yo + cy, ft, zLipB - cz - 0.01, -t + 0.01), R2(fb, ft, zCavB + cz, zLipB - cz)]);
-            hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot).add(gripRidges(xf, yT)));
+            hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc)));
           }
           hookEnv = { kind: 'cubrail', yc, open, ext, lipD, cav, zF, yTop: yc + open / 2 + ext };
         }
-        for (const { xf, yT } of cub ? hookAt : []) {
+        for (const { xf, yT, zc } of cub ? hookAt : []) {
           const prof = union([
-            R2(yT - clipH, yT + 0.2 + t, -t, T + 0.2 + lipF), // clip around the plate's top edge (the plate is cut out of it below)
+            R2(yT - clipH, yT + 0.2 + t, -t, zc + 0.2 + lipF), // clip around the plate's top edge (the plate is cut out of it below)
             R2(yT, yU + t, -t, 0), // front leg, between the plate and the panel
             R2(yU, yU + t, zBk - t, 0), // over the top
             R2(yP - back, yU + t, zBk - t, zBk), // down the back
           ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
-          hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot).add(gripRidges(xf, yT)));
+          hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc)));
         }
         if (cub) hookEnv = { kind: 'cubicle', yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2 };
       }
@@ -1801,7 +1826,7 @@ const SLIDERS = {
   footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
-  namePad: { label: 'Name margin', min: 0, max: 20, step: 0.2, out: mm() },
+  namePad: { label: 'Name margin', min: -3, max: 20, step: 0.2, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
   proud: { label: 'Frame extrusion', min: -2, max: 8, step: 0.1, layers: true, signed: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
@@ -1816,11 +1841,11 @@ const SLIDERS = {
   hookW: { label: 'Hook width', min: 10, max: 80, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 50, step: 0.5, out: mm() },
   marginH: { label: 'Side margin', min: 0, max: 50, step: 0.5, out: mm() },
-  pad: { label: 'Text padding', min: 0, max: 20, step: 0.2, out: mm() },
+  pad: { label: 'Text padding', min: -3, max: 20, step: 0.2, out: mm() },
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -3224,10 +3249,14 @@ function setBuildState(kind, text) {
   el.dataset.state = kind;
   el.textContent = text;
 }
-function showError(msg) {
+let errorTimer = 0;
+// ms: hide the message again after that long (for a change that was undone)
+function showError(msg, ms) {
   const t = $('#errorToast');
+  clearTimeout(errorTimer);
   t.textContent = msg || '';
   t.hidden = !msg;
+  if (msg && ms) errorTimer = setTimeout(() => { t.hidden = true; }, ms);
 }
 
 function updateReadout() {
@@ -3351,7 +3380,7 @@ async function textFontFor(str, familyKey) {
 }
 
 let textMissing = [];
-let rebuildTimer = 0, building = false, pending = false, firstBuild = true, lastFit = null;
+let rebuildTimer = 0, building = false, pending = false, firstBuild = true, lastFit = null, lastGood = null;
 function changed() {
   saveState();
   if (!engine) return;
@@ -3379,12 +3408,22 @@ async function rebuild() {
     firstBuild = false;
     updateReadout();
     showError('');
+    lastGood = structuredClone(state);
     setBuildState('ok', `Built in ${Math.round(ms)} ms`);
     $('#dlZip2').disabled = false;
     $('#dl3mf').disabled = false;
   } catch (e) {
     if (!e.user) console.error(e);
-    showError(e.user ? e.message : 'Something went wrong while building the model: ' + (e.message || e));
+    const msg = e.user ? e.message : 'Something went wrong while building the model: ' + (e.message || e);
+    // A change that can't be built is undone: the settings go back to the ones the preview shows, and the message stays a
+    // few seconds. (With another change already waiting, that one is tried first.)
+    if (lastGood && !pending) {
+      revertTo(lastGood);
+      showError(msg + ' The last change was undone.', 6000);
+      setBuildState('ok', 'Change undone');
+      return;
+    }
+    showError(msg);
     setBuildState('error', e.user ? 'Check the size' : 'Build failed');
     // the preview still shows the last good model; don't let it be exported as if it matched the settings
     $('#dlZip2').disabled = true;
@@ -3394,6 +3433,16 @@ async function rebuild() {
     building = false;
     if (pending) { pending = false; rebuild(); }
   }
+}
+
+function revertTo(good) {
+  const before = state;
+  state = { ...structuredClone(good), view: before.view, page: before.page };
+  saveState();
+  syncControls();
+  if (JSON.stringify(before.statuses) !== JSON.stringify(state.statuses) || before.current !== state.current) renderStatuses();
+  if (before.shape !== state.shape) renderShapes();
+  applyColors();
 }
 
 $('#dlZip2').addEventListener('click', downloadZip);
