@@ -1330,11 +1330,11 @@ function createEngine(wasm) {
       const yi = yR, yo = yR + Rw;
       // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
       // With a name tag right above the track the upper rail is shared: the frame's dovetail on its lower side, the tag's 45° lean
-      // on its upper side (as tall as the tag rail), and one straight top from the track rail's height to the tag rail's height,
-      // so each still sets independently and there is no step between them.
+      // on its upper side. Each side has a flat top at its own height (the track rail's beside the frame, the tag rail's beside
+      // the tag, as wide as the tag's other rail looks), joined by a vertical step, so the two heights still set independently.
       const uTag = lz(p.tagT ?? 1.6, 2), zTag = T + uTag + lz(0.8), zRails = shared ? Math.max(z1, zTag) : z1;
       const railTop = shared
-        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, zTag], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
+        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, zTag], [yc + yo - tagRw(p), zTag], [yc + yo - tagRw(p), z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
         : poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
