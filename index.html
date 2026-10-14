@@ -884,10 +884,14 @@ function createEngine(wasm) {
 
   // Shapes with a border or end features keep their rails to the track length. On the others the rails, and the name tag rail,
   // run out to the edge and follow the outline.
-  const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb', 'wave']);
+  const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb']);
   // With a slide-in tag, these shapes run the tag's upper rail out to the outline above it when the sign hangs from cubicle hooks
   // (the hooks then clip over plate and rail), and a hang loop's rings rise to the rail tops. The pixel shape always runs it out.
   const TAG_FILL = new Set(['rail', 'rounded', 'pill', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch']);
+  // the tag's upper rail runs out to the outline above it on these whatever the mount
+  const TOP_FILL = new Set(['pixel', 'cloud', 'scallop', 'wave', 'arch']);
+  // the status track's lower rail runs out to the outline below it on these (the wave's rails reach every edge)
+  const BOT_FILL = new Set(['scallop', 'wave', 'speech']);
 
   // ---------- text ----------
   // Contours keep the font's own winding; CrossSection's NonZero fill rule resolves holes and overlaps.
@@ -1317,6 +1321,16 @@ function createEngine(wasm) {
         const endFill = rect(-xR - xa, 2 * (yR + d) + 1, (xa - xR) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
         rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(z1)));
       }
+      // Rails run out to the outline: below the lower rail on the BOT_FILL shapes, and above the upper rail on the wave when nothing
+      // else sits above the track (a name tag fills its own rail out; a name printed on the plate keeps its bare plate).
+      if (statusOn) {
+        const fx0 = fillRails ? xa : -X, fx1 = fillRails ? xb : X, own = SHAPES[p.shape].make(W, H).cs;
+        const out = (y0, y1) => edge.intersect(own).intersect(rect(fx1 - fx0, y1 - y0, (fx0 + fx1) / 2, (y0 + y1) / 2));
+        const fills = [];
+        if (BOT_FILL.has(p.shape)) fills.push(out(ob.min[1] - 2, yc - yo + chf + 0.01));
+        if (p.shape === 'wave' && !p.nameRail && !headerText) fills.push(out(yc + yo - chf - 0.01, ob.max[1] + 2));
+        for (const c of fills) if (!c.isEmpty()) rails.push(c.extrude(z1));
+      }
       let body = Manifold.union([sh.cs.extrude(T), ...rails]);
 
       if (p.mount === 'magnet') {
@@ -1436,9 +1450,14 @@ function createEngine(wasm) {
         // The upper rail runs out to the outline above it (the shape's own outline: a hang loop's eyelets are not part of it), so
         // no strip of bare plate is left along the top and cubicle hooks clip over the full thickness of plate and rail.
         const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
-        if (p.shape === 'pixel' || (hooked && TAG_FILL.has(p.shape))) {
+        if (TOP_FILL.has(p.shape) || (hooked && TAG_FILL.has(p.shape))) {
           const yUp = ym + wb + rw - 0.01, fillCS = edge.intersect(SHAPES[p.shape].make(W, H).cs).intersect(strip(yUp, ob.max[1] + 2));
           if (!fillCS.isEmpty()) body = body.add(fillCS.extrude(zTop));
+        }
+        // the wave with a tag and no status track: the tag's lower rail runs out to the bottom edge as well
+        if (!statusOn && p.shape === 'wave') {
+          const lowCS = edge.intersect(SHAPES.wave.make(W, H).cs).intersect(strip(ob.min[1] - 2, yLo + 0.01));
+          if (!lowCS.isEmpty()) body = body.add(lowCS.extrude(zTop));
         }
         // A tag band of its own above the track (the arch's crown): the strip between the track's upper rail and the tag's lower
         // rail rises to the same height, so the two rails share one flat top.
@@ -1519,16 +1538,18 @@ function createEngine(wasm) {
         const ybG = ob.min[1], floor = 2;
         const ty = floor - ybG * ca, tz = ybG * sa;
         const M = [1, 0, 0, 0, 0, ca, -sa, 0, 0, sa, ca, 0, 0, ty, tz, 1];
-        const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]).transform(M);
+        const slotCS = sh.cs.offset(0.2, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 0.4).translate([0, 0, -0.2]).transform(M);
         const fl = p.footW ?? 22, ff = p.footF ?? 12, fbk = p.footB ?? 38, fd = ff + fbk;
         for (const sx of [-1, 1]) {
           const xf = sx * Math.min(W * 0.28, X * 0.75);
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
           const hF = lz((ybL - ybG) * ca + floor + 7.5);
+          // the foot clips over the plate, or plate and rail where a rail runs out to the bottom edge
+          const zc = Math.max(T, base.intersect(Manifold.cube([fl + 1, 12, 400]).translate([xf - fl / 2 - 0.5, ybL - 1, -1])).boundingBox().max[2]);
           const zMid = -(ybL - ybG) * sa + T * ca / 2;
           const zFront = zMid + ff, zBack = zMid - fbk;
-          feet.push(extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot));
+          feet.push(extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot(zc)));
         }
         stand = { tilt: p.tilt, ty, tz };
       }
