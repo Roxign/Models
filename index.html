@@ -1040,7 +1040,7 @@ function createEngine(wasm) {
   // The tag rail is a dovetail like the status track: the tag's long edges are cut at 45° through its whole thickness and the
   // rails lean over them at the same angle, so nothing overhangs flat when it prints. The tag's top face shows in full.
   // Band height: the letters with room for descenders (1.45 x the letter height), the 45° edges, the rails and their clearance.
-  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + 0.4) + 2 * (tagRw(p) + 1.42 * (p.tol ?? 0.25));
+  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + (p.namePad ?? 1)) + 2 * (tagRw(p) + 1.42 * (p.tol ?? 0.25));
   // Where the tag sits in the header band: centre line, half-height of its bottom face and of the channel at the bottom.
   function tagDims(p, hdrZone) {
     const [h0, h1] = hdrZone, tol = p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25), c = tol * Math.SQRT2;
@@ -1059,12 +1059,18 @@ function createEngine(wasm) {
       const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2;
       return { hrTot, yc, yR: 0, wh: 0, hdrZone: [b0, b1], clear: p.marginH ?? 1.5 };
     }
+    // shared: the name tag's lower rail is the status track's upper rail (one rail between the two channels)
+    let shared = false;
     if ((p.header || '').trim() || p.nameRail) {
       if (sh.crown && !(p.nameRail && sh.bumpy) && !hooked) hdrZone = sh.crown.slice();
-      else { const z = hh || clamp(H * 0.17, 8, 16); hdrZone = [b1 - z, b1]; b1 -= z + 1; }
+      else {
+        const z = hh || clamp(H * 0.17, 8, 16);
+        hdrZone = [b1 - z, b1];
+        if (p.nameRail) { b1 -= z - tagRw(p); shared = true; } else b1 -= z + 1;
+      }
     }
     const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2, yR = hrTot - 6;
-    return { hrTot, yc, yR, wh: 2 * (yR - p.tol - p.frame), hdrZone, clear: p.marginH ?? 1.5 };
+    return { hrTot, yc, yR, wh: 2 * (yR - p.tol - p.frame), hdrZone, shared, clear: p.marginH ?? 1.5 };
   }
   // Half-length of the widest span centred on x = 0, from y0 to y1, that stays inside cs (0 if none fits).
   function bandHalf(cs, y0, y1, W) {
@@ -1085,9 +1091,10 @@ function createEngine(wasm) {
   function tagTextHalf(p, sh, hdrZone, W, keepX) {
     const { ym, htag } = tagDims(p, hdrZone), u = p.tagT ?? 1.6, htop = htag - u;
     const face = tagRw(p) + Math.max(0.3, (p.tol ?? 0.25) * Math.SQRT2) + u; // the top face's inset from the outline
-    if (keepX != null) return keepX - face - 3;
-    // the 3 mm margin is sideways only, so a name band that runs along a straight top edge keeps its full height
-    return bandHalf(hErode(hErode(sh.cs, p.marginH ?? 0).offset(-face, 'Round', 2, 16), 3), ym - (htop - 0.4), ym + (htop - 0.4), W);
+    const npad = p.namePad ?? 1, side = npad + 2;
+    if (keepX != null) return keepX - face - side;
+    // the side margin is sideways only, so a name band that runs along a straight top edge keeps its full height
+    return bandHalf(hErode(hErode(sh.cs, p.marginH ?? 0).offset(-face, 'Round', 2, 16), side), ym - (htop - npad), ym + (htop - npad), W);
   }
   // Shrink an outline sideways only: points that keep m of outline to their left and right.
   const hErode = (cs, m) => (m > 0.01 ? cs.intersect(cs.translate([m, 0])).intersect(cs.translate([-m, 0])) : cs);
@@ -1131,8 +1138,8 @@ function createEngine(wasm) {
     let hh = 0, hdrW = 0, tagNeed = 0;
     if (headerText || p.nameRail) {
       const m = headerText ? measureLines(font, [headerText]) : null, textW = m ? m.w * A.hdrCap / capRef(font) : 0;
-      hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62;
-      hdrW = textW + (p.nameRail ? 12 : 0);
+      hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62 + 2 * (p.namePad ?? 1);
+      hdrW = textW + (p.nameRail ? 12 : 2 * (p.namePad ?? 1));
       if (p.nameRail) hdrW = Math.max(hdrW, 60);
       // half-length the name needs on the tag (a blank tag is still at least 40 mm of top face)
       if (p.nameRail) tagNeed = Math.max(textW, 40) / 2 + 0.3;
@@ -1177,8 +1184,8 @@ function createEngine(wasm) {
   function autoSizeName(p, font, A) {
     const headerText = (p.header || '').trim();
     const m = headerText ? measureLines(font, [headerText]) : null, textW = m ? m.w * A.hdrCap / capRef(font) : 0;
-    const hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62;
-    const need = p.nameRail ? Math.max(textW, 40) / 2 + 0.3 : Math.max(textW, 20) / 2 + 3 + (p.mount === 'screw' ? 11 : 0);
+    const npad = p.namePad ?? 1, hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62 + 2 * npad;
+    const need = p.nameRail ? Math.max(textW, 40) / 2 + 0.3 : Math.max(textW, 20) / 2 + 2 + npad + (p.mount === 'screw' ? 11 : 0);
     const keep = KEEP_RAILS.has(p.shape), scr = p.mount === 'screw' ? 11 : 0;
     const make = (W, H) => SHAPES[p.shape].make(W, H);
     const room = (W, H) => { const z = vLayout(p, make(W, H), H, hh).hdrZone; return z[1] - z[0]; };
@@ -1304,12 +1311,13 @@ function createEngine(wasm) {
       });
       let hdrCap = 0;
       if (headerText && !p.nameRail) {
-        const [h0, h1] = hdrZone, zh = h1 - h0, my = (h0 + h1) / 2;
+        // the name on the plate keeps the name margin from the edges of its band and from the outline
+        const npad = p.namePad ?? 1, [h0, h1] = hdrZone, zh = Math.max(2, h1 - h0 - 2 * npad), my = (h0 + h1) / 2;
         const hdrMax = Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), zh * 0.62);
-        const tb = fitText(font, headerText, Math.min(2 * X0, W * 0.86), zh * 0.72, hdrMax, true);
+        const tb = fitText(font, headerText, Math.min(2 * X0, W * 0.86) - 2 * npad, zh * 0.72, hdrMax, true);
         if (tb.cs) {
           let k = 1, hcs = tb.cs.translate([0, my]);
-          for (let i = 0; i < 12 && hcs.offset(1.4, 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.9; hcs = tb.cs.scale(k).translate([0, my]); }
+          for (let i = 0; i < 24 && hcs.offset(Math.max(1.4, npad), 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.95; hcs = tb.cs.scale(k).translate([0, my]); }
           nameParts.push(hcs);
           hdrCap = tb.cap * k;
           capMin = Math.min(capMin, hdrCap);
@@ -1422,7 +1430,7 @@ function createEngine(wasm) {
         // over the tag's end like the rails do. Seen from the front the border is then the same width all round, round
         // corners included, and nothing overhangs flat.
         const tt = lz(p.tagT ?? 1.6, 2), u = tt, lipH = lz(0.8), gap = Math.max(0.3, tol * Math.SQRT2), htop = htag - u;
-        if (htop < 2) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
+        if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
         tagT = tt;
         const zS = T, zTop = zS + u + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
         // rails: from the bed, leaning in at 45° over the tag's thickness, then straight up
@@ -1450,7 +1458,7 @@ function createEngine(wasm) {
         const tagCS = rect(xb - xa + 4, 2 * htop, (xa + xb) / 2, ym).intersect(inset(rw + gap + u));
         const topCS = tagCS;
         // the straight middle of the tag, where the name is centred
-        const rowsT = [ym - htop + 0.3, ym, ym + htop - 0.3].map((y) => row(topCS, y)).filter((c) => !c.isEmpty()).map((c) => c.bounds());
+        const rowsT = [ym - htop + Math.max(0.3, p.namePad ?? 1), ym, ym + htop - Math.max(0.3, p.namePad ?? 1)].map((y) => row(topCS, y)).filter((c) => !c.isEmpty()).map((c) => c.bounds());
         const cxL = rowsT.length === 3 ? Math.max(...rowsT.map((b) => b.min[0])) : 0, cxR = rowsT.length === 3 ? Math.min(...rowsT.map((b) => b.max[0])) : 0;
         if (cxR - cxL < 30) throw new UserError('The plate is too narrow for the name tag rail. Make it wider.');
         const cx = (cxL + cxR) / 2;
@@ -1459,11 +1467,11 @@ function createEngine(wasm) {
         tagBody = extrudeX(trap, xa - 2, xb + 2).intersect(Manifold.union(tagPlans));
         tagAll = tagBody;
         if (headerText) {
-          const room = 2 * (htop - 0.4);
-          const tb = fitText(font, headerText, cxR - cxL - 6, room, auto ? autoMetrics(p).hdrCap : (p.hcap || 10), true);
+          const npad = p.namePad ?? 1, room = 2 * (htop - npad);
+          const tb = fitText(font, headerText, cxR - cxL - 2 * (npad + 2), room, auto ? autoMetrics(p).hdrCap : (p.hcap || 10), true);
           if (tb.cs) {
             // keep the letters inside the tag, away from slanted or curved ends
-            const safe = hErode(topCS, 1.5).intersect(rect(xb - xa + 4, 2 * (htop - 0.3), (xa + xb) / 2, ym));
+            const safe = hErode(topCS, npad + 0.5).intersect(rect(xb - xa + 4, 2 * (htop - Math.min(0.3, npad)), (xa + xb) / 2, ym));
             let k = 1, tcs = tb.cs.translate([cx, ym]);
             for (let i = 0; i < 30 && tcs.subtract(safe).area() > 0.05; i++) { k *= 0.97; tcs = tb.cs.scale(k).translate([cx, ym]); }
             hdrCap = tb.cap * k;
@@ -1783,7 +1791,7 @@ const DEFAULTS = {
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 20, hookGrip: 0.3, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -1812,6 +1820,7 @@ const SLIDERS = {
   footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, zero: true, out: mm() },
+  namePad: { label: 'Name margin', min: 0, max: 20, step: 0.2, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
   proud: { label: 'Frame extrusion', min: 0, max: 8, step: 0.1, layers: true, zero: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
@@ -1980,6 +1989,7 @@ const SECTIONS = [
     { group: 'Name', when: 'name', items: [
       { text: 'header', label: 'Text', placeholder: 'e.g. Alan Chien' },
       { slider: 'hcap' },
+      { slider: 'namePad' },
       { slider: 'nameReliefH' },
       { slider: 'tagT', when: 'tag' },
     ] },
@@ -3298,11 +3308,12 @@ async function rebuild() {
     const ms = performance.now() - t0;
     if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
     if (result.info.auto) { state.width = Math.round(result.info.plateW * 10) / 10; state.height = Math.round(result.info.plateH * 10) / 10; syncControls(); }
-    // the camera is only re-framed on the first build and when the view mode changes; only switching the desk stand or the view mode does
-    const fit = { view: state.view, stand: state.mount === 'stand', W: result.info.plateW, H: result.info.plateH };
-    const refit = firstBuild || !lastFit || fit.view !== lastFit.view || fit.stand !== lastFit.stand;
+    // Changing settings never moves the camera, in either view. It is framed on the first build, when the view mode is
+    // switched (by the switch itself), and when the desk stand comes or goes in the assembled view (the sign stands up).
+    const fit = { stand: state.mount === 'stand' };
+    const refit = firstBuild || !lastFit || (state.view === 'assembled' && fit.stand !== lastFit.stand);
     updateScene(result, refit);
-    if (refit) lastFit = fit;
+    lastFit = fit;
     firstBuild = false;
     updateReadout();
     showError('');
