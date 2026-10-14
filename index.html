@@ -854,25 +854,11 @@ function createEngine(wasm) {
         return { cs, body: [-H / 2, H / 2] };
       },
     },
-    // Round knob on the right end and a matching socket on the left: signs can be joined side by side.
-    puzzle: {
-      label: 'Puzzle', make: (W, H) => {
-        const r = Math.min(7, H * 0.13);
-        const cs = union([rrect(W - r, H, 4, -r / 2, 0), circle(r, W / 2 - r, 0, 48)]).subtract(circle(r * 0.95, -W / 2, 0, 48));
-        return { cs, body: [-H / 2, H / 2] };
-      },
-    },
     pixel: {
       label: 'Pixel', make: (W, H) => {
         const q = 4, x = W / 2, y = H / 2;
         return { cs: poly([[-x + 2 * q, -y], [x - 2 * q, -y], [x - 2 * q, -y + q], [x - q, -y + q], [x - q, -y + 2 * q], [x, -y + 2 * q], [x, y - 2 * q], [x - q, y - 2 * q], [x - q, y - q], [x - 2 * q, y - q], [x - 2 * q, y],
           [-x + 2 * q, y], [-x + 2 * q, y - q], [-x + q, y - q], [-x + q, y - 2 * q], [-x, y - 2 * q], [-x, -y + 2 * q], [-x + q, -y + 2 * q], [-x + q, -y + q], [-x + 2 * q, -y + q]]), body: [-H / 2, H / 2] };
-      },
-    },
-    folder: {
-      label: 'Folder', make: (W, H) => {
-        const tw = Math.min(W * 0.3, 70), th = Math.min(8, H * 0.14);
-        return { cs: union([rrect(W, H, 3), rrect(tw, th + 4, 3, -W / 2 + tw / 2 + 2, H / 2 + th / 2 - 2)]), body: [-H / 2, H / 2] };
       },
     },
     cat: {
@@ -898,7 +884,10 @@ function createEngine(wasm) {
 
   // Shapes with a border or end features keep their rails to the track length. On the others the rails, and the name tag rail,
   // run out to the edge and follow the outline.
-  const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb', 'puzzle', 'folder', 'wave']);
+  const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb', 'wave']);
+  // With a slide-in tag, these shapes run the tag's upper rail out to the outline above it when the sign hangs from cubicle hooks
+  // (the hooks then clip over plate and rail), and a hang loop's rings rise to the rail tops. The pixel shape always runs it out.
+  const TAG_FILL = new Set(['rail', 'rounded', 'pill', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch']);
 
   // ---------- text ----------
   // Contours keep the font's own winding; CrossSection's NonZero fill rule resolves holes and overlaps.
@@ -1233,6 +1222,7 @@ function createEngine(wasm) {
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
+      let hangRing = null; // the eyelets outside the plate's own outline
       if (p.mount === 'hang') {
         // eyelets on top of whatever outline was chosen, each centered over the outline's height at its position
         const re = Math.max(1.5, (p.hangHole ?? 10) / 2), ro = Math.max(re + 3.5, (re + 0.8) / 0.7);
@@ -1241,6 +1231,7 @@ function createEngine(wasm) {
           const strip = rect(2, 600, x, 0).intersect(sh.cs), tb = strip.isEmpty() ? sh.cs.bounds() : strip.bounds(), cy = tb.max[1] + ro * 0.7;
           eyes.push(circle(ro, x, cy, 64)); holes.push(circle(re, x, cy, 64));
         }
+        hangRing = union(eyes).subtract(union(holes)).subtract(sh.cs);
         sh.cs = union([sh.cs, ...eyes]).subtract(union(holes));
       }
       const ob = sh.cs.bounds();
@@ -1302,7 +1293,9 @@ function createEngine(wasm) {
       // One top height for every rail: with a name tag, the status rails and the tag's rails all rise to the taller of the two
       // (the track's rail height, or the tag's thickness plus its lip), so the sign has one flat top face. The channels below
       // keep their own shapes: the frame's dovetail and the tag's 45° lean.
-      const uTag = lz(p.tagT ?? 1.6, 2), zTag = T + uTag + lz(0.8);
+      // the tag's rails stand hTagR above the plate: the setting, but never lower than the tag plus one layer
+      const uTag = lz(p.tagT ?? 1.6, 2), oneL = dyn ? 0.2 : LH, hTagR = Math.max(lz(p.tagRailH ?? uTag + 0.8), uTag + oneL), zTag = T + hTagR;
+      if (p.nameRail && lz(p.tagRailH ?? uTag + 0.8) < uTag + oneL - 1e-6) warnings.push(`The tag rail is raised to ${fmtMm(hTagR)} mm: it can't be lower than the ${fmtMm(uTag)} mm tag plus one layer.`);
       const z0 = 0, z1 = statusOn && p.nameRail ? Math.max(T + Rh, zTag) : T + Rh, chf = 0.8;
       const yi = yR, yo = yR + Rw;
       // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
@@ -1404,14 +1397,14 @@ function createEngine(wasm) {
       // stops at the left end. Where the rails run to the edge, the stop follows the outline at the same distance in from it as
       // the rails along the top (a solid wall the rail's width, with a lip over the tag like the rails'), so the border reads
       // as one even frame, round corners included. The tag has the same gap at both ends, so it is symmetric whenever the plate is.
-      let tagAll = null, tagBody = null, tagText = null, tagT = 0;
+      let tagAll = null, tagBody = null, tagText = null, tagT = 0, tagZTop = 0;
       if (p.nameRail) {
         const { ym, htag, wb } = tagDims(p, hdrZone), rw = tagRw(p);
         // u: height of the 45° undercut, the tag's whole thickness. The tag is a 45° dovetail on every side: its long edges
         // slide under the leaning rails and its ends are bevelled the same way, and at the closed (left) end the stop leans
         // over the tag's end like the rails do. Seen from the front the border is then the same width all round, round
         // corners included, and nothing overhangs flat.
-        const tt = lz(p.tagT ?? 1.6, 2), u = tt, lipH = lz(0.8), gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
+        const tt = uTag, u = tt, lipH = hTagR - tt, gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
         if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
         tagT = tt;
         // the tag's rails reach the common rail height when there is a status track, or their own height without one
@@ -1438,13 +1431,20 @@ function createEngine(wasm) {
         stopParts.push(band.intersect(E.subtract(inset(rw + u))).intersect(left).extrude(zTop - zS - u).translate([0, 0, zS + u]));
         const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), ...(shared ? [] : [extrudeX(dn, follow ? xa : -X, follow ? xb : X)])]);
         body = body.add((follow ? rails.intersect(inEdge(zTop)) : rails).add(Manifold.union(stopParts)));
-        // Pixel shape: the upper rail runs out to the stepped outline above it, so no strip of bare plate is left along the top
-        // and the cubicle hooks clip over the full thickness of plate and rail.
-        if (p.shape === 'pixel') {
-          const yUp = ym + wb + rw - 0.01, yEnd = ob.max[1] + 2, fx0 = follow ? xa : -X, fx1 = follow ? xb : X;
-          // (the pixel outline itself: a hang loop's eyelets keep the plate's thickness)
-          const fillCS = edge.intersect(SHAPES.pixel.make(W, H).cs).intersect(rect(fx1 - fx0, yEnd - yUp, (fx0 + fx1) / 2, (yUp + yEnd) / 2));
+        tagZTop = zTop;
+        const fx0 = follow ? xa : -X, fx1 = follow ? xb : X, strip = (y0, y1) => rect(fx1 - fx0, y1 - y0, (fx0 + fx1) / 2, (y0 + y1) / 2);
+        // The upper rail runs out to the outline above it (the shape's own outline: a hang loop's eyelets are not part of it), so
+        // no strip of bare plate is left along the top and cubicle hooks clip over the full thickness of plate and rail.
+        const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
+        if (p.shape === 'pixel' || (hooked && TAG_FILL.has(p.shape))) {
+          const yUp = ym + wb + rw - 0.01, fillCS = edge.intersect(SHAPES[p.shape].make(W, H).cs).intersect(strip(yUp, ob.max[1] + 2));
           if (!fillCS.isEmpty()) body = body.add(fillCS.extrude(zTop));
+        }
+        // A tag band of its own above the track (the arch's crown): the strip between the track's upper rail and the tag's lower
+        // rail rises to the same height, so the two rails share one flat top.
+        if (statusOn && !shared && yLo > yc + yo - chf) {
+          const midCS = strip(yc + yo - chf - 0.01, yLo + 0.01), m = follow ? midCS.intersect(edge) : midCS;
+          if (!m.isEmpty()) body = body.add(m.extrude(zTop));
         }
 
         // the top face, all of it visible: where the name goes
@@ -1480,6 +1480,7 @@ function createEngine(wasm) {
           }
         }
       }
+      if (hangRing && !hangRing.isEmpty() && p.nameRail && TAG_FILL.has(p.shape) && tagZTop > T) body = body.add(hangRing.extrude(tagZTop));
       if (p.bevel > 0) {
         const zTop = body.boundingBox().max[2], cT = Math.min(lz(p.bevel), lzDown(T * 0.8)), cR = zTop - T > LH ? Math.min(lz(p.bevel), lzDown((zTop - T) * 0.8)) : 0;
         body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR, (h) => (dyn ? 3 : Math.max(1, Math.round(h / LH)))));
@@ -1787,7 +1788,7 @@ const DEFAULTS = {
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGrip: 0.1, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 2.4,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -1819,6 +1820,7 @@ const SLIDERS = {
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
   namePad: { label: 'Name margin', min: -3, max: 20, step: 0.2, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
+  tagRailH: { label: 'Tag rail height', min: 0.6, max: 12, step: 0.1, layers: true, out: mm() },
   proud: { label: 'Frame extrusion', min: -2, max: 8, step: 0.1, layers: true, signed: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
   hookBack: { label: 'Hook length down the back', min: 8, max: 150, step: 1, out: mm(0) },
@@ -1836,7 +1838,7 @@ const SLIDERS = {
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -1873,7 +1875,7 @@ const SHAPE_DEFAULTS = {
   honeycomb: { marginV: 16, marginH: 12 },
 };
 const CHOICES = {
-  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
+  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
   mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
@@ -1986,9 +1988,10 @@ const SECTIONS = [
       { slider: 'namePad' },
       { slider: 'nameReliefH' },
       { slider: 'tagT', when: 'tag' },
+      { slider: 'tagRailH', when: 'tag' },
       { slider: 'tagTol', when: 'tag' },
     ] },
-    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move.', when: 'tag' },
+    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move. The tag rail height is how far its rails stand above the plate: at least the tag plus one layer, and taller rails rise above the tag so it can\'t drop out.', when: 'tag' },
   ] },
 ];
 
@@ -2000,6 +2003,7 @@ function sanitize(s) {
   if (Number.isFinite(+s.layerH)) out.layerH = +s.layerH;
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
+  if (s.tagRailH == null && Number.isFinite(+s.tagT)) s = { ...s, tagRailH: +s.tagT + 0.8 };
   for (const k of Object.keys(SLIDERS)) out[k] = freeClamp(k, Number.isFinite(+s[k]) ? +s[k] : out[k], out);
   if (s.chamfer === true && s.bevel == null) out.bevel = 1.2;
   if (Number.isFinite(+s.footD) && s.footF == null && s.footB == null) { out.footF = Math.round(+s.footD * 0.42); out.footB = Math.round(+s.footD * 0.58); }
@@ -3025,7 +3029,7 @@ function renderPresets() {
 function renderShapes() {
   const grid = $('#shapeGrid');
   grid.innerHTML = '';
-  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'];
+  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'];
   for (const [k, label] of Object.entries(engine.shapes).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
