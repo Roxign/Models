@@ -128,6 +128,10 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
 .vp-top > * { pointer-events: auto; }
 /* the build time, beside the view buttons; a fixed width so the buttons never shift */
 .vp-tools { align-items: center; }
+/* view direction buttons, bottom left of the 3D view */
+.vp-views { position: absolute; left: 10px; bottom: 10px; display: flex; pointer-events: none; }
+.vp-views .seg { pointer-events: auto; background: color-mix(in srgb, var(--panel) 85%, transparent); flex-wrap: nowrap; }
+.vp-views .seg button { padding: 4px 8px; font-size: 11.5px; }
 .vp-tools .build-state { width: 118px; justify-content: flex-end; white-space: nowrap; overflow: hidden; font-size: 11px; padding: 0 4px; text-shadow: 0 0 6px var(--stage); }
 /* size and warnings in the top bar, always in view */
 .fit-status { position: relative; display: flex; align-items: center; gap: 6px; }
@@ -454,6 +458,17 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
         </button>
+        </div>
+      </div>
+      <div class="vp-views">
+        <div class="seg" role="radiogroup" aria-label="View direction" id="orthoSeg">
+          <button type="button" role="radio" data-value="3d" aria-checked="true" title="Perspective view you can orbit">3D</button>
+          <button type="button" role="radio" data-value="front" title="Straight-on view from the front, no perspective">Front</button>
+          <button type="button" role="radio" data-value="back" title="From the back, no perspective">Back</button>
+          <button type="button" role="radio" data-value="top" title="From above, no perspective">Top</button>
+          <button type="button" role="radio" data-value="bottom" title="From below, no perspective">Bottom</button>
+          <button type="button" role="radio" data-value="left" title="From the left, no perspective">Left</button>
+          <button type="button" role="radio" data-value="right" title="From the right, no perspective">Right</button>
         </div>
       </div>
       <div class="pal-pop" id="palPop" hidden>
@@ -1379,7 +1394,7 @@ function createEngine(wasm) {
       // where the cubicle hooks clip on: x, the top of the plate there, and their width
       const hookAt = [];
       if (p.mount === 'cubicle' || p.mount === 'cubrail') {
-        const hw = lz(p.hookW ?? 20), xh = Math.max(hw, Math.min(W * 0.3, (statusOn ? X : X0) * 0.8));
+        const hw = lz(p.hookW ?? 10), xh = Math.max(hw, Math.min(W * 0.3, (statusOn ? X : X0) * 0.8));
         for (const sx of [-1, 1]) {
           const xf = sx * xh, strip = rect(hw, H * 3, xf, 0).intersect(sh.cs);
           hookAt.push({ xf, hw, yT: strip.isEmpty() ? ob.max[1] : strip.bounds().max[1] });
@@ -1559,12 +1574,12 @@ function createEngine(wasm) {
       if (p.mount === 'cubicle' || p.mount === 'cubrail') {
         const cub = p.mount === 'cubicle', t = Math.max(3, 6 * NZ), lipF = Math.max(2, 4 * NZ), clipH = 7.5, g = 1;
         const P = p.cubP ?? 55, back = p.hookBack ?? 25;
-        const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 20), zBk = -t - g - P;
+        const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 10), zBk = -t - g - P;
         const R2 = (y0, y1, z0, z1) => rect(y1 - y0, z1 - z0, (y0 + y1) / 2, (z0 + z1) / 2);
         const slot = sh.cs.offset(0.2, 'Round', 2, 16).extrude(T + 0.4).translate([0, 0, -0.2]);
         // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each reaches past the 0.2 mm
         // clearance into the sign by half the squeeze, so the clip pinches the plate and the hook does not wobble or slide.
-        const squeeze = Math.max(0, p.hookGrip ?? 0.3), rr = Math.max(0.8, 2 * NZ);
+        const squeeze = Math.max(0, p.hookGrip ?? 0.1), rr = Math.max(0.8, 2 * NZ);
         const gripRidges = (xf, yT) => {
           if (squeeze < 0.01) return Manifold.union([]);
           const e = squeeze / 2, y = yT - 4;
@@ -1800,7 +1815,7 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 20, hookGrip: 0.3, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGrip: 0.1, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1,
 };
@@ -2067,8 +2082,12 @@ labelRenderer.domElement.className = 'dim-layer';
 renderer.domElement.after(labelRenderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(30, 1, 1, 5000);
-const controls = new OrbitControls(camera, renderer.domElement);
+const persp = new THREE.PerspectiveCamera(30, 1, 1, 5000);
+// Orthographic views (front, back, top, bottom, left, right) use their own camera; 'cam' is whichever is showing.
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10000);
+let cam = persp, viewDir = '3d';
+const camera = persp;
+const controls = new OrbitControls(cam, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.12;
 // Wheel zoom updates the camera inside the event handler, so redraw on every change rather than relying on the frame loop to notice.
@@ -2180,9 +2199,7 @@ function addDimensions(info) {
   dimRefs.push(lines,
     dimLabel(`${fmt(W)} mm`, 'plate', [(x0 + x1) / 2, yd, z], signGroup),
     dimLabel(`${fmt(H)} mm`, 'plate', [xd, (y0 + y1) / 2, z], signGroup),
-    dimLabel(`${fmt(zt)} mm deep`, 'plate', [xz + 2, ym, zt / 2], signGroup),
-    // the window size rides on the frame's bottom bar
-    ...(sliderMesh ? [dimLabel(`window ${fmt(info.ww)} × ${fmt(info.wh)}`, 'win', [0, info.yc - info.wh / 2 - 2.6, zt + 0.3], sliderMesh)] : []));
+    dimLabel(`${fmt(zt)} mm deep`, 'plate', [xz + 2, ym, zt / 2], signGroup));
   showDimensions();
 }
 function showDimensions() {
@@ -2356,6 +2373,7 @@ function fitCamera() {
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
   const dir = assembled ? new THREE.Vector3(0.22, 0.2, 1).normalize() : new THREE.Vector3(0, 1.25, 0.95).normalize();
+  if (viewDir !== '3d') { fitOrtho(box, center, size); return; }
   const vFov = camera.fov * Math.PI / 180;
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
   const halfW = size.x / 2, halfH = (assembled ? size.y : Math.max(size.z, size.y)) / 2;
@@ -2374,6 +2392,41 @@ function fitCamera() {
   requestRender();
 }
 
+// Straight-on views: the camera looks along one axis, with no perspective, framed to the model plus a margin.
+const ORTHO = {
+  front: { dir: [0, 0, 1], up: [0, 1, 0] }, back: { dir: [0, 0, -1], up: [0, 1, 0] },
+  top: { dir: [0, 1, 0], up: [0, 0, -1] }, bottom: { dir: [0, -1, 0], up: [0, 0, 1] },
+  left: { dir: [-1, 0, 0], up: [0, 1, 0] }, right: { dir: [1, 0, 0], up: [0, 1, 0] },
+};
+function fitOrtho(box, center, size) {
+  const v = ORTHO[viewDir], dir = new THREE.Vector3(...v.dir), up = new THREE.Vector3(...v.up);
+  const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+  // the box's extent across and up the screen
+  const corners = [];
+  for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z).sub(center));
+  const halfW = Math.max(...corners.map((c) => Math.abs(c.dot(right)))), halfH = Math.max(...corners.map((c) => Math.abs(c.dot(up))));
+  const aspect = renderer.getSize(new THREE.Vector2()).x / Math.max(1, renderer.getSize(new THREE.Vector2()).y);
+  const h = Math.max(halfH, halfW / aspect) * 1.15, depth = Math.max(size.x, size.y, size.z);
+  ortho.left = -h * aspect; ortho.right = h * aspect; ortho.top = h; ortho.bottom = -h;
+  ortho.near = 0.1; ortho.far = depth * 6 + 1000; ortho.zoom = 1;
+  ortho.up.copy(up);
+  ortho.position.copy(center).addScaledVector(dir, depth * 2 + 200);
+  ortho.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.update();
+  fitSize = renderer.getSize(new THREE.Vector2());
+  requestRender();
+}
+function setViewDir(d) {
+  viewDir = d;
+  cam = d === '3d' ? persp : ortho;
+  controls.object = cam;
+  if (d === '3d') persp.up.set(0, 1, 0);
+  controls.minZoom = 0.2; controls.maxZoom = 20;
+  $$('#orthoSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === d)));
+  fitCamera();
+}
+
 let fitSize = null;
 function resize() {
   const r = viewportEl.getBoundingClientRect();
@@ -2382,6 +2435,10 @@ function resize() {
   labelRenderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  // keep the straight-on view's scale and centre, and only follow the new shape of the window
+  const oh = (ortho.top - ortho.bottom) / 2;
+  ortho.left = -oh * (w / h); ortho.right = oh * (w / h);
+  ortho.updateProjectionMatrix();
   // re-frame when the viewport changes a lot (first layout, rotation, panel resize)
   if (result && fitSize && (Math.abs(w - fitSize.x) > fitSize.x * 0.25 || Math.abs(h - fitSize.y) > fitSize.y * 0.25)) fitCamera();
   requestRender();
@@ -2393,10 +2450,10 @@ function loop() {
   requestAnimationFrame(loop);
   let moving = controls.update();
   // Recover if the camera ever ends up at a non-finite position instead of freezing on the last frame.
-  const p = camera.position;
+  const p = cam.position;
   if (!Number.isFinite(p.x + p.y + p.z) || !Number.isFinite(controls.target.x + controls.target.y + controls.target.z)) {
     controls.target.set(0, 0, 0);
-    camera.position.set(0, 0, 500);
+    cam.position.set(0, 0, 500);
     fitCamera();
     moving = true;
   }
@@ -2405,7 +2462,7 @@ function loop() {
     if (Math.abs(dx) > 0.01) { sliderMesh.position.x += reduceMotion ? dx : dx * 0.18; moving = true; }
     else if (dx !== 0) { sliderMesh.position.x = sliderTarget; moving = true; }
   }
-  if (moving || needsRender) { renderer.render(scene, camera); labelRenderer.render(scene, camera); needsRender = false; }
+  if (moving || needsRender) { renderer.render(scene, cam); labelRenderer.render(scene, cam); needsRender = false; }
 }
 
 // drag the frame along its track
@@ -2415,7 +2472,7 @@ let drag = null;
 function rayFromEvent(e) {
   const r = renderer.domElement.getBoundingClientRect();
   ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-  raycaster.setFromCamera(ndc, camera);
+  raycaster.setFromCamera(ndc, cam);
 }
 function localX(e, zt = result.info.zt) {
   rayFromEvent(e);
@@ -3145,6 +3202,7 @@ $('#viewSeg').addEventListener('click', (e) => {
   saveState();
 });
 $('#resetView').addEventListener('click', fitCamera);
+$('#orthoSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setViewDir(b.dataset.value); });
 $('#warnBtn').addEventListener('click', () => { const p = $('#warnPop'); p.hidden = !p.hidden; $('#warnBtn').setAttribute('aria-expanded', String(!p.hidden)); });
 document.addEventListener('pointerdown', (e) => { const p = $('#warnPop'); if (!p.hidden && !p.contains(e.target) && !$('#warnBtn').contains(e.target)) { p.hidden = true; $('#warnBtn').setAttribute('aria-expanded', 'false'); } });
 $('#palToggle').addEventListener('click', () => { const p = $('#palPop'); p.hidden = !p.hidden; $('#palToggle').setAttribute('aria-expanded', String(!p.hidden)); });
