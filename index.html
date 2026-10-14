@@ -10,21 +10,6 @@
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<!-- link preview when the page is shared -->
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Office Status Slider">
-<meta property="og:title" content="Office Status Slider">
-<meta property="og:description" content="Design a 3D-printable office status sign with a sliding frame and an optional slide-in name tag. Preview it in 3D and download STL or 3MF files.">
-<meta property="og:url" content="https://roxign.github.io/Models/">
-<meta property="og:image" content="https://roxign.github.io/Models/og-image.png">
-<meta property="og:image:type" content="image/png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="A dark door sign with four status windows (Available, In a meeting, On a call, Do not disturb) and an orange sliding frame around Available.">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Office Status Slider">
-<meta name="twitter:description" content="Design a 3D-printable office status sign with a sliding frame and an optional slide-in name tag. Preview it in 3D and download STL or 3MF files.">
-<meta name="twitter:image" content="https://roxign.github.io/Models/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -35,7 +20,7 @@
   --accent: #2346D6; --accent-ink: #FFFFFF; --accent-soft: rgba(35, 70, 214, 0.10); --stage: #D8DDE3;
   --warn: #8A4F00; --warn-bg: #FFF0D4; --good: #16714A; --danger: #B42318;
   --plate: #24768A; --plate-soft: rgba(36, 118, 138, 0.10); --labels: #7448C0; --labels-soft: rgba(116, 72, 192, 0.10);
-  --frame: #B8521B; --frame-soft: rgba(208, 98, 34, 0.11); --name: #A23E78; --name-soft: rgba(162, 62, 120, 0.10); --shape: #8A6A12; --shape-soft: rgba(138, 106, 18, 0.11); --print: #2B7448; --print-soft: rgba(43, 116, 72, 0.10);
+  --name: #A23E78; --name-soft: rgba(162, 62, 120, 0.10); --shape: #8A6A12; --shape-soft: rgba(138, 106, 18, 0.11); --print: #2B7448; --print-soft: rgba(43, 116, 72, 0.10);
   --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
   --font-body: "Archivo", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -47,7 +32,7 @@
     --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
     --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
     --plate: #6CC3D5; --plate-soft: rgba(108, 195, 213, 0.13); --labels: #B99BF2; --labels-soft: rgba(185, 155, 242, 0.13);
-    --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
+    --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
     color-scheme: dark;
   }
 }
@@ -56,7 +41,7 @@
   --accent: #8FA7FF; --accent-ink: #0B1030; --accent-soft: rgba(143, 167, 255, 0.14); --stage: #1B1F25;
   --warn: #F4BC63; --warn-bg: #2C2312; --good: #5CCF95; --danger: #FF8A80;
   --plate: #6CC3D5; --plate-soft: rgba(108, 195, 213, 0.13); --labels: #B99BF2; --labels-soft: rgba(185, 155, 242, 0.13);
-  --frame: #F2985F; --frame-soft: rgba(242, 152, 95, 0.13); --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
+  --name: #F08CC0; --name-soft: rgba(240, 140, 192, 0.13); --shape: #E3BE5E; --shape-soft: rgba(227, 190, 94, 0.13); --print: #6FCB95; --print-soft: rgba(111, 203, 149, 0.13);
   color-scheme: dark;
 }
 
@@ -81,7 +66,6 @@ button { cursor: pointer; }
 .numwrap { display: inline-flex; align-items: center; gap: 4px; }
 .num { width: 66px; text-align: right; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 6px; border: 1px solid var(--line); background: var(--soft); border-radius: 6px; }
 .unit { color: var(--muted); font-family: var(--font-mono); font-size: 11px; min-width: 14px; }
-.page .grid, .group .grid { grid-template-columns: minmax(0, 1fr); }
 .group { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
 .group > .sub { margin: 0; color: var(--hue); }
 input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
@@ -128,10 +112,8 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
 .vp-top > * { pointer-events: auto; }
 /* the build time, beside the view buttons; a fixed width so the buttons never shift */
 .vp-tools { align-items: center; }
-/* view direction buttons, bottom left of the 3D view */
-.vp-views { position: absolute; left: 10px; bottom: 10px; display: flex; pointer-events: none; }
-.vp-views .seg { pointer-events: auto; background: color-mix(in srgb, var(--panel) 85%, transparent); flex-wrap: nowrap; }
-.vp-views .seg button { padding: 4px 8px; font-size: 11.5px; }
+/* view cube, after Bambu Studio's: turns with the view; click a face to look straight at it */
+.viewport .view-cube { position: absolute; top: 50px; right: 8px; width: 84px; height: 84px; cursor: pointer; touch-action: none; }
 .vp-tools .build-state { width: 118px; justify-content: flex-end; white-space: nowrap; overflow: hidden; font-size: 11px; padding: 0 4px; text-shadow: 0 0 6px var(--stage); }
 /* size and warnings in the top bar, always in view */
 .fit-status { position: relative; display: flex; align-items: center; gap: 6px; }
@@ -141,7 +123,6 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
 .size-chip.bad::before { background: var(--danger); }
 .warn-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650; padding: 5px 9px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-bg); color: var(--warn); }
 .warn-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: min(380px, calc(100vw - 24px)); max-height: min(60vh, 420px); overflow-y: auto; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2); }
-.vp-dims { color: var(--ink); font-variant-numeric: tabular-nums; }
 .vp-tools { display: flex; gap: 6px; }
 .icon-btn[aria-pressed="true"] { color: var(--plate); border-color: color-mix(in srgb, var(--plate) 55%, transparent); background: color-mix(in srgb, var(--plate-soft) 60%, var(--panel)); }
 .dim-layer { position: absolute; top: 0; left: 0; pointer-events: none; }
@@ -150,7 +131,6 @@ input:disabled { opacity: 0.5; cursor: not-allowed; }
   padding: 3px 6px; border-radius: 5px; color: var(--plate); background: color-mix(in srgb, var(--panel) 90%, transparent);
   border: 1px solid color-mix(in srgb, var(--plate) 45%, transparent);
 }
-.dim.win { color: var(--frame); border-color: color-mix(in srgb, var(--frame) 50%, transparent); }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; background: color-mix(in srgb, var(--stage) 88%, transparent); color: var(--muted); }
 .overlay strong { display: block; color: var(--ink); font-family: var(--font-display); font-stretch: 112%; font-size: 15px; margin-bottom: 4px; }
 .error-toast {
@@ -171,10 +151,8 @@ input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent); }
 select, input[type="text"] { width: 100%; min-width: 0; border: 1px solid var(--line); background: var(--soft); border-radius: 8px; padding: 7px 9px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550; }
 .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
-.grid { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 12px; }
 .spec { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .spec b { font-weight: 500; color: var(--ink); }
-.spec .good { color: var(--good); }
 .spec .bad { color: var(--danger); }
 
 /* status cards: one per label, in the same left-to-right order as the printed sign */
@@ -233,36 +211,22 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .set-pop .set-group:first-child { padding-top: 2px; }
 .set-pop button { width: 100%; height: 36px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 8px; font-family: var(--font-display); font-stretch: 85%; font-weight: 650; font-size: 13px; text-align: left; }
 .set-pop button svg { width: 20px; height: 20px; flex: none; }
-.popover .none-label { font-size: 10.5px; color: var(--muted); }
 
 /* settings: one card per part of the sign, each with its own color */
 .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .panel > *, #settings > * { flex: none; }
 #settings { display: contents; }
-.section {
-  --hue: var(--accent); --hue-soft: var(--accent-soft);
-  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
-  padding: 0 18px 18px; display: flex; flex-direction: column; gap: 12px;
-}
-/* each card's color; listed after .section so it wins over the default */
+/* each tab's color */
 .hue-plate { --hue: var(--plate); --hue-soft: var(--plate-soft); }
 .hue-labels { --hue: var(--labels); --hue-soft: var(--labels-soft); }
-.hue-frame { --hue: var(--frame); --hue-soft: var(--frame-soft); }
 .hue-name { --hue: var(--name); --hue-soft: var(--name-soft); }
 .hue-shape { --hue: var(--shape); --hue-soft: var(--shape-soft); }
 .hue-print { --hue: var(--print); --hue-soft: var(--print-soft); }
-.sec-head {
-  display: flex; align-items: center; gap: 10px; margin: 0 -18px 2px; padding: 10px 14px 10px 14px;
-  background: var(--hue-soft); border-bottom: 1px solid color-mix(in srgb, var(--hue) 22%, transparent);
-}
-.sec-head h2 { margin: 0; font-family: var(--font-display); font-stretch: 125%; font-weight: 750; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--hue); }
-.sec-head small { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); }
 .sec-tag { flex: none; width: 26px; height: 26px; border-radius: 8px; background: var(--hue); color: var(--panel); display: grid; place-items: center; }
 .sec-tag svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-:is(.section, .page) input[type="range"], :is(.section, .page) .check input { accent-color: var(--hue); }
-:is(.section, .page) .seg button[aria-checked="true"] { color: var(--hue); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 45%, transparent), 0 1px 2px rgba(0, 0, 0, 0.1); }
+.page input[type="range"], .page .check input { accent-color: var(--hue); }
+.page .seg button[aria-checked="true"] { color: var(--hue); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 45%, transparent), 0 1px 2px rgba(0, 0, 0, 0.1); }
 .sub { margin: 6px 0 -4px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.sub small { font-family: var(--font-mono); font-weight: 400; letter-spacing: 0; text-transform: none; }
 /* settings pages: one tab per part of the sign */
 .pages { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 .tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--soft); border-bottom: 1px solid var(--line); }
@@ -361,6 +325,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
   .fit-status { order: 3; }
   .warn-pop { left: 0; right: auto; }
   .vp-tools .build-state { width: 14px; font-size: 0; padding: 0; } /* just the dot on phones */
+  .viewport .view-cube { width: 64px; height: 64px; top: 48px; }
   .vp-top .seg { flex-wrap: nowrap; }
   .vp-top .seg button { padding: 7px 9px; white-space: nowrap; }
   .st-head .hint { display: none; }
@@ -455,22 +420,12 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <button class="icon-btn" id="dimsToggle" title="Show dimensions" aria-label="Show dimensions" aria-pressed="false">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>
         </button>
-        <button class="icon-btn" id="resetView" title="Reset view" aria-label="Reset view">
+        <button class="icon-btn" id="resetView" title="Reset view (back to 3D)" aria-label="Reset view">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
         </button>
         </div>
       </div>
-      <div class="vp-views">
-        <div class="seg" role="radiogroup" aria-label="View direction" id="orthoSeg">
-          <button type="button" role="radio" data-value="3d" aria-checked="true" title="Perspective view you can orbit">3D</button>
-          <button type="button" role="radio" data-value="front" title="Straight-on view from the front, no perspective">Front</button>
-          <button type="button" role="radio" data-value="back" title="From the back, no perspective">Back</button>
-          <button type="button" role="radio" data-value="top" title="From above, no perspective">Top</button>
-          <button type="button" role="radio" data-value="bottom" title="From below, no perspective">Bottom</button>
-          <button type="button" role="radio" data-value="left" title="From the left, no perspective">Left</button>
-          <button type="button" role="radio" data-value="right" title="From the right, no perspective">Right</button>
-        </div>
-      </div>
+      <canvas class="view-cube" id="viewCube" aria-label="View cube: click a face to look straight at it"></canvas>
       <div class="pal-pop" id="palPop" hidden>
         <strong>Preview colors</strong>
         <div class="pal-colors">
@@ -969,7 +924,6 @@ function createEngine(wasm) {
     }
     return font._cap;
   }
-  const advWidth = (font, str) => font.advance(str);
   // Line breaks are part of the design: only an explicit | splits the text.
   function lineOptions(font, text) {
     if (text.includes('|')) return [text.split('|').map((x) => x.trim()).filter(Boolean)];
@@ -1275,7 +1229,7 @@ function createEngine(wasm) {
       const Lh = raised ? lz(p.reliefH) : 0, engr = raised ? 0 : Math.min(lz(p.reliefH), T - lz(1));
       // the name has its own thickness (raised) or depth (engraved)
       const Ln = raised ? lz(p.nameReliefH ?? p.reliefH) : 0, engrN = raised ? 0 : Math.min(lz(p.nameReliefH ?? p.reliefH), T - lz(1));
-      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fb = p.frame, fbx = p.frame, play = 0.6, proud = lz(p.proud ?? 0.8, 0);
+      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fbx = p.frame, play = 0.6, proud = lz(p.proud ?? 0.8, 0);
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
@@ -1617,7 +1571,7 @@ function createEngine(wasm) {
           ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
           hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot).add(gripRidges(xf, yT)));
         }
-        if (cub) hookEnv = { kind: 'cubicle', yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2, back, t, g };
+        if (cub) hookEnv = { kind: 'cubicle', yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2 };
       }
 
       const nz = p.nozzle || 0.4;
@@ -1638,8 +1592,8 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, engr, raised, zt, zb, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
-          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, pitch, plateW: W, plateH: H, auto,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, plateW: W, plateH: H, auto,
         },
       };
       return out;
@@ -1863,8 +1817,6 @@ const SLIDERS = {
   marginH: { label: 'Side margin', min: 0, max: 50, step: 0.5, out: mm() },
   pad: { label: 'Text padding', min: 0, max: 20, step: 0.2, out: mm() },
 };
-// Global printer settings. Slider limits and steps follow them.
-const NOZZLES = [0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8, 1];
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 const FLOORS = { cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
@@ -1894,7 +1846,7 @@ function clampSnap(k, v, s = state) {
   v = Math.min(max, Math.max(min, v));
   return rnd(Math.min(max, min + Math.round((v - min) / step) * step));
 }
-const BEDS = [[180, '180 × 180 mm (A1 mini, Prusa MINI)'], [220, '220 × 220 mm (Ender 3)'], [250, '250 × 210 mm (Prusa MK4)'], [256, '256 × 256 mm (Bambu X1, P1, A1)'], [300, '300 × 300 mm'], [350, '350 × 350 mm']];
+const BEDS = [180, 220, 250, 256, 300, 350]; // print bed widths in the Machine menu
 // Picking a design can set related options; moving to a normal shape puts the neutral values back.
 const SHAPE_NEUTRAL = { thick: 2, marginV: 0, marginH: 0 };
 const SHAPE_DEFAULTS = {
@@ -1905,7 +1857,7 @@ const SHAPE_DEFAULTS = {
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'puzzle', 'pixel', 'folder', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS.map(([v]) => v), view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -1918,7 +1870,6 @@ const MOUNT_HINTS = {
 };
 // Conditions for controls that only apply in some modes.
 const WHEN = {
-  auto: (s) => s.sizeMode === 'auto',
   manual: (s) => s.sizeMode !== 'auto',
   magnet: (s) => s.mount === 'magnet',
   stand: (s) => s.mount === 'stand',
@@ -1932,13 +1883,12 @@ const WHEN = {
   cubrail: (s) => s.mount === 'cubrail',
   hooked: (s) => s.mount === 'cubicle' || s.mount === 'cubrail',
   none: (s) => s.mount === 'none',
-  dyn: (s) => !!s.dyn,
 };
 
-// The settings panel. Sections with tab: true become pages behind the Shape | Plate | Status | Name tabs;
-// the rest render as cards below. hue: the page's color. Preview colors live in their own popover on the 3D view.
+// The settings panel: each section is a page behind the Shape | Plate | Status | Name tabs. hue: the page's color.
+// Preview colors live in their own popover on the 3D view.
 const SECTIONS = [
-  { tab: true, title: 'Shape', hue: 'shape', glyph: '<path d="M12 3 21 9v6l-9 6-9-6V9z"/>', items: [
+  { title: 'Shape', hue: 'shape', glyph: '<path d="M12 3 21 9v6l-9 6-9-6V9z"/>', items: [
     { group: 'Shape', items: [
       { html: 'shapes' },
     ] },
@@ -1970,7 +1920,7 @@ const SECTIONS = [
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
     ] },
   ] },
-  { tab: true, title: 'Plate', hue: 'plate', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
+  { title: 'Plate', hue: 'plate', glyph: '<rect x="3" y="6" width="18" height="12" rx="3"/>', items: [
     { slider: 'bevel' },
     { group: 'Size', items: [
       { fit: true },
@@ -1984,7 +1934,7 @@ const SECTIONS = [
       { slider: 'thick' },
     ] },
   ] },
-  { tab: true, title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
+  { title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
     { check: 'statusOn', label: 'Status track and sliding frame', title: 'The row of statuses with the frame that slides along it. Turn it off for a sign with only a name.' },
     { hint: 'Off: the sign carries only the name from the Name tab.', when: 'nostatus' },
     { group: 'Status labels', when: 'status', items: [
@@ -2010,7 +1960,7 @@ const SECTIONS = [
       { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
     ] },
   ] },
-  { tab: true, title: 'Name', hue: 'name', glyph: '<path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>', items: [
+  { title: 'Name', hue: 'name', glyph: '<path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9z"/><circle cx="8" cy="8" r="1.5"/>', items: [
     { seg: 'nameMode', label: 'Name', options: [['off', 'Off'], ['plate', 'On the plate', 'Raised or engraved straight on the plate'], ['tag', 'Slide-in tag', 'A separate flat tag that slides into a rail, so the sign can be reused by printing a new tag']] },
     { group: 'Name', when: 'name', items: [
       { text: 'header', label: 'Text', placeholder: 'e.g. Alan Chien' },
@@ -2423,7 +2373,6 @@ function setViewDir(d) {
   controls.object = cam;
   if (d === '3d') persp.up.set(0, 1, 0);
   controls.minZoom = 0.2; controls.maxZoom = 20;
-  $$('#orthoSeg button').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.value === d)));
   fitCamera();
 }
 
@@ -2462,7 +2411,7 @@ function loop() {
     if (Math.abs(dx) > 0.01) { sliderMesh.position.x += reduceMotion ? dx : dx * 0.18; moving = true; }
     else if (dx !== 0) { sliderMesh.position.x = sliderTarget; moving = true; }
   }
-  if (moving || needsRender) { renderer.render(scene, cam); labelRenderer.render(scene, cam); needsRender = false; }
+  if (moving || needsRender) { renderer.render(scene, cam); labelRenderer.render(scene, cam); renderCube(); needsRender = false; }
 }
 
 // drag the frame along its track
@@ -2772,7 +2721,6 @@ function svgIcon(name) {
 // Settings panel, rendered from SECTIONS.
 function itemHTML(it) {
   const when = it.when ? ` data-when="${it.when}"` : '';
-  if (it.row) return `<div class="grid" style="--cols:${it.cols || 2}"${when}>${it.row.map(itemHTML).join('')}</div>`;
   if (it.slider) {
     const k = it.slider, f = SLIDERS[k];
     return `<div class="field"${when}><div class="field-row"><label for="${k}">${f.label}</label><span class="numwrap"><input type="number" class="num" id="${k}Out" data-num="${k}" step="any" aria-label="${f.label}, type a value"><span class="unit">${f.unit || 'mm'}</span></span></div>`
@@ -2790,21 +2738,18 @@ function itemHTML(it) {
   }
   if (it.text) return `<div class="field"${when}><label for="${it.text}">${it.label}</label><input type="text" id="${it.text}" data-key="${it.text}" maxlength="${MAX_TEXT}" placeholder="${it.placeholder}" autocomplete="off"></div>`;
   if (it.check) return `<label class="check"${when}${it.title ? ` title="${it.title}"` : ''}><input type="checkbox" id="${it.check}" data-key="${it.check}"> ${it.label}</label>`;
-  if (it.color) return `<label class="swatch"${when}>${it.label}<input type="color" id="${it.color}" data-key="${it.color}"></label>`;
   if (it.fit) return '<label class="check" title="On: the plate grows or shrinks to the smallest size that fits every status (letter height is on the Labels tab), and width and height are locked to the result. Off: type or drag the size yourself, starting from the last result."><input type="checkbox" id="fit"> Fit to text <span class="hint">(locks width and height)</span></label>';
   if (it.group) return `<div class="group"${when}><h3 class="sub">${it.group}</h3>${it.items.map(itemHTML).join('')}</div>`;
-  if (it.sub) return `<h3 class="sub"${when}>${it.sub}${it.noteId ? ` <small id="${it.noteId}"></small>` : ''}</h3>`;
   if (it.hint != null) return `<p class="hint"${it.id ? ` id="${it.id}"` : ''}${when}>${it.hint}</p>`;
-  return { shapes: '<div class="field"><button type="button" class="shape-btn" aria-label="Shape" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-106 -54 212 108" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>', palettes: '<div class="palette-row" id="palettes"></div>' }[it.html] || '';
+  return { shapes: '<div class="field"><button type="button" class="shape-btn" aria-label="Shape" id="shapeBtn" aria-haspopup="listbox" aria-expanded="false"><svg viewBox="-106 -54 212 108" aria-hidden="true"><path id="shapeBtnPath"/></svg><span id="shapeBtnLabel"></span><span class="chev" aria-hidden="true">▾</span></button></div>', spec: '<p class="spec" id="spec">—</p>' }[it.html] || '';
 }
 const tagHTML = (s) => `<span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24">${s.glyph}</svg></span>`;
 function renderPanel() {
-  const pages = SECTIONS.filter((s) => s.tab), cards = SECTIONS.filter((s) => !s.tab);
+  const pages = SECTIONS;
   const tabs = pages.map((s) => `<button type="button" role="tab" class="tab hue-${s.hue}" id="tab-${s.hue}" data-page="${s.hue}" aria-controls="page-${s.hue}">${tagHTML(s)}<span>${s.title}</span></button>`).join('');
   const bodies = pages.map((s) => `<div class="page hue-${s.hue}" role="tabpanel" id="page-${s.hue}" aria-labelledby="tab-${s.hue}">`
     + `${s.items.map(itemHTML).join('')}</div>`).join('');
-  $('#settings').innerHTML = `<div class="pages"><div class="tabs" role="tablist" aria-label="Settings">${tabs}</div>${bodies}</div>`
-    + cards.map((s) => `<section class="section"><div class="sec-head"><h2>${s.title}</h2></div>${s.items.map(itemHTML).join('')}</section>`).join('');
+  $('#settings').innerHTML = `<div class="pages"><div class="tabs" role="tablist" aria-label="Settings">${tabs}</div>${bodies}</div>`;
 }
 function setPage(page, focus) {
   state.page = page;
@@ -3201,8 +3146,53 @@ $('#viewSeg').addEventListener('click', (e) => {
   applyView(true);
   saveState();
 });
-$('#resetView').addEventListener('click', fitCamera);
-$('#orthoSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setViewDir(b.dataset.value); });
+// Reset view: back to the 3D perspective view, framed to the model
+$('#resetView').addEventListener('click', () => (viewDir === '3d' ? fitCamera() : setViewDir('3d')));
+// View cube, after Bambu Studio's: a small cube in the corner turns with the view, each face labelled; click a face to look
+// straight at it (orthographic). Reset view goes back to the 3D perspective view.
+const cubeEl = $('#viewCube');
+const cubeR = new THREE.WebGLRenderer({ canvas: cubeEl, antialias: true, alpha: true });
+cubeR.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+const cubeScene = new THREE.Scene(), cubeCam = new THREE.OrthographicCamera(-1.75, 1.75, 1.75, -1.75, 0.1, 20);
+// BoxGeometry's face order: +x, -x, +y, -y, +z, -z
+const FACE_KEYS = ['right', 'left', 'top', 'bottom', 'front', 'back'];
+const faceMats = FACE_KEYS.map((k) => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#eef0f3'; g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = '#8f98a3'; g.lineWidth = 6; g.strokeRect(3, 3, 122, 122);
+  g.fillStyle = '#28303a'; g.font = '700 25px Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(k.toUpperCase(), 64, 66);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: t });
+});
+const cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), faceMats);
+cubeScene.add(cubeMesh, new THREE.LineSegments(new THREE.EdgesGeometry(cubeMesh.geometry), new THREE.LineBasicMaterial({ color: 0x59616b })));
+let cubeHover = -1;
+function renderCube() {
+  const w = cubeEl.clientWidth;
+  if (!w) return;
+  if (cubeEl.width !== Math.round(w * cubeR.getPixelRatio())) cubeR.setSize(w, w, false);
+  const d = new THREE.Vector3().subVectors(cam.position, controls.target).normalize();
+  cubeCam.position.copy(d).multiplyScalar(6);
+  cubeCam.up.copy(cam.up);
+  cubeCam.lookAt(0, 0, 0);
+  faceMats.forEach((m, i) => m.color.set(i === cubeHover ? 0xbcd0ff : (FACE_KEYS[i] === viewDir ? 0xd7e2ff : 0xffffff)));
+  cubeR.render(cubeScene, cubeCam);
+}
+const cubeRay = new THREE.Raycaster(), cubeNdc = new THREE.Vector2();
+function cubeFace(e) {
+  const r = cubeEl.getBoundingClientRect();
+  cubeNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  cubeRay.setFromCamera(cubeNdc, cubeCam);
+  const hit = cubeRay.intersectObject(cubeMesh, false)[0];
+  return hit ? hit.face.materialIndex : -1;
+}
+cubeEl.addEventListener('pointermove', (e) => { const f = cubeFace(e); if (f !== cubeHover) { cubeHover = f; cubeEl.title = f >= 0 ? FACE_KEYS[f][0].toUpperCase() + FACE_KEYS[f].slice(1) + ' view' : ''; requestRender(); } });
+cubeEl.addEventListener('pointerleave', () => { cubeHover = -1; requestRender(); });
+cubeEl.addEventListener('click', (e) => { const f = cubeFace(e); if (f >= 0) setViewDir(FACE_KEYS[f]); });
 $('#warnBtn').addEventListener('click', () => { const p = $('#warnPop'); p.hidden = !p.hidden; $('#warnBtn').setAttribute('aria-expanded', String(!p.hidden)); });
 document.addEventListener('pointerdown', (e) => { const p = $('#warnPop'); if (!p.hidden && !p.contains(e.target) && !$('#warnBtn').contains(e.target)) { p.hidden = true; $('#warnBtn').setAttribute('aria-expanded', 'false'); } });
 $('#palToggle').addEventListener('click', () => { const p = $('#palPop'); p.hidden = !p.hidden; $('#palToggle').setAttribute('aria-expanded', String(!p.hidden)); });
