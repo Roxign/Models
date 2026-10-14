@@ -1002,7 +1002,9 @@ function createEngine(wasm) {
   // The tag rail is a dovetail like the status track: the tag's long edges are cut at 45° through its whole thickness and the
   // rails lean over them at the same angle, so nothing overhangs flat when it prints. The tag's top face shows in full.
   // Band height: the letters with room for descenders (1.45 x the letter height), the 45° edges, the rails and their clearance.
-  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + (p.namePad ?? 1)) + 2 * (tagRw(p) + 1.42 * (p.tagTol ?? p.tol ?? 0.25));
+  // the height of the rails' 45° lean (the holder): never lower than the tag; above it the lean reaches over the tag's top face
+  const tagHold = (p) => Math.max(p.tagRailH ?? p.tagT ?? 1.6, p.tagT ?? 1.6);
+  const nameBandH = (p) => 1.45 * (p.hcap || 6.5) + 2 * ((p.tagT ?? 1.6) + (p.namePad ?? 1)) + 2 * (tagRw(p) + 1.42 * (p.tagTol ?? p.tol ?? 0.25)) + 2 * (tagHold(p) - (p.tagT ?? 1.6));
   // Where the tag sits in the header band: centre line, half-height of its bottom face and of the channel at the bottom.
   function tagDims(p, hdrZone) {
     const [h0, h1] = hdrZone, tol = p.tagTol ?? p.tol ?? 0.25, zoneH = Math.min(h1 - h0, nameBandH(p) * 1.25), c = tol * Math.SQRT2;
@@ -1051,8 +1053,9 @@ function createEngine(wasm) {
   // Half-length left for the name on the tag's top face: inside the stop and the 45° end, the 1.5 mm keep-out and a 3 mm margin.
   // keepX: on bordered shapes the tag runs along the track, from -keepX to keepX.
   function tagTextHalf(p, sh, hdrZone, W, keepX) {
-    const { ym, htag } = tagDims(p, hdrZone), u = p.tagT ?? 1.6, htop = htag - u;
-    const face = tagRw(p) + Math.max(0.3, (p.tagTol ?? p.tol ?? 0.25) * Math.SQRT2) + u; // the top face's inset from the outline
+    const { ym, htag, wb } = tagDims(p, hdrZone), u = p.tagT ?? 1.6, L = tagHold(p), htop = Math.min(htag - u, wb - L);
+    // the visible top face's inset from the outline: the tag's own 45° edge, or the holder where it reaches over the tag
+    const face = tagRw(p) + Math.max(Math.max(0.3, (p.tagTol ?? p.tol ?? 0.25) * Math.SQRT2) + u, L);
     const npad = Math.max(0, p.namePad ?? 1), side = npad + 2;
     if (keepX != null) return keepX - face - side;
     // the side margin is sideways only, so a name band that runs along a straight top edge keeps its full height
@@ -1297,9 +1300,10 @@ function createEngine(wasm) {
       // One top height for every rail: with a name tag, the status rails and the tag's rails all rise to the taller of the two
       // (the track's rail height, or the tag's thickness plus its lip), so the sign has one flat top face. The channels below
       // keep their own shapes: the frame's dovetail and the tag's 45° lean.
-      // the tag's rails stand hTagR above the plate: the setting, but never lower than the tag plus one layer
-      const uTag = lz(p.tagT ?? 1.6, 2), oneL = dyn ? 0.2 : LH, hTagR = Math.max(lz(p.tagRailH ?? uTag + 0.8), uTag + oneL), zTag = T + hTagR;
-      if (p.nameRail && lz(p.tagRailH ?? uTag + 0.8) < uTag + oneL - 1e-6) warnings.push(`The tag rail is raised to ${fmtMm(hTagR)} mm: it can't be lower than the ${fmtMm(uTag)} mm tag plus one layer.`);
+      // The tag's rails lean in at 45° from the plate up to the holder height (never lower than the tag; above the tag the lean
+      // reaches over its top face so it can't lift out), then rise straight up 0.8 mm.
+      const uTag = lz(p.tagT ?? 1.6, 2), holdH = Math.max(lz(p.tagRailH ?? uTag), uTag), zTag = T + holdH + lz(0.8);
+      if (p.nameRail && lz(p.tagRailH ?? uTag) < uTag - 1e-6) warnings.push(`The tag rail's 45° holder is raised to the ${fmtMm(uTag)} mm tag: it can't be lower than the tag.`);
       const z0 = 0, z1 = statusOn && p.nameRail ? Math.max(T + Rh, zTag) : T + Rh, chf = 0.8;
       const yi = yR, yo = yR + Rw;
       // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
@@ -1307,7 +1311,7 @@ function createEngine(wasm) {
       // on its upper side, and the common flat top.
 
       const railTop = shared
-        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
+        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + holdH, T + holdH], [yc + yo + holdH, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
         : poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
@@ -1418,14 +1422,18 @@ function createEngine(wasm) {
         // slide under the leaning rails and its ends are bevelled the same way, and at the closed (left) end the stop leans
         // over the tag's end like the rails do. Seen from the front the border is then the same width all round, round
         // corners included, and nothing overhangs flat.
-        const tt = uTag, u = tt, lipH = hTagR - tt, gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
+        const tt = uTag, u = tt, L = holdH, lipH = lz(0.8), gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
+        // hv: half-height of the part of the top face that shows between the holders
+        const hv = Math.min(htop, wb - L);
         if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
+        if (hv < 2) throw new UserError('The tag rail is so tall that its 45° holders cover nearly all of the tag. Lower the tag rail height.');
         tagT = tt;
         // the tag's rails reach the common rail height when there is a status track, or their own height without one
-        const zS = T, zTop = statusOn ? Math.max(zS + u + lipH, z1) : zS + u + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
-        // rails: from the bed, leaning in at 45° over the tag's thickness, then straight up
-        const up = poly([[ym + wb, 0], [ym + wb + rw, 0], [ym + wb + rw, zTop], [ym + wb - u, zTop], [ym + wb - u, zS + u], [ym + wb, zS]]);
-        const dn = poly([[ym - wb, 0], [ym - wb, zS], [ym - wb + u, zS + u], [ym - wb + u, zTop], [ym - wb - rw, zTop], [ym - wb - rw, 0]]);
+        const zS = T, zTop = statusOn ? Math.max(zS + L + lipH, z1) : zS + L + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
+        // rails: from the bed, leaning in at 45° over the tag's edge (and past it, over the top face, up to the holder height),
+        // then straight up
+        const up = poly([[ym + wb, 0], [ym + wb + rw, 0], [ym + wb + rw, zTop], [ym + wb - L, zTop], [ym + wb - L, zS + L], [ym + wb, zS]]);
+        const dn = poly([[ym - wb, 0], [ym - wb, zS], [ym - wb + L, zS + L], [ym - wb + L, zTop], [ym - wb - rw, zTop], [ym - wb - rw, 0]]);
         const row = (cs, y) => cs.intersect(rect(xb - xa, 0.2, (xa + xb) / 2, y));
         // following the outline only works where it crosses the whole band in one piece; otherwise keep to the track
         const oneSpan = [yLo + 0.2, ym - htag, ym, ym + htag, yHi - 0.2].every((y) => row(edge, y).toPolygons().length === 1);
@@ -1436,13 +1444,16 @@ function createEngine(wasm) {
         const mid = follow ? (ob.min[0] + ob.max[0]) / 2 : 0, band = rect(xb - xa, yHi - sLo, (xa + xb) / 2, (yHi + sLo) / 2), left = rect(mid - xa, yHi - yLo, (xa + mid) / 2, ym);
         const inset = (d) => E.offset(-d, 'Round', 2, 32);
         // the 45° part is built in steps of one layer (or 4 steps with dynamic layers), as the printer builds it anyway
-        const n = dyn ? 4 : Math.max(1, Math.round(u / LH)), stopParts = [], tagPlans = [];
+        const n = dyn ? 4 : Math.max(1, Math.round(u / LH)), nS = dyn ? 4 : Math.max(1, Math.round(L / LH)), stopParts = [], tagPlans = [];
+        for (let k = 0; k < nS; k++) {
+          const z0 = (k * L) / nS, z1 = ((k + 1) * L) / nS;
+          stopParts.push(band.intersect(E.subtract(inset(rw + z0))).intersect(left).extrude(z1 - z0).translate([0, 0, zS + z0]));
+        }
         for (let k = 0; k < n; k++) {
           const z0 = (k * u) / n, z1 = ((k + 1) * u) / n;
-          stopParts.push(band.intersect(E.subtract(inset(rw + z0))).intersect(left).extrude(z1 - z0).translate([0, 0, zS + z0]));
           tagPlans.push(inset(rw + gap + z1).extrude(z1 - z0 + (k === n - 1 ? 0 : 0.001)).translate([0, 0, zS + z0]));
         }
-        stopParts.push(band.intersect(E.subtract(inset(rw + u))).intersect(left).extrude(zTop - zS - u).translate([0, 0, zS + u]));
+        stopParts.push(band.intersect(E.subtract(inset(rw + L))).intersect(left).extrude(zTop - zS - L).translate([0, 0, zS + L]));
         const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), ...(shared ? [] : [extrudeX(dn, follow ? xa : -X, follow ? xb : X)])]);
         body = body.add((follow ? rails.intersect(inEdge(zTop)) : rails).add(Manifold.union(stopParts)));
         tagZTop = zTop;
@@ -1468,9 +1479,9 @@ function createEngine(wasm) {
 
         // the top face, all of it visible: where the name goes
         const tagCS = rect(xb - xa + 4, 2 * htop, (xa + xb) / 2, ym).intersect(inset(rw + gap + u));
-        const topCS = tagCS;
+        const topCS = L > u + gap ? tagCS.intersect(inset(rw + L)).intersect(rect(xb - xa + 4, 2 * hv, (xa + xb) / 2, ym)) : tagCS;
         // the straight middle of the tag, where the name is centred
-        const rowsT = [ym - htop + Math.max(0.3, p.namePad ?? 1), ym, ym + htop - Math.max(0.3, p.namePad ?? 1)].map((y) => row(topCS, y)).filter((c) => !c.isEmpty()).map((c) => c.bounds());
+        const rowsT = [ym - hv + Math.max(0.3, p.namePad ?? 1), ym, ym + hv - Math.max(0.3, p.namePad ?? 1)].map((y) => row(topCS, y)).filter((c) => !c.isEmpty()).map((c) => c.bounds());
         const cxL = rowsT.length === 3 ? Math.max(...rowsT.map((b) => b.min[0])) : 0, cxR = rowsT.length === 3 ? Math.min(...rowsT.map((b) => b.max[0])) : 0;
         if (cxR - cxL < 30) throw new UserError('The plate is too narrow for the name tag rail. Make it wider.');
         const cx = (cxL + cxR) / 2;
@@ -1479,11 +1490,11 @@ function createEngine(wasm) {
         tagBody = extrudeX(trap, xa - 2, xb + 2).intersect(Manifold.union(tagPlans));
         tagAll = tagBody;
         if (headerText) {
-          const npad = p.namePad ?? 1, room = 2 * (htop - npad);
+          const npad = p.namePad ?? 1, room = 2 * (hv - npad);
           const tb = fitText(font, headerText, cxR - cxL - 2 * (npad + 2), room, auto ? autoMetrics(p).hdrCap : (p.hcap || 10), true);
           if (tb.cs) {
             // keep the letters inside the tag, away from slanted or curved ends
-            const safe = hErode(topCS, npad + 0.5).intersect(rect(xb - xa + 4, 2 * (htop - Math.min(0.3, npad)), (xa + xb) / 2, ym));
+            const safe = hErode(topCS, npad + 0.5).intersect(rect(xb - xa + 4, 2 * (hv - Math.min(0.3, npad)), (xa + xb) / 2, ym));
             let k = 1, tcs = tb.cs.translate([cx, ym]);
             for (let i = 0; i < 30 && tcs.subtract(safe).area() > 0.05; i++) { k *= 0.97; tcs = tb.cs.scale(k).translate([cx, ym]); }
             hdrCap = tb.cap * k;
@@ -1809,7 +1820,7 @@ const DEFAULTS = {
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGrip: 0.1, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 2.4,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -1841,7 +1852,7 @@ const SLIDERS = {
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
   namePad: { label: 'Name margin', min: -3, max: 20, step: 0.2, out: mm() },
   tagT: { label: 'Tag thickness', min: 0.4, max: 8, step: 0.1, layers: true, out: mm() },
-  tagRailH: { label: 'Tag rail height', min: 0.6, max: 12, step: 0.1, layers: true, out: mm() },
+  tagRailH: { label: 'Tag rail height (45° holder)', min: 0.4, max: 6, step: 0.1, layers: true, out: mm() },
   proud: { label: 'Frame extrusion', min: -2, max: 8, step: 0.1, layers: true, signed: true, out: mm() },
   cubP: { label: 'Panel thickness', min: 20, max: 200, step: 1, out: mm(0) },
   hookBack: { label: 'Hook length down the back', min: 8, max: 150, step: 1, out: mm(0) },
@@ -2012,7 +2023,7 @@ const SECTIONS = [
       { slider: 'tagRailH', when: 'tag' },
       { slider: 'tagTol', when: 'tag' },
     ] },
-    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move. The tag rail height is how far its rails stand above the plate: at least the tag plus one layer, and taller rails rise above the tag so it can\'t drop out.', when: 'tag' },
+    { hint: 'The tag slides in from the right end, like the frame, and stops at the left end. Drag it in the preview to see it move. The tag rail height is how high the rails\' 45° lean rises. At the tag\'s thickness the lean just meets the tag\'s edges; above it the lean reaches over the edges of the tag\'s top face and holds the tag in, so it can\'t fall out.', when: 'tag' },
   ] },
 ];
 
@@ -2024,7 +2035,7 @@ function sanitize(s) {
   if (Number.isFinite(+s.layerH)) out.layerH = +s.layerH;
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
-  if (s.tagRailH == null && Number.isFinite(+s.tagT)) s = { ...s, tagRailH: +s.tagT + 0.8 };
+  if (s.tagRailH == null && Number.isFinite(+s.tagT)) s = { ...s, tagRailH: +s.tagT };
   for (const k of Object.keys(SLIDERS)) out[k] = freeClamp(k, Number.isFinite(+s[k]) ? +s[k] : out[k], out);
   if (s.chamfer === true && s.bevel == null) out.bevel = 1.2;
   if (Number.isFinite(+s.footD) && s.footF == null && s.footB == null) { out.footF = Math.round(+s.footD * 0.42); out.footB = Math.round(+s.footD * 0.58); }
