@@ -1326,15 +1326,18 @@ function createEngine(wasm) {
       const labelsCS = union(labelParts), nameCS = union(nameParts);
 
       // base body: plate + dovetail rails, closed at the left end and open at the right, + mounting
-      const z0 = 0, z1 = T + Rh, chf = 0.8;
+      // One top height for every rail: with a name tag, the status rails and the tag's rails all rise to the taller of the two
+      // (the track's rail height, or the tag's thickness plus its lip), so the sign has one flat top face. The channels below
+      // keep their own shapes: the frame's dovetail and the tag's 45° lean.
+      const uTag = lz(p.tagT ?? 1.6, 2), zTag = T + uTag + lz(0.8);
+      const z0 = 0, z1 = statusOn && p.nameRail ? Math.max(T + Rh, zTag) : T + Rh, chf = 0.8;
       const yi = yR, yo = yR + Rw;
       // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
       // With a name tag right above the track the upper rail is shared: the frame's dovetail on its lower side, the tag's 45° lean
-      // on its upper side. Each side has a flat top at its own height (the track rail's beside the frame, the tag rail's beside
-      // the tag, as wide as the tag's other rail looks), joined by a vertical step, so the two heights still set independently.
-      const uTag = lz(p.tagT ?? 1.6, 2), zTag = T + uTag + lz(0.8), zRails = shared ? Math.max(z1, zTag) : z1;
+      // on its upper side, and the common flat top.
+
       const railTop = shared
-        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, zTag], [yc + yo - tagRw(p), zTag], [yc + yo - tagRw(p), z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
+        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
         : poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
@@ -1346,7 +1349,7 @@ function createEngine(wasm) {
       const rails = statusOn ? [extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block] : [];
       if (fillRails && statusOn) {
         const endFill = rect(-xR - xa, 2 * (yR + d) + 1, (xa - xR) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(zRails)));
+        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(z1)));
       }
       let body = Manifold.union([sh.cs.extrude(T), ...rails]);
 
@@ -1438,7 +1441,8 @@ function createEngine(wasm) {
         const tt = lz(p.tagT ?? 1.6, 2), u = tt, lipH = lz(0.8), gap = Math.max(0.3, tol * Math.SQRT2), htop = htag - u;
         if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
         tagT = tt;
-        const zS = T, zTop = zS + u + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
+        // the tag's rails reach the common rail height when there is a status track, or their own height without one
+        const zS = T, zTop = statusOn ? Math.max(zS + u + lipH, z1) : zS + u + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
         // rails: from the bed, leaning in at 45° over the tag's thickness, then straight up
         const up = poly([[ym + wb, 0], [ym + wb + rw, 0], [ym + wb + rw, zTop], [ym + wb - u, zTop], [ym + wb - u, zS + u], [ym + wb, zS]]);
         const dn = poly([[ym - wb, 0], [ym - wb, zS], [ym - wb + u, zS + u], [ym - wb + u, zTop], [ym - wb - rw, zTop], [ym - wb - rw, 0]]);
@@ -1511,7 +1515,7 @@ function createEngine(wasm) {
       }
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const ztS = T + Rh + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
