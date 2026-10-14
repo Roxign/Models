@@ -1278,7 +1278,7 @@ function createEngine(wasm) {
 
       // vertical layout
       const v = vLayout(p, sh, H, hh);
-      const { hrTot, yc, yR, wh, hdrZone } = v;
+      const { hrTot, yc, yR, wh, hdrZone, shared } = v;
       const headerText = (p.header || '').trim();
       if (statusOn && wh < 12) throw new UserError('The plate is too short for the track. Increase the height' + ((headerText || p.nameRail) && !sh.crown ? ' or turn off the name' : '') + '.');
 
@@ -1329,7 +1329,13 @@ function createEngine(wasm) {
       const z0 = 0, z1 = T + Rh, chf = 0.8;
       const yi = yR, yo = yR + Rw;
       // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
-      const railTop = poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
+      // With a name tag right above the track the upper rail is shared: the frame's dovetail on its lower side, the tag's 45° lean
+      // on its upper side (as tall as the tag rail), and one straight top from the track rail's height to the tag rail's height,
+      // so each still sets independently and there is no step between them.
+      const uTag = lz(p.tagT ?? 1.6, 2), zTag = T + uTag + lz(0.8), zRails = shared ? Math.max(z1, zTag) : z1;
+      const railTop = shared
+        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + uTag, T + uTag], [yc + yo + uTag, zTag], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
+        : poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
       const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
       const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
       // Bordered shapes keep the rails to the track. On the others the rails run out to the edge (less the side margin) and follow
@@ -1340,7 +1346,7 @@ function createEngine(wasm) {
       const rails = statusOn ? [extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block] : [];
       if (fillRails && statusOn) {
         const endFill = rect(-xR - xa, 2 * (yR + d) + 1, (xa - xR) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(z1)));
+        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(zRails)));
       }
       let body = Manifold.union([sh.cs.extrude(T), ...rails]);
 
@@ -1442,7 +1448,8 @@ function createEngine(wasm) {
         const follow = fillRails && oneSpan;
         // E: what the tag's ends and the stop follow, the outline or the ends of the track
         const E = follow ? edge : rect(2 * X, yHi - yLo + 20, 0, ym);
-        const mid = follow ? (ob.min[0] + ob.max[0]) / 2 : 0, band = rect(xb - xa, yHi - yLo, (xa + xb) / 2, ym), left = rect(mid - xa, yHi - yLo, (xa + mid) / 2, ym);
+        const sLo = shared ? ym - wb : yLo; // the stop's lower edge: above the shared rail, when there is one
+        const mid = follow ? (ob.min[0] + ob.max[0]) / 2 : 0, band = rect(xb - xa, yHi - sLo, (xa + xb) / 2, (yHi + sLo) / 2), left = rect(mid - xa, yHi - yLo, (xa + mid) / 2, ym);
         const inset = (d) => E.offset(-d, 'Round', 2, 32);
         // the 45° part is built in steps of one layer (or 4 steps with dynamic layers), as the printer builds it anyway
         const n = dyn ? 4 : Math.max(1, Math.round(u / LH)), stopParts = [], tagPlans = [];
@@ -1452,7 +1459,7 @@ function createEngine(wasm) {
           tagPlans.push(inset(rw + gap + z1).extrude(z1 - z0 + (k === n - 1 ? 0 : 0.001)).translate([0, 0, zS + z0]));
         }
         stopParts.push(band.intersect(E.subtract(inset(rw + u))).intersect(left).extrude(zTop - zS - u).translate([0, 0, zS + u]));
-        const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), extrudeX(dn, follow ? xa : -X, follow ? xb : X)]);
+        const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), ...(shared ? [] : [extrudeX(dn, follow ? xa : -X, follow ? xb : X)])]);
         body = body.add((follow ? rails.intersect(inEdge(zTop)) : rails).add(Manifold.union(stopParts)));
         // the top face, all of it visible: where the name goes
         const tagCS = rect(xb - xa + 4, 2 * htop, (xa + xb) / 2, ym).intersect(inset(rw + gap + u));
