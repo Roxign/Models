@@ -976,7 +976,7 @@ function createEngine(wasm) {
         const hinges = [-1, 1].map((sx) => rrect(arm * 2.2, H * 0.14, 1, sx * (W / 2 - arm * 1.1), H / 2 - H * 0.1));
         const cs = union([...lenses, bridge, ...hinges]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24);
         const lensIn = union(lenses.map((l) => l.offset(-rim, 'Round', 2, 32))).subtract(rect(bv, 2 * H, 0, 0));
-        return { cs, body: [-H / 2 + noseH, H / 2 - dip], edgeTop: H / 2, lenses: lensIn };
+        return { cs, body: [-H / 2 + noseH, H / 2 - dip], edgeTop: H / 2, lenses: lensIn, detail: { cs: cs.subtract(lensIn) } };
       },
     },
     // Spiral notebook, for planners: a row of punched holes along the top of the cover, each with a ring looping up over its
@@ -1168,11 +1168,6 @@ function createEngine(wasm) {
     const htag = zoneH / 2 - tagRw(p) - c;
     return { ym: (h0 + h1) / 2, htag, wb: htag + c };
   }
-  // How tall the block is (the rails' top), worked out the way build() does
-  function blockTop(p) {
-    const LH = p.layerH || 0.2, q = (v, n = 1) => (p.dyn ? v : Math.max(n, Math.round(v / LH - 1e-6)) * LH), T = q(p.thick ?? 2, 2), u = q(p.tagT ?? 1.6, 2);
-    return Math.max(p.statusOn === false ? T : T + q(p.railH ?? 3.6), p.nameRail ? T + Math.max(q(p.tagRailH ?? u), u) + q(0.8) : T);
-  }
   // The solid strip between the plate's edge and the nearest opening, at the top face: the track's rail (6 mm), the name tag's
   // rail and holder, or a printed name's margin. Feet and hooks may cover it.
   // the rail between the track and the plate's edge, at the top face (it is d = 2 mm narrower at the floor, under the dovetail)
@@ -1182,14 +1177,6 @@ function createEngine(wasm) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
     const named = !!((p.header || '').trim() || p.nameRail);
-    // Desk stand: the feet hold footGrip up the sign's front face (more along the face when it leans) and keep footClear from
-    // the nearest opening; leaning forward, the frame standing proud of the face comes lower too. So the sign grows only by
-    // what that leaves of the solid rail under the track.
-    if (p.mount === 'stand') {
-      const a = clamp(p.tilt ?? 15, -60, 60) * D2R, ca = Math.cos(a), sa = Math.sin(a), g = p.footGrip ?? 7.5;
-      const cov = Math.max(g, (sa < 0 ? -sa * blockTop(p) : 0) + 1.5) / ca + (sa < 0 ? (Math.max(0, p.proud ?? 0.8) + 0.4) * Math.tan(-a) : 0);
-      b0 = Math.max(b0, sh.body[0] + Math.max(0, cov + Math.max(0, p.footClear ?? 0.5) - solidEdge(p, p.statusOn === false && named)));
-    }
     // Cubicle hooks: the clip covers 7.5 mm of the front face below the top edge (edgeTop on shapes with something above it)
     // and keeps hookClear from the nearest opening. Shapes with a crown keep the hooks up there instead.
     const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
@@ -1202,7 +1189,8 @@ function createEngine(wasm) {
     // shared: the name tag's lower rail is the status track's upper rail (one rail between the two channels)
     let shared = false;
     if ((p.header || '').trim() || p.nameRail) {
-      if (sh.crown && !(p.nameRail && sh.bumpy) && !hooked) hdrZone = sh.crown.slice();
+      // a smooth crown (the arch) holds the name; a bumpy one (the cloud) leaves it to a band of its own above the track
+      if (sh.crown && !sh.bumpy && !hooked) hdrZone = sh.crown.slice();
       else {
         const z = hh || clamp(H * 0.17, 8, 16);
         hdrZone = [b1 - z, b1];
@@ -1236,6 +1224,12 @@ function createEngine(wasm) {
     if (keepX != null) return keepX - face - side;
     // the side margin is sideways only, so a name band that runs along a straight top edge keeps its full height
     return bandHalf(hErode(hErode(sh.cs, p.marginH ?? 0).offset(-face, 'Round', 2, 16), side), ym - (htop - npad), ym + (htop - npad), W);
+  }
+  // Half-width the outline leaves for a name printed on the plate in its band: the letters keep the name margin (at least 1.4 mm)
+  // from the outline over the height they take up.
+  function plateNameHalf(p, sh, hdrZone, W) {
+    const npad = Math.max(0, p.namePad ?? 1), [h0, h1] = hdrZone, zh = Math.max(2, h1 - h0 - 2 * npad), my = (h0 + h1) / 2;
+    return bandHalf(sh.cs.offset(-Math.max(1.4, npad), 'Round', 2, 16), my - zh * 0.36, my + zh * 0.36, W);
   }
   // Shrink an outline sideways only: points that keep m of outline to their left and right.
   const hErode = (cs, m) => (m > 0.01 ? cs.intersect(cs.translate([m, 0])).intersect(cs.translate([-m, 0])) : cs);
@@ -1276,7 +1270,7 @@ function createEngine(wasm) {
     const wwReq = Math.max(best.CW + 2 * pad + 0.4, 14.2);
     const whReq = Math.max(best.CH + 2 * pad + 0.4, 12.2);
     const headerText = (p.header || '').trim();
-    let hh = 0, hdrW = 0, tagNeed = 0;
+    let hh = 0, hdrW = 0, tagNeed = 0, plateNeed = 0;
     if (headerText || p.nameRail) {
       const m = headerText ? measureLines(font, [headerText]) : null, textW = m ? m.w * A.hdrCap / capRef(font) : 0;
       hh = p.nameRail ? nameBandH(p) : A.hdrCap / 0.62 + 2 * (p.namePad ?? 1);
@@ -1284,6 +1278,7 @@ function createEngine(wasm) {
       if (p.nameRail) hdrW = Math.max(hdrW, 60);
       // half-length the name needs on the tag (a blank tag is still at least 40 mm of top face)
       if (p.nameRail) tagNeed = Math.max(textW, 40) / 2 + 0.3;
+      else if (textW) plateNeed = textW / 2 + 0.3;
     }
     const keep = KEEP_RAILS.has(p.shape);
     // rail half-length needed for that window width (inverse of the window formula in build)
@@ -1302,6 +1297,8 @@ function createEngine(wasm) {
         let s = xNeed - X0;
         // the name tag runs along the track on bordered shapes and along its own band (to the edge) on the others
         if (tagNeed) s = Math.max(s, tagNeed - tagTextHalf(p, sh, v.hdrZone, W, keep ? X0 - (p.mount === 'screw' ? 11 : 0) : null));
+        // a name printed on the plate: as wide as the outline leaves at its band (narrower where the shape curves in)
+        if (plateNeed && v.hdrZone) s = Math.max(s, plateNeed - plateNameHalf(p, sh, v.hdrZone, W));
         return s;
       };
       let W = Math.max(floorW, 2 * xNeed + 12);
@@ -1461,7 +1458,7 @@ function createEngine(wasm) {
         // the name on the plate keeps the name margin from the edges of its band and from the outline
         const npad = p.namePad ?? 1, [h0, h1] = hdrZone, zh = Math.max(2, h1 - h0 - 2 * npad), my = (h0 + h1) / 2;
         const hdrMax = Math.min(auto ? autoMetrics(p).hdrCap : (p.hcap || 10), zh * 0.62);
-        const tb = fitText(font, headerText, Math.min(2 * X0, W * 0.86) - 2 * npad, zh * 0.72, hdrMax, true);
+        const tb = fitText(font, headerText, Math.min(Math.min(2 * X0, W * 0.86) - 2 * npad, 2 * plateNameHalf(p, sh, hdrZone, W)), zh * 0.72, hdrMax, true);
         if (tb.cs) {
           let k = 1, hcs = tb.cs.translate([0, my]);
           for (let i = 0; i < 24 && hcs.offset(Math.max(1.4, npad), 'Round', 2, 12).subtract(sh.cs).area() > 0.05; i++) { k *= 0.95; hcs = tb.cs.scale(k).translate([0, my]); }
@@ -1483,9 +1480,14 @@ function createEngine(wasm) {
       const z1 = Math.max(statusOn ? T + Rh : T, p.nameRail ? zTag : T);
       const fillRails = !KEEP_RAILS.has(p.shape), mh = p.marginH ?? 0;
       const edge = hErode(sh.cs, mh);
-      // a second plate color on the top layers: accK layers deep (accDep); the shape's details for that color, if it has any
-      const accMode = p.accentMode || 'off', accK = Math.max(1, Math.round(p.accentLayers ?? 3)), accL = dyn ? 0.2 : LH, accDep = accK * accL;
-      let detail = sh.detail ? { cs: sh.detail.cs, from: sh.detail.full ? -1 : z1 - accDep } : null;
+      // A second plate color in steps of one layer on top of the block (see below). accTD: the accent filament's transmission
+      // distance; accK steps, by default as many as it takes the accent to cover the plate color fully (a tenth of the TD).
+      const accMode = p.accentMode || 'off', accL = dyn ? 0.2 : LH, accTD = Math.max(0.1, p.accentTD ?? 4);
+      const accK = p.accentLayers > 0 ? Math.round(p.accentLayers) : clamp(Math.ceil((0.1 * accTD) / accL - 1e-6), 1, 20);
+      const accOn = accMode !== 'off', accTop = accOn ? z1 + accK * accL : z1;
+      // how much of the color below a stack of the accent t thick hides (AutoForge's model of HueForge's TD)
+      const accCover = (t) => Math.min(1, Math.sqrt(t / (0.1 * accTD)));
+      let detail = sh.detail ? sh.detail.cs : null, raisedExtra = null;
       const xa = ob.min[0] - 1, xb = ob.max[0] + 1;
       let body = sh.cs.extrude(z1);
       if (p.bevel > 0) {
@@ -1540,14 +1542,13 @@ function createEngine(wasm) {
         if (hdrZone && p.nameRail) bead = bead.subtract(toRight(-X - 1.5, hdrZone[1] - hdrZone[0] + 1, (hdrZone[0] + hdrZone[1]) / 2));
         else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
         for (const h of hookAt) bead = bead.subtract(rect(h.hw + 3, 14, h.xf, h.yT - 6));
-        body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
-        detail = { cs: bead, from: z1 - 0.01 };
+        // with a second color the bead is made of it (anything raised above the block is), so one filament swap still does
+        if (accOn) { raisedExtra = bead; if (accMode === 'details') detail = bead; } else body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
       }
       if (sh.lenses) {
         // glasses: the lenses one layer below the rims
         const rec = lz(0.2);
         body = body.subtract(sh.lenses.extrude(rec + 1).translate([0, 0, z1 - rec]));
-        detail = { cs: sh.lenses, from: z1 - rec - accDep };
       }
       if (p.shape === 'honeycomb') {
         const R = 2.6, Rx = R * Math.cos(30 * D2R), m = 2.5, g = 2, sp0 = Math.sqrt(3) * R + lw(1.2);
@@ -1656,35 +1657,36 @@ function createEngine(wasm) {
           }
         }
       }
-      // The plate's second color: the top layers (Top layer), more of them towards the right (Gradient) or towards the outline
-      // (Edge glow), or the shape's own details. In a translucent filament the thin layers let the plate color show through, so
-      // the steps read as a gradient from one color into the other.
+      // The plate's second color, the way HueForge colors a print: the plate stops flat at the top of the block and the second
+      // color is stacked on it in steps of one layer, so a single filament swap at the block's top prints it. Where the stack is
+      // thin the plate color shows through (more so in a translucent, high-TD filament), so the steps shade from one color into
+      // the other: all of them everywhere (Top layer), more towards the right (Gradient) or towards the outline (Edge glow), or
+      // on the shape's own details. A name printed on the plate sits on top of the steps.
       let accent = null, accentShade = null;
-      if (accMode !== 'off') {
-        const up = z1 + 60, cs = sh.cs, layers = [], plans = []; // plans[j]: where layer j (from the top) has the accent color
-        const slab = (plan, a, b) => (plan && !plan.isEmpty() ? plan.extrude(b - a).translate([0, 0, a]) : null);
-        const layerZ = (j) => [z1 - (j + 1) * accL, j ? z1 - j * accL : up]; // layer j from the top; the top one takes everything above
-        if (accMode === 'top') layers.push(slab(cs, z1 - accDep, up));
-        else if (accMode === 'gradient') {
-          const w = ob.max[0] - ob.min[0], hgt = ob.max[1] - ob.min[1] + 2, ym0 = (ob.min[1] + ob.max[1]) / 2;
-          // none at the left end, one layer more every (width / (k + 1)), all k at the right end
-          for (let j = 0; j < accK; j++) { const x0 = ob.min[0] + (w * (j + 1)) / (accK + 1); plans.push(cs.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0))); layers.push(slab(plans[j], ...layerZ(j))); }
-        } else if (accMode === 'edge') {
-          const D = clamp(Math.min(W, H) * 0.3, 4, 20);
-          for (let j = 0; j < accK; j++) { plans.push(cs.subtract(cs.offset(-(D * (accK - j)) / accK, 'Round', 2, 32))); layers.push(slab(plans[j], ...layerZ(j))); }
-        } else if (accMode === 'details') {
-          if (detail) layers.push(slab(detail.cs, detail.from, up));
-          else warnings.push('This shape has no details for the second color. Pick another plate accent.');
+      if (accOn) {
+        const top = body.slice(z1 - 0.05), plans = []; // the block's top face; plans[j]: where step j (from the bottom) is printed
+        const w = ob.max[0] - ob.min[0], hgt = ob.max[1] - ob.min[1] + 2, ym0 = (ob.min[1] + ob.max[1]) / 2;
+        for (let j = 0; j < accK; j++) {
+          let pl = null;
+          if (accMode === 'top') pl = top;
+          else if (accMode === 'gradient') { const x0 = ob.min[0] + (w * (j + 1)) / (accK + 1); pl = top.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0)); }
+          else if (accMode === 'edge') { const D = clamp(Math.min(W, H) * 0.3, 4, 20); pl = top.intersect(sh.cs.subtract(sh.cs.offset(-(D * (accK - j)) / accK, 'Round', 2, 32))); }
+          else if (accMode === 'details' && detail) pl = top.intersect(detail);
+          // under a printed name and on raised features the steps are full height
+          const extra = [raisedExtra, nameCS && !nameCS.isEmpty() ? nameCS.offset(0.4, 'Round', 2, 12).intersect(sh.cs) : null].filter(Boolean);
+          if (extra.length) pl = union([pl, ...extra].filter(Boolean));
+          plans.push(pl && !pl.isEmpty() ? pl : null);
         }
-        const vol = layers.filter(Boolean).length ? Manifold.union(layers.filter(Boolean)) : null;
-        if (vol) { const a = body.intersect(vol); if (!a.isEmpty()) { accent = a; body = body.subtract(vol); } }
-        // for the preview: the accent split by how many layers deep it is there (a translucent filament shows the plate through)
-        if (accent && plans.length) {
+        if (accMode === 'details' && !detail) warnings.push('This shape has no details for the second color. Pick another plate accent.');
+        const layers = plans.map((pl, j) => (pl ? pl.extrude(accL + (j < accK - 1 ? 0.001 : 0)).translate([0, 0, z1 + j * accL]) : null)).filter(Boolean);
+        if (layers.length) accent = Manifold.union(layers);
+        // for the preview: the steps by how many layers thick they are, each shaded by how much of the plate color it hides
+        if (accent) {
           accentShade = [];
-          for (let i = 1; i <= plans.length; i++) {
-            const zone = i < plans.length ? plans[i - 1].subtract(plans[i]) : plans[i - 1];
-            const piece = zone.isEmpty() ? null : accent.intersect(zone.extrude(up + 2).translate([0, 0, -1]));
-            if (piece && !piece.isEmpty()) accentShade.push({ level: i, of: plans.length, mesh: meshData(piece) });
+          for (let i = 1; i <= accK; i++) {
+            const zone = plans[i - 1] ? (i < accK && plans[i] ? plans[i - 1].subtract(plans[i]) : plans[i - 1]) : null;
+            const piece = zone && !zone.isEmpty() ? accent.intersect(zone.extrude(accTop - z1 + 2).translate([0, 0, z1 - 1])) : null;
+            if (piece && !piece.isEmpty()) accentShade.push({ level: i, cover: accCover(i * accL), mesh: meshData(piece) });
           }
         }
       }
@@ -1693,16 +1695,16 @@ function createEngine(wasm) {
       let labels = null, nameText = null;
       if (raised) {
         if (labelsCS) labels = labelsCS.extrude(Lh).translate([0, 0, T]);
-        if (nameCS) nameText = nameCS.extrude(Ln).translate([0, 0, z1]);
+        if (nameCS) nameText = nameCS.extrude(Ln).translate([0, 0, accTop]);
       } else {
         if (labelsCS) body = body.subtract(labelsCS.extrude(engr + 1).translate([0, 0, T - engr]));
-        if (nameCS) body = body.subtract(nameCS.extrude(engrN + 1).translate([0, 0, z1 - engrN]));
+        if (nameCS) { const cut = nameCS.extrude(engrN + 1).translate([0, 0, accTop - engrN]); body = body.subtract(cut); if (accent) accent = accent.subtract(cut); }
       }
       // the top of the base (plate, rails and letters) inside a box, for the hooks and feet that clip over it
       const topIn = (bx) => Math.max(T, ...[body, accent, labels, nameText].filter(Boolean).map((m) => m.intersect(bx).boundingBox().max[2]).filter(Number.isFinite));
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], accent ? accent.boundingBox().max[2] : 0, T + Lh, nameText ? z1 + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = accTop + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], accent ? accent.boundingBox().max[2] : 0, T + Lh, nameText ? accTop + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1729,22 +1731,38 @@ function createEngine(wasm) {
         const slotCS = (sh.outer || sh.cs).offset(gF, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 2 * gF).translate([0, 0, -gF]).transform(M);
         // ff, fbk: how far each foot reaches in front of and behind the sign (never less than a solid wall)
         const fl = p.footW ?? 22, ff = Math.max(lw(1.6), p.footF ?? 12), fbk = Math.max(lw(1.6), p.footB ?? 38);
+        // the lowest opening in the top face: the track, the name tag's channel or a printed name; leaning forward, the frame
+        // standing proud of the face comes lower than the face itself
+        let yOpenLow = Infinity;
+        if (statusOn) yOpenLow = yc - yR;
+        else if (p.nameRail && hdrZone) { const td = tagDims(p, hdrZone); yOpenLow = td.ym - td.wb + holdH; }
+        else if (headerText && hdrZone) yOpenLow = hdrZone[0] + Math.max(0, p.namePad ?? 1);
+        const fwdLean = sa < 0 ? (Math.max(0, proud) + 0.4) * (-sa / Math.max(0.5, ca)) : 0;
         if ((p.footN ?? 2) > 1 && (2 * Math.min(W * 0.28, X * 0.75)) / ((p.footN ?? 2) - 1) < fl + 1) warnings.push('The feet overlap each other. Use fewer or narrower feet, or a wider sign.');
         for (const xf of spread(p.footN ?? 2, Math.min(W * 0.28, X * 0.75))) {
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
-          // the foot clips over the full thickness of the base there, footGrip up from the sign's lowest corner
+          // The foot clips over the full thickness of the base there. Behind the sign it rises footGrip up the back face (nothing is
+          // in the way there); in front it rises as far up the face as it can and still keep footClear from the lowest opening (more
+          // room under the track, as on the film strip, means a taller front lip). The plate itself is never changed for the feet.
           const zc = topIn(Manifold.cube([fl + 1, 12, 400]).translate([xf - fl / 2 - 0.5, ybL - 1, -1]));
-          const yBack = (ybL - ybG) * ca + floor + lift0, yFront = yBack + sa * zc, hF = lzDown(Math.max(yFront + (p.footGrip ?? 7.5), Math.max(yBack, yFront) + 1.5));
-          // The sign's back and front faces where its bottom edge meets the foot, and how far they move back (or forward, leaning
-          // forward) by the top of the foot. The reach is measured from the outermost of those, so each foot keeps a whole wall in
-          // front of the sign and behind it all the way up.
+          const yBack = (ybL - ybG) * ca + floor + lift0, yFront = yBack + sa * zc, grip = Math.max(1, p.footGrip ?? 12);
+          const front = Math.max(0, Math.min(grip, yOpenLow - ybL - Math.max(0, p.footClear ?? 0.5) - fwdLean));
+          const hFr = lzDown(Math.max(yFront + front * ca, Math.min(yBack, yFront) + 1)), hBk = Math.max(hFr, lzDown(yBack + grip * ca)), hF = hBk;
+          if (front < 2 && !warnings.some((w) => w.startsWith('The feet'))) warnings.push(`The feet's front lip is only ${fmtMm(front)} mm tall: there is little plate under the track. Add a bottom margin or a wider rail beside the track for a firmer hold${sa < 0 ? ', especially leaning forward' : ''}.`);
           // (each face moves by its own height in the foot times the lean's tangent)
-          const tA = sa / Math.max(0.5, ca), zB0 = -(ybL - ybG) * sa, zF0 = zB0 + zc * ca;
-          const zFront = Math.max(zF0, zF0 - (hF - yFront) * tA) + gF + ff, zBack = Math.min(zB0, zB0 - (hF - yBack) * tA) - gF - fbk;
-          let foot = extrudeY(rrect(fl, zFront - zBack, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot(zc));
+          const tA = sa / Math.max(0.5, ca), zB0 = -(ybL - ybG) * sa, zF0 = zB0 + zc * ca, zFace = (Y) => zF0 - (Y - yFront) * tA;
+          const zFront = Math.max(zF0, zFace(hFr)) + gF + ff, zBack = Math.min(zB0, zB0 - (hBk - yBack) * tA) - gF - fbk;
+          let foot = extrudeY(rrect(fl, zFront - zBack, 4, xf, -(zFront + zBack) / 2), hBk);
+          if (hBk > hFr + 0.01) {
+            // above the front lip nothing stays in front of the sign's face (built in the sign's own coordinates, then stood up),
+            // so the back wall follows the sign at any lean
+            const ahead = Manifold.cube([fl + 4, 4000, 400]).translate([xf - fl / 2 - 2, -2000, zc + gF]).transform(M);
+            foot = foot.subtract(ahead.intersect(Manifold.cube([fl + 4, hBk - hFr + 1, 4000]).translate([xf - fl / 2 - 2, hFr, -2000])));
+          }
+          foot = foot.subtract(slot(zc));
           if (biteF >= 0.005) {
-            const y = ybL + 0.5 * (p.footGrip ?? 7.5) / Math.max(0.5, ca), root = (z) => rect(2 * rrF, 0.02, y, z);
+            const y = ybL + 0.5 * Math.max(1, front), root = (z) => rect(2 * rrF, 0.02, y, z);
             foot = foot.add(extrudeX(union([
               CrossSection.hull([circle(rrF, y, zc - biteF + rrF, 24), root(zc + gF + 0.05)]),
               CrossSection.hull([circle(rrF, y, biteF - rrF, 24), root(-gF - 0.05)]),
@@ -1849,7 +1867,7 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: z1, accentMode: accent ? accMode : 'off', accentZ: z1 - accDep, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: accTop, accentMode: accent ? accMode : 'off', accentZ: z1, accentTop: accTop, accentLayers: accK, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, plateW: W, plateH: H, auto,
         },
       };
@@ -1971,29 +1989,29 @@ const withBreak = (t) => {
 // you typed stays.
 const look = (shape, font, [colBase, colLabel, colSlider], name = 'off', hcap = 20, extra = {}) => ({
   shape, font, layout: 'stack', relief: 'raised', uniform: true, reliefH: 0.4, statusOn: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel,
-  nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, accentMode: 'off', accentLayers: 3, colAccent: colSlider, ...extra,
+  nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, accentMode: 'off', accentLayers: 0, accentTD: 0, colAccent: colSlider, ...extra,
 });
 const PRESETS_RAW = [
-  { name: 'Office classic', look: look('rail', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
-  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#FFFFFF', '#0A2989', '#0056B8'], 'tag', 18, { accentMode: 'gradient' }), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
-  { name: 'Deep work', look: look('pixel', 'mono', ['#000000', '#00AE42', '#00AE42'], 'plate', 16, { accentMode: 'gradient' }), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
-  { name: 'Studio', look: look('banner', 'bebas', ['#000000', '#FFFFFF', '#C12E1F'], 'plate', 18, { accentMode: 'edge' }), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
-  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#FFFFFF', '#545454', '#00B1B7'], 'tag', 18, { accentMode: 'edge' }), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
-  { name: 'Meeting room', look: look('rounded', 'inter', ['#3F8E43', '#FFFFFF', '#FEC600'], 'plate', 18), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
-  { name: 'Classroom', look: look('arch', 'fredoka', ['#3F8E43', '#FFFFFF', '#F4EE2A'], 'plate', 18), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
-  { name: 'Clinic', look: look('pill', 'poppins', ['#FFFFFF', '#5B6579', '#00B1B7'], 'tag', 18), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
-  { name: 'Home office', look: look('cat', 'fredoka', ['#F7E6DE', '#6F5034', '#FF6A13'], 'plate', 16), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
+  { name: 'Office classic', sample: 'ALEX CHEN', look: look('rail', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
+  { name: 'Hybrid team', sample: 'ALEX CHEN', look: look('pill', 'montserrat', ['#0A2989', '#FFFFFF', '#FF6A13'], 'tag', 18, { accentMode: 'gradient', colAccent: '#FFFFFF' }), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
+  { name: 'Deep work', sample: 'FOCUS ZONE', look: look('pixel', 'mono', ['#000000', '#00AE42', '#00AE42'], 'plate', 16, { accentMode: 'gradient', colAccent: '#FFFFFF' }), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
+  { name: 'Studio', sample: 'STUDIO A', look: look('banner', 'bebas', ['#000000', '#FFFFFF', '#C12E1F'], 'plate', 18, { accentMode: 'edge', colAccent: '#C12E1F' }), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Research lab', sample: 'DR. ALEX CHEN', look: look('honeycomb', 'roboto', ['#545454', '#FFFFFF', '#00B1B7'], 'tag', 18, { accentMode: 'edge', colAccent: '#00B1B7' }), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
+  { name: 'Meeting room', sample: 'ROOM 301', look: look('rounded', 'inter', ['#3F8E43', '#FFFFFF', '#FEC600'], 'plate', 18), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
+  { name: 'Classroom', sample: 'ROOM 204', look: look('arch', 'fredoka', ['#3F8E43', '#FFFFFF', '#F4EE2A'], 'plate', 18), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
+  { name: 'Clinic', sample: 'DR. ALEX CHEN', look: look('pill', 'poppins', ['#FFFFFF', '#5B6579', '#00B1B7'], 'tag', 18), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
+  { name: 'Home office', sample: 'HOME OFFICE', look: look('cat', 'fredoka', ['#F7E6DE', '#6F5034', '#FF6A13'], 'plate', 16), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
   { name: 'Simple three', look: look('lozenge', 'inter', ['#FFFFFF', '#000000', '#0056B8'], 'off', 20), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: 'Mood', look: look('cloud', 'fredoka', ['#FFFFFF', '#545454', '#FEC600'], 'plate', 14, { accentMode: 'gradient', colAccent: '#F55A74' }), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
-  { name: '繁體中文', look: look('rounded', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
+  { name: 'Mood', look: look('cloud', 'fredoka', ['#0056B8', '#FFFFFF', '#FEC600'], 'off', 14, { accentMode: 'gradient', colAccent: '#FEC600' }), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
+  { name: '繁體中文', sample: '王小明', look: look('rounded', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
-  { name: '剪輯師', look: look('film', 'oswald', ['#000000', '#FFFFFF', '#FEC600'], 'tag', 20, { accentMode: 'details', colAccent: '#A6A9AA' }), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
-  { name: '企劃', look: look('glasses', 'poppins', ['#0A2989', '#FFFFFF', '#FF6A13'], 'tag', 20, { accentMode: 'details', colAccent: '#0086D6', accentLayers: 2 }), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
+  { name: '剪輯師', look: look('film', 'oswald', ['#000000', '#FFFFFF', '#FEC600'], 'off', 20, { accentMode: 'details', colAccent: '#A6A9AA' }), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
+  { name: '企劃', look: look('glasses', 'poppins', ['#FFFFFF', '#0A2989', '#FF6A13'], 'off', 20, { accentMode: 'details', colAccent: '#0A2989', accentLayers: 3 }), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
   // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
-  { name: '心情', look: look('cloud', 'fredoka', ['#FFFFFF', '#545454', '#FEC600'], 'plate', 14, { accentMode: 'gradient', colAccent: '#F55A74' }), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
-  { name: '日本語', look: look('scallop', 'serif', ['#FFFFFF', '#000000', '#C12E1F'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
+  { name: '心情', look: look('cloud', 'fredoka', ['#0056B8', '#FFFFFF', '#FEC600'], 'off', 14, { accentMode: 'gradient', colAccent: '#FEC600' }), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
+  { name: '日本語', sample: '山田 太郎', look: look('scallop', 'serif', ['#FFFFFF', '#000000', '#C12E1F'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
-const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
+const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, sample: p.sample || '', look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
   ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
   ['STEP OUT', 'exit'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
@@ -2040,10 +2058,19 @@ const STATUS_SETS = (() => {
 })();
 // Common PLA colors (the usual basic range of the big filament brands); presets and palettes use only these, at most four per
 // sign, and the color pickers suggest them.
-const FILAMENT_COLORS = [['Black', '#000000'], ['White', '#FFFFFF'], ['Light Gray', '#D1D3D5'], ['Gray', '#8E9089'], ['Dark Gray', '#545454'], ['Silver', '#A6A9AA'],
-  ['Beige', '#F7E6DE'], ['Red', '#C12E1F'], ['Dark Red', '#9D2235'], ['Orange', '#FF6A13'], ['Sunflower Yellow', '#FEC600'], ['Yellow', '#F4EE2A'], ['Gold', '#E4BD68'],
-  ['Green', '#00AE42'], ['Dark Green', '#3F8E43'], ['Turquoise', '#00B1B7'], ['Cyan', '#0086D6'], ['Cobalt Blue', '#0056B8'], ['Navy Blue', '#0A2989'],
-  ['Blue Grey', '#5B6579'], ['Purple', '#5E43B7'], ['Pink', '#F55A74'], ['Magenta', '#EC008C'], ['Brown', '#9D432C'], ['Cocoa Brown', '#6F5034']];
+// The third number is a typical HueForge transmission distance (TD, mm) for that color in basic PLA: how much light gets through.
+const FILAMENT_COLORS = [['Black', '#000000', 0.3], ['White', '#FFFFFF', 5], ['Light Gray', '#D1D3D5', 3.5], ['Gray', '#8E9089', 0.7], ['Dark Gray', '#545454', 0.3],
+  ['Silver', '#A6A9AA', 4], ['Beige', '#F7E6DE', 5], ['Red', '#C12E1F', 3], ['Dark Red', '#9D2235', 1.5], ['Orange', '#FF6A13', 6.5], ['Sunflower Yellow', '#FEC600', 7.5],
+  ['Yellow', '#F4EE2A', 7.6], ['Gold', '#E4BD68', 4], ['Green', '#00AE42', 2.2], ['Dark Green', '#3F8E43', 1.5], ['Turquoise', '#00B1B7', 4], ['Cyan', '#0086D6', 6.6],
+  ['Cobalt Blue', '#0056B8', 1.5], ['Navy Blue', '#0A2989', 0.8], ['Blue Grey', '#5B6579', 1], ['Purple', '#5E43B7', 2], ['Pink', '#F55A74', 4.1], ['Magenta', '#EC008C', 3],
+  ['Brown', '#9D432C', 1.8], ['Cocoa Brown', '#6F5034', 1.8]];
+// the typical TD of the common color nearest to hex
+function typicalTD(hex) {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), [r, g, b] = rgb(hex);
+  let best = null;
+  for (const [, h, td] of FILAMENT_COLORS) { const [r2, g2, b2] = rgb(h), d = Math.hypot(r - r2, g - g2, b - b2); if (!best || d < best.d) best = { d, td }; }
+  return best.td;
+}
 // the nearest common filament color's name, or the hex code when none is close
 function filamentName(hex) {
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), [r, g, b] = rgb(hex);
@@ -2065,8 +2092,8 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.4, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookClear: 0.5, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
-  statusOn: true, nameMode: 'off', tagT: 1.6, accentMode: 'off', accentLayers: 3, colAccent: '#0086D6', railW: 4,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 12, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookClear: 0.5, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
+  statusOn: true, nameMode: 'off', tagT: 1.6, accentMode: 'off', accentLayers: 0, accentTD: 0, colAccent: '#0086D6', railW: 4,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.4, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
 
@@ -2083,7 +2110,8 @@ const SLIDERS = {
   nameReliefH: { label: 'Name text thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 15, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 15, step: 0.5, out: mm() },
-  accentLayers: { label: 'Second color depth', min: 1, max: 10, step: 1, out: (v) => `${v} layer${v > 1 ? 's' : ''}` },
+  accentLayers: { label: 'Second color steps', min: 0, max: 20, step: 1, out: (v) => (v > 0 ? `${v} layer${v > 1 ? 's' : ''}` : 'auto') },
+  accentTD: { label: 'Second color TD', min: 0, max: 30, step: 0.1, out: (v) => (v > 0 ? `${v} mm` : 'typical') },
   railW: { label: 'Rail width beside the track', min: 3, max: 12, step: 0.2, nozzleMin: 9, out: mm() },
   railH: { label: 'Rail height', min: 2.4, max: 10, step: 0.5, layers: true, out: mm() },
   tagTol: { label: 'Tag slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
@@ -2097,7 +2125,7 @@ const SLIDERS = {
   footW: { label: 'Foot width', min: 10, max: 100, step: 1, out: mm(0) },
   footF: { label: 'Foot reach in front of the sign', min: 2, max: 120, step: 1, out: mm(0) },
   footB: { label: 'Foot reach behind the sign', min: 2, max: 250, step: 1, out: mm(0) },
-  footGrip: { label: 'Foot grip height', min: 3, max: 20, step: 0.5, out: mm() },
+  footGrip: { label: 'Foot grip height', min: 3, max: 40, step: 0.5, out: mm() },
   footGap: { label: 'Gap between foot and sign', min: 0.05, max: 1, step: 0.05, out: mm(2) },
   footClear: { label: 'Space between feet and track', min: 0, max: 10, step: 0.1, out: mm() },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
@@ -2124,7 +2152,7 @@ const SLIDERS = {
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { accentLayers: 1, footGap: 0.02, footGrip: 2, hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { footGap: 0.02, footGrip: 2, hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -2170,7 +2198,7 @@ const MOUNT_HINTS = {
   magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
-  stand: 'Two slotted feet print separately and hold the sign upright on a desk. Each foot reaches the set distance in front of and behind the sign, measured from its faces, so it always keeps a wall on both sides. Foot grip height is how far up the sign they hold; the sign only grows by what the feet cover beyond the rail under the track.',
+  stand: 'Slotted feet print separately and hold the sign upright on a desk; the sign itself is not changed for them. Behind the sign each foot rises the foot grip height up its back; in front it rises as far as it can while keeping the set space from the track, so a sign with more plate under the track (like the film strip) gets a taller front lip. Each foot reaches the set distance in front of and behind the sign, measured from its faces.',
   cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is. A negative drop hangs the sign higher than the panel.',
   cubrail: 'For a C-shaped rail: each hook ends in a thin tab. Hold the sign up a little, push the tabs into the slot and let go; the tabs drop behind the lower lip. It slides along the rail. Measure the slot and the hollow behind it.',
 };
@@ -2251,8 +2279,9 @@ const SECTIONS = [
     ] },
     { group: 'Second color', items: [
       { seg: 'accentMode', label: 'Plate accent', options: [['off', 'Off'], ['top', 'Top layer'], ['gradient', 'Gradient'], ['edge', 'Edge glow'], ['details', 'Shape details']] },
+      { slider: 'accentTD', when: 'accent' },
       { slider: 'accentLayers', when: 'accent' },
-      { hint: 'A second plate color on the top layers. In a translucent filament the thin layers let the plate color show through, so a gradient or an edge glow shades from one color into the other. Shape details color the shape\'s own features: the glasses\' lenses, the notebook\'s rings, the film strip\'s edges, the Classic bead. Top layer prints with one filament swap; the others need a multi-color printer (AMS, MMU). Keep the whole sign to four colors.', when: 'accent' },
+      { hint: 'Made the way HueForge colors a print: the second color is stacked on top of the plate in steps of one layer, so one filament swap prints it, and where the stack is thin the plate color shows through. TD (transmission distance) is how much light a filament lets through; it hides the color below it at about a tenth of its TD. Leave it at 0 for the typical value of the chosen color, or enter your filament\'s (HueForge lists them). Auto steps: as many layers as full cover takes, each a different shade; thinner layers give more of them. A lighter, more translucent color over a darker plate gives the longest gradient. Shape details: the glasses\' frame, the notebook\'s rings, the film strip\'s edges, the Classic bead.', when: 'accent' },
     ] },
   ] },
   { title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
@@ -2524,7 +2553,7 @@ function updateScene(res, refit) {
   signGroup.add(makeMesh(geometryFrom(parts.body), mats.base));
   shadeMats = [];
   if (parts.accentShade && parts.accentShade.length) {
-    for (const sh of parts.accentShade) { const m = mats.accent.clone(); m.userData.level = sh.level; shadeMats.push(m); signGroup.add(makeMesh(geometryFrom(sh.mesh), m)); }
+    for (const sh of parts.accentShade) { const m = mats.accent.clone(); m.userData.cover = sh.cover; shadeMats.push(m); signGroup.add(makeMesh(geometryFrom(sh.mesh), m)); }
     applyColors();
   } else if (parts.accent) signGroup.add(makeMesh(geometryFrom(parts.accent), mats.accent));
   if (parts.labels) signGroup.add(makeMesh(geometryFrom(parts.labels), mats.label));
@@ -3010,15 +3039,17 @@ function downloadZip() {
   saveBlob(zipBlob(zfiles), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.zip`);
 }
 // height of the tallest raised text on the base
-// Two colors on one nozzle: the heights to swap to the text color and back. The status labels stand on the track floor (Z = T),
-// a name printed on the plate on the top face (Z = zName); where both start at the same height they share one swap.
-const swaps = (i) => {
-  const out = [];
-  if (result.parts.labels) out.push([i.T, i.T + i.Lh]);
-  if (result.parts.nameText) { const a = i.zName ?? i.T, b = a + i.Ln, same = out.find(([x]) => Math.abs(x - a) < 1e-6); if (same) same[1] = Math.max(same[1], b); else out.push([a, b]); }
-  return out;
+// Filament swaps for the base on one nozzle, bottom to top: the status labels on the track floor (Z = T) and back to the plate,
+// the second color on top of the block, and a name printed on the plate on top of everything.
+const swapEvents = (i) => {
+  const P = result.parts, ev = [];
+  if (P.labels) ev.push([i.T, state.colLabel, 'status lettering'], [i.T + i.Lh, state.colBase, 'plate']);
+  if (P.accent) ev.push([i.accentZ, state.colAccent, 'second color']);
+  if (P.nameText) ev.push([i.zName, state.colName, 'name']);
+  return ev.sort((a, b) => a[0] - b[0]).filter((e, k, a) => !(a[k + 1] && Math.abs(a[k + 1][0] - e[0]) < 1e-6));
 };
-const swapText = (i, mono = (v) => v) => swaps(i).map(([a, b]) => `swap to the text color on the first layer above Z = ${mono(a.toFixed(2) + ' mm')} (the ${mono((a + layerFine()).toFixed(2) + ' mm')} layer) and back on the first layer above Z = ${mono(b.toFixed(2) + ' mm')}`).join('; then ');
+const swaps = (i) => swapEvents(i);
+const swapText = (i, mono = (v) => v) => swapEvents(i).map(([z, c, what]) => `from the first layer above Z = ${mono(z.toFixed(2) + ' mm')}, ${what} (${filamentName(c)})`).join('; ');
 function readmeText() {
   const i = result.info;
   const lines = [
@@ -3037,9 +3068,8 @@ function readmeText() {
     result.parts.hooks.length ? '- cubicle_hook_left / cubicle_hook_right: printed on their side.' : null,
     '',
     'Two colors on a single nozzle',
-    i.raised && swaps(i).length ? `- With ${layerFine()} mm layers: ${swapText(i)}.${result.parts.nameText && result.parts.labels ? ' The status labels and the name share that color this way; for two text colors use a multi-color printer.' : ''}` : '- Not needed: the letters are engraved.',
-    i.raised && swaps(i).length ? '- The sides of the plate are printed at those heights too, so they pick up a thin stripe of the text color.' : null,
-    i.accentMode === 'top' ? `- Plate accent: swap to the accent color on the first layer above Z = ${i.accentZ.toFixed(2)} mm and keep it to the top (or load base_accent with the body).` : i.accentMode !== 'off' ? '- Plate accent: its color changes within layers, so load base_body and base_accent together as one object on a multi-color printer (AMS, MMU).' : null,
+    swaps(i).length ? `- With ${layerFine()} mm layers, start in the plate color, then: ${swapText(i)}.` : '- Not needed: one color.',
+    result.parts.labels ? '- The sides of the plate are printed at the lettering heights too, so they pick up a thin stripe of that color.' : null,
     i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
     'Assembly',
@@ -3354,6 +3384,9 @@ function renderPresets() {
     state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
     state.current = 0;
     if (p.look) Object.assign(state, SHAPE_NEUTRAL, SHAPE_DEFAULTS[p.look.shape] || {}, p.look);
+    // a sample name where the preset suits one; a name you typed stays (only an empty name or another preset's sample changes)
+    const samples = new Set(PRESETS.map((x) => x.sample).filter(Boolean));
+    if (!(state.header || '').trim() || samples.has(state.header)) state.header = p.sample;
     renderStatuses();
     if (engine) renderShapes();
     syncControls();
@@ -3477,7 +3510,7 @@ function setKey(k, raw, free) {
     for (const sk of Object.keys(SLIDERS)) state[sk] = freeClamp(sk, state[sk]);
   }
   syncControls();
-  if (COLOR_KEYS.has(k)) { applyColors(); saveState(); if (result) updateReadout(); return; }
+  if (COLOR_KEYS.has(k)) { applyColors(); saveState(); if (result) updateReadout(); if (k === 'colAccent' && state.accentMode !== 'off' && !(state.accentTD > 0)) changed(); return; }
   if (k === 'bed') { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
   changed();
 }
@@ -3573,8 +3606,8 @@ function applyColors() {
   mats.tag.color.set(state.colTag);
   mats.name.color.set(state.colName);
   mats.accent.color.set(state.colAccent);
-  // about 40% of the plate color is hidden by each translucent layer
-  for (const m of shadeMats) m.color.set(state.colBase).lerp(new THREE.Color(state.colAccent), 1 - Math.pow(0.6, m.userData.level));
+  // each step shows the plate color through it by how much the accent covers at that thickness (a straight blend, as AutoForge)
+  for (const m of shadeMats) m.color.set(state.colBase).lerp(new THREE.Color(state.colAccent), m.userData.cover);
   requestRender();
 }
 function setBuildState(kind, text) {
@@ -3642,10 +3675,9 @@ function renderExport() {
   const i = result.info;
   const steps = [
     `<b>Print</b> every part as exported. They are already oriented for printing and need no supports${result.parts.slider ? '; the frame prints face-down' : ''}.`,
-    i.raised
-      ? `<b>Two colors, one nozzle</b> (${layerFine()} mm layers): ${swapText(i, (v) => `<span class="mono">${v}</span>`)}. The sides of the plate pick up a thin stripe of the text color at those heights. With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
+    swaps(i).length
+      ? `<b>Colors on one nozzle</b> (${layerFine()} mm layers): start in the plate color, then ${swapText(i, (v) => `<span class="mono">${v}</span>`)}.${result.parts.labels ? ' The sides of the plate pick up a thin stripe of the lettering color at its heights.' : ''} With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
-    i.accentMode === 'top' ? `<b>Plate accent:</b> swap to the accent color on the first layer above <span class="mono">Z ${i.accentZ.toFixed(2)} mm</span> and keep it to the top, or load <i>plate accent</i> with the base body.` : i.accentMode && i.accentMode !== 'off' ? '<b>Plate accent:</b> its color changes within layers, so print the base on a multi-color printer (AMS, MMU) with <i>base body</i> and <i>plate accent</i> loaded together. A translucent accent filament gives the smoothest gradient.' : null,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     result.parts.slider ? `<b>Assemble:</b> slide the frame into the track from the right end, the open end. Nothing holds it there but the fit of the dovetail, so don't push it past the last status.` : null,
@@ -3733,7 +3765,7 @@ async function rebuild() {
     const { font, missing } = await textFontFor(state.statuses.map((x) => x.text).join('') + state.header, state.font);
     textMissing = missing;
     const t0 = performance.now();
-    result = engine.build({ ...state, header: state.nameMode === 'off' ? '' : state.header, nameRail: state.nameMode === 'tag', statuses: state.statuses.map((s) => ({ ...s })) }, font);
+    result = engine.build({ ...state, accentTD: state.accentTD > 0 ? state.accentTD : typicalTD(state.colAccent), header: state.nameMode === 'off' ? '' : state.header, nameRail: state.nameMode === 'tag', statuses: state.statuses.map((s) => ({ ...s })) }, font);
     const ms = performance.now() - t0;
     if (state.current >= result.info.cells.length) state.current = result.info.cells.length - 1;
     if (result.info.auto) { state.width = Math.round(result.info.plateW * 10) / 10; state.height = Math.round(result.info.plateH * 10) / 10; syncControls(); }
