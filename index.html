@@ -1018,16 +1018,9 @@ function createEngine(wasm) {
     honeycomb: { label: 'Honeycomb', make: (W, H) => ({ cs: rrect(W, H, Math.min(10, H * 0.2)), body: [-H / 2, H / 2] }) },
   };
 
-  // Shapes with a border or end features keep their rails to the track length. On the others the rails, and the name tag rail,
-  // run out to the edge and follow the outline.
+  // The rails always follow the outline (they are what is left of the plate around the channels). On these bordered shapes the
+  // name tag's ends and its channel's closed end keep to the track length; on the others they follow the outline too.
   const KEEP_RAILS = new Set(['rail', 'classic', 'honeycomb']);
-  // With a slide-in tag, these shapes run the tag's upper rail out to the outline above it when the sign hangs from cubicle hooks
-  // (the hooks then clip over plate and rail), and a hang loop's rings rise to the rail tops. The pixel shape always runs it out.
-  const TAG_FILL = new Set(['rail', 'rounded', 'pill', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch']);
-  // the tag's upper rail runs out to the outline above it on these whatever the mount
-  const TOP_FILL = new Set(['pixel', 'cloud', 'scallop', 'wave', 'arch']);
-  // the status track's lower rail runs out to the outline below it on these (the wave's rails reach every edge)
-  const BOT_FILL = new Set(['scallop', 'wave', 'speech']);
 
   // ---------- text ----------
   // Contours keep the font's own winding; CrossSection's NonZero fill rule resolves holes and overlaps.
@@ -1365,7 +1358,6 @@ function createEngine(wasm) {
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
-      let hangRing = null; // the eyelets outside the plate's own outline
       if (p.mount === 'hang') {
         // eyelets on top of whatever outline was chosen, each centered over the outline's height at its position
         const re = Math.max(1.5, (p.hangHole ?? 10) / 2), ro = Math.max(re + 3.5, (re + 0.8) / 0.7);
@@ -1374,7 +1366,6 @@ function createEngine(wasm) {
           const strip = rect(2, 600, x, 0).intersect(sh.cs), tb = strip.isEmpty() ? sh.cs.bounds() : strip.bounds(), cy = tb.max[1] + ro * 0.7;
           eyes.push(circle(ro, x, cy, 64)); holes.push(circle(re, x, cy, 64));
         }
-        hangRing = union(eyes).subtract(union(holes)).subtract(sh.cs);
         sh.cs = union([sh.cs, ...eyes]).subtract(union(holes));
       }
       const ob = sh.cs.bounds();
@@ -1432,46 +1423,29 @@ function createEngine(wasm) {
       }
       const labelsCS = union(labelParts), nameCS = union(nameParts);
 
-      // base body: plate + dovetail rails, closed at the left end and open at the right, + mounting
-      // One top height for every rail: with a name tag, the status rails and the tag's rails all rise to the taller of the two
-      // (the track's rail height, or the tag's thickness plus its lip), so the sign has one flat top face. The channels below
-      // keep their own shapes: the frame's dovetail and the tag's 45° lean.
-      // The tag's rails lean in at 45° from the plate up to the holder height (never lower than the tag; above the tag the lean
-      // reaches over its top face so it can't lift out), then rise straight up 0.8 mm.
+      // Base body. The plate is one solid block: the outline (with the hang loop's eyelets, if any) as tall as the rails. The
+      // status track and the name tag's channel are then cut down into it, closed at the left end and open through the right
+      // edge for the frame and the tag. So the rails follow the outline all round and the sign has one flat top face.
+      // The tag's channel leans in at 45° from its floor up to the holder height (never lower than the tag; above the tag the
+      // lean reaches over its top face so it can't lift out), then rises straight up 0.8 mm more.
       const uTag = lz(p.tagT ?? 1.6, 2), holdH = Math.max(lz(p.tagRailH ?? uTag), uTag), zTag = T + holdH + lz(0.8);
       if (p.nameRail && lz(p.tagRailH ?? uTag) < uTag - 1e-6) warnings.push(`The tag rail's 45° holder is raised to the ${fmtMm(uTag)} mm tag: it can't be lower than the tag.`);
-      const z0 = 0, z1 = statusOn && p.nameRail ? Math.max(T + Rh, zTag) : T + Rh, chf = 0.8;
-      const yi = yR, yo = yR + Rw;
-      // rail cross-sections start at the bed (inside the plate); the 45° undercut starts at the plate's face
-      // With a name tag right above the track the upper rail is shared: the frame's dovetail on its lower side, the tag's 45° lean
-      // on its upper side, and the common flat top.
-
-      const railTop = shared
-        ? poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, T], [yc + yo + holdH, T + holdH], [yc + yo + holdH, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]])
-        : poly([[yc + yi + d + 0.02, z0], [yc + yo, z0], [yc + yo, z1 - chf], [yc + yo - chf, z1], [yc + yi, z1], [yc + yi, T + d], [yc + yi + d + 0.02, T - 0.02]]);
-      const railBot = poly([[yc - yi - d - 0.02, z0], [yc - yi - d - 0.02, T - 0.02], [yc - yi, T + d], [yc - yi, z1], [yc - yo + chf, z1], [yc - yo, z1 - chf], [yc - yo, z0]]);
-      const block = rect(X - xR, 2 * (yR + d) + 1, -(xR + X) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-      // Bordered shapes keep the rails to the track. On the others the rails run out to the edge (less the side margin) and follow
-      // the outline; the left end is filled solid and the right end stays open for the frame.
+      // z1: the top of the block, the taller of the track's rail height and the tag's (just the plate with neither)
+      const z1 = Math.max(statusOn ? T + Rh : T, p.nameRail ? zTag : T);
       const fillRails = !KEEP_RAILS.has(p.shape), mh = p.marginH ?? 0;
       const edge = hErode(sh.cs, mh);
-      const xa = ob.min[0] - 1, xb = ob.max[0] + 1, inEdge = (h) => edge.extrude(h + 2).translate([0, 0, -1]);
-      const rails = statusOn ? [extrudeX(railTop, -X, X), extrudeX(railBot, -X, X), block] : [];
-      if (fillRails && statusOn) {
-        const endFill = rect(-xR - xa, 2 * (yR + d) + 1, (xa - xR) / 2, yc).extrude(z1 - z0).translate([0, 0, z0]);
-        rails.push(Manifold.union([extrudeX(railTop, xa, xb), extrudeX(railBot, xa, xb), endFill]).intersect(inEdge(z1)));
+      const xa = ob.min[0] - 1, xb = ob.max[0] + 1;
+      let body = sh.cs.extrude(z1);
+      if (p.bevel > 0) {
+        // the block's top edge, chamfered in steps of one layer
+        const c = Math.min(lz(p.bevel), lzDown(z1 * 0.8));
+        body = body.intersect(bevelEnvelope(sh.cs, z1, z1, c, 0, (h) => (dyn ? 3 : Math.max(1, Math.round(h / LH)))));
       }
-      // Rails run out to the outline: below the lower rail on the BOT_FILL shapes, and above the upper rail on the wave when nothing
-      // else sits above the track (a name tag fills its own rail out; a name printed on the plate keeps its bare plate).
       if (statusOn) {
-        const fx0 = fillRails ? xa : -X, fx1 = fillRails ? xb : X, own = SHAPES[p.shape].make(W, H).cs;
-        const out = (y0, y1) => edge.intersect(own).intersect(rect(fx1 - fx0, y1 - y0, (fx0 + fx1) / 2, (y0 + y1) / 2));
-        const fills = [];
-        if (BOT_FILL.has(p.shape)) fills.push(out(ob.min[1] - 2, yc - yo + chf + 0.01));
-        if (p.shape === 'wave' && !p.nameRail && !headerText) fills.push(out(yc + yo - chf - 0.01, ob.max[1] + 2));
-        for (const c of fills) if (!c.isEmpty()) rails.push(c.extrude(z1));
+        // the track: a dovetail groove, d wider at its floor than at the top, from the left end of the track out through the right edge
+        const groove = poly([[yc - yR - d, T], [yc + yR + d, T], [yc + yR, T + d], [yc + yR, z1 + 1], [yc - yR, z1 + 1], [yc - yR, T + d]]);
+        body = body.subtract(extrudeX(groove, -xR, xb + 1));
       }
-      let body = Manifold.union([sh.cs.extrude(T), ...rails]);
 
       if (p.mount === 'magnet') {
         const r = p.magD / 2 + 0.1, depth = Math.min(lz(p.magH + 0.2), T - lz(0.6));
@@ -1484,9 +1458,9 @@ function createEngine(wasm) {
         const r = (p.screwD ?? 4.4) / 2, rh = Math.max(r + 0.5, (p.screwHead ?? 8.8) / 2), cs = Math.min(rh - r, T - 0.8);
         for (const sx of [-1, 1]) {
           const x = sx * (X + 5.5);
-          body = body.subtract(Manifold.cylinder(T + 2, r, r, 32).translate([x, yc, -1]));
+          body = body.subtract(Manifold.cylinder(z1 + 2, r, r, 32).translate([x, yc, -1]));
           body = body.subtract(Manifold.cylinder(cs + 0.01, r, r + cs, 40).translate([x, yc, T - cs]));
-          body = body.subtract(Manifold.cylinder(Rh + 2, r + cs + 0.3, r + cs + 0.3, 40).translate([x, yc, T - 0.01]));
+          body = body.subtract(Manifold.cylinder(z1 - T + 2, r + cs + 0.3, r + cs + 0.3, 40).translate([x, yc, T - 0.01]));
         }
       }
 
@@ -1513,7 +1487,7 @@ function createEngine(wasm) {
         if (hdrZone && p.nameRail) bead = bead.subtract(toRight(-X - 1.5, hdrZone[1] - hdrZone[0] + 1, (hdrZone[0] + hdrZone[1]) / 2));
         else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
         for (const h of hookAt) bead = bead.subtract(rect(h.hw + 3, 14, h.xf, h.yT - 6));
-        body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, T - 0.02]));
+        body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
       }
       if (p.shape === 'clipboard' && sh.clip) {
         // the clip: a raised plate across the top of the board and up the tab, with a rounded bar along its lower edge
@@ -1522,8 +1496,8 @@ function createEngine(wasm) {
         // two rivets on the clip
         const rivets = union([-1, 1].map((sx) => circle(Math.max(1.1, ch * 0.09), sx * cw * 0.38, top + ch * 0.05, 24))).intersect(plateCS);
         const bar = rrect(cw * 1.08, Math.max(2.2, ch * 0.22), 1.1, 0, yB + Math.max(1.1, ch * 0.11));
-        body = body.add(plateCS.extrude(hC + 0.02).translate([0, 0, T - 0.02])).add(bar.intersect(sh.cs).extrude(hC + lz(1) + 0.02).translate([0, 0, T - 0.02]));
-        if (rivets && !rivets.isEmpty()) body = body.add(rivets.extrude(hC + lz(0.6) + 0.02).translate([0, 0, T - 0.02]));
+        body = body.add(plateCS.extrude(hC + 0.02).translate([0, 0, z1 - 0.02])).add(bar.intersect(sh.cs).extrude(hC + lz(1) + 0.02).translate([0, 0, z1 - 0.02]));
+        if (rivets && !rivets.isEmpty()) body = body.add(rivets.extrude(hC + lz(0.6) + 0.02).translate([0, 0, z1 - 0.02]));
       }
       if (p.shape === 'honeycomb') {
         const R = 2.6, Rx = R * Math.cos(30 * D2R), m = 2.5, g = 2, sp0 = Math.sqrt(3) * R + lw(1.2);
@@ -1543,8 +1517,8 @@ function createEngine(wasm) {
         const keep = (x, y) => {
           const dx = Math.max(Math.abs(x) - (hx - rc), 0), dy = Math.max(Math.abs(y) - (hy - rc), 0);
           if (dx * dx + dy * dy > rc * rc || Math.abs(x) > hx || Math.abs(y) > hy) return false;
-          if (Math.abs(x) < X + g && Math.abs(y - yc) < hrTot + g) return false;
-          if (hdrZone && Math.abs(x) < X0 + g && y > hdrZone[0] - g && y < hdrZone[1] + g) return false;
+          if (statusOn && x > -X - g && Math.abs(y - yc) < hrTot + g) return false;
+          if (hdrZone && (p.nameRail ? x > -X0 - g : Math.abs(x) < X0 + g) && y > hdrZone[0] - g && y < hdrZone[1] + g) return false;
           return !excl.some(([ex, ey, er]) => Math.hypot(x - ex, y - ey) < er + R);
         };
         const rings = [];
@@ -1555,73 +1529,49 @@ function createEngine(wasm) {
             if (ring.every(([x, y]) => keep(x, y))) rings.push(ring);
           }
         }
-        if (rings.length) body = body.subtract(CS(rings).extrude(T + 2).translate([0, 0, -1]));
+        if (rings.length) body = body.subtract(CS(rings).extrude(z1 + 2).translate([0, 0, -1]));
       }
       // Name tag rail: two lipped rails along the header band and a flat tag that slides in from the right, like the frame, and
       // stops at the left end. Where the rails run to the edge, the stop follows the outline at the same distance in from it as
       // the rails along the top (a solid wall the rail's width, with a lip over the tag like the rails'), so the border reads
       // as one even frame, round corners included. The tag has the same gap at both ends, so it is symmetric whenever the plate is.
-      let tagAll = null, tagBody = null, tagText = null, tagT = 0, tagZTop = 0;
+      let tagAll = null, tagBody = null, tagText = null, tagT = 0;
       if (p.nameRail) {
         const { ym, htag, wb } = tagDims(p, hdrZone), rw = tagRw(p);
         // u: height of the 45° undercut, the tag's whole thickness. The tag is a 45° dovetail on every side: its long edges
         // slide under the leaning rails and its ends are bevelled the same way, and at the closed (left) end the stop leans
         // over the tag's end like the rails do. Seen from the front the border is then the same width all round, round
         // corners included, and nothing overhangs flat.
-        const tt = uTag, u = tt, L = holdH, lipH = lz(0.8), gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
+        const tt = uTag, u = tt, L = holdH, gap = Math.max(0.3, (p.tagTol ?? tol) * Math.SQRT2), htop = htag - u;
         // hv: half-height of the part of the top face that shows between the holders
         const hv = Math.min(htop, wb - L);
         if (htop < 2 + (p.namePad ?? 1) - 1) throw new UserError('The name band is too short for the slide-in tag. Increase the plate height or the name letter height.');
         if (hv < 2) throw new UserError('The tag rail is so tall that its 45° holders cover nearly all of the tag. Lower the tag rail height.');
         tagT = tt;
-        // the tag's rails reach the common rail height when there is a status track, or their own height without one
-        const zS = T, zTop = statusOn ? Math.max(zS + L + lipH, z1) : zS + L + lipH, yLo = ym - wb - rw, yHi = ym + wb + rw;
-        // rails: from the bed, leaning in at 45° over the tag's edge (and past it, over the top face, up to the holder height),
-        // then straight up
-        const up = poly([[ym + wb, 0], [ym + wb + rw, 0], [ym + wb + rw, zTop], [ym + wb - L, zTop], [ym + wb - L, zS + L], [ym + wb, zS]]);
-        const dn = poly([[ym - wb, 0], [ym - wb, zS], [ym - wb + L, zS + L], [ym - wb + L, zTop], [ym - wb - rw, zTop], [ym - wb - rw, 0]]);
+        const zS = T, zTop = z1, yLo = ym - wb - rw, yHi = ym + wb + rw;
         const row = (cs, y) => cs.intersect(rect(xb - xa, 0.2, (xa + xb) / 2, y));
         // following the outline only works where it crosses the whole band in one piece; otherwise keep to the track
         const oneSpan = [yLo + 0.2, ym - htag, ym, ym + htag, yHi - 0.2].every((y) => row(edge, y).toPolygons().length === 1);
         const follow = fillRails && oneSpan;
-        // E: what the tag's ends and the stop follow, the outline or the ends of the track
+        // E: what the tag's ends and the channel's closed end follow, the outline or the ends of the track
         const E = follow ? edge : rect(2 * X, yHi - yLo + 20, 0, ym);
-        const sLo = shared ? ym - wb : yLo; // the stop's lower edge: above the shared rail, when there is one
-        const mid = follow ? (ob.min[0] + ob.max[0]) / 2 : 0, band = rect(xb - xa, yHi - sLo, (xa + xb) / 2, (yHi + sLo) / 2), left = rect(mid - xa, yHi - yLo, (xa + mid) / 2, ym);
-        const inset = (d) => E.offset(-d, 'Round', 2, 32);
-        // the 45° part is built in steps of one layer (or 4 steps with dynamic layers), as the printer builds it anyway
-        const n = dyn ? 4 : Math.max(1, Math.round(u / LH)), nS = dyn ? 4 : Math.max(1, Math.round(L / LH)), stopParts = [], tagPlans = [];
+        const mid = follow ? (ob.min[0] + ob.max[0]) / 2 : 0, right = rect(xb + 2 - mid, yHi - yLo + 40, (mid + xb + 2) / 2, ym);
+        const inset = (dd) => E.offset(-dd, 'Round', 2, 32);
+        // The channel: the 45° dovetail along its length, and in plan the outline at the closed (left) end, where it leans over
+        // the tag's bevelled end the same way, built in steps of one layer (or 4 with dynamic layers) as the printer builds it.
+        // Its right half runs straight out through the right edge.
+        const n = dyn ? 4 : Math.max(1, Math.round(u / LH)), nS = dyn ? 4 : Math.max(1, Math.round(L / LH)), plans = [], tagPlans = [];
         for (let k = 0; k < nS; k++) {
-          const z0 = (k * L) / nS, z1 = ((k + 1) * L) / nS;
-          stopParts.push(band.intersect(E.subtract(inset(rw + z0))).intersect(left).extrude(z1 - z0).translate([0, 0, zS + z0]));
+          const a = (k * L) / nS, b = ((k + 1) * L) / nS;
+          plans.push(union([inset(rw + a), right]).extrude(b - a + 0.001).translate([0, 0, zS + a]));
         }
+        plans.push(union([inset(rw + L), right]).extrude(zTop - zS - L + 1).translate([0, 0, zS + L]));
         for (let k = 0; k < n; k++) {
           const z0 = (k * u) / n, z1 = ((k + 1) * u) / n;
           tagPlans.push(inset(rw + gap + z1).extrude(z1 - z0 + (k === n - 1 ? 0 : 0.001)).translate([0, 0, zS + z0]));
         }
-        stopParts.push(band.intersect(E.subtract(inset(rw + L))).intersect(left).extrude(zTop - zS - L).translate([0, 0, zS + L]));
-        const rails = Manifold.union([extrudeX(up, follow ? xa : -X, follow ? xb : X), ...(shared ? [] : [extrudeX(dn, follow ? xa : -X, follow ? xb : X)])]);
-        body = body.add((follow ? rails.intersect(inEdge(zTop)) : rails).add(Manifold.union(stopParts)));
-        tagZTop = zTop;
-        const fx0 = follow ? xa : -X, fx1 = follow ? xb : X, strip = (y0, y1) => rect(fx1 - fx0, y1 - y0, (fx0 + fx1) / 2, (y0 + y1) / 2);
-        // The upper rail runs out to the outline above it (the shape's own outline: a hang loop's eyelets are not part of it), so
-        // no strip of bare plate is left along the top and cubicle hooks clip over the full thickness of plate and rail.
-        const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
-        if (TOP_FILL.has(p.shape) || (hooked && TAG_FILL.has(p.shape))) {
-          const yUp = ym + wb + rw - 0.01, fillCS = edge.intersect(SHAPES[p.shape].make(W, H).cs).intersect(strip(yUp, ob.max[1] + 2));
-          if (!fillCS.isEmpty()) body = body.add(fillCS.extrude(zTop));
-        }
-        // the wave with a tag and no status track: the tag's lower rail runs out to the bottom edge as well
-        if (!statusOn && p.shape === 'wave') {
-          const lowCS = edge.intersect(SHAPES.wave.make(W, H).cs).intersect(strip(ob.min[1] - 2, yLo + 0.01));
-          if (!lowCS.isEmpty()) body = body.add(lowCS.extrude(zTop));
-        }
-        // A tag band of its own above the track (the arch's crown): the strip between the track's upper rail and the tag's lower
-        // rail rises to the same height, so the two rails share one flat top.
-        if (statusOn && !shared && yLo > yc + yo - chf) {
-          const midCS = strip(yc + yo - chf - 0.01, yLo + 0.01), m = follow ? midCS.intersect(edge) : midCS;
-          if (!m.isEmpty()) body = body.add(m.extrude(zTop));
-        }
+        const groove = poly([[ym - wb, zS], [ym + wb, zS], [ym + wb - L, zS + L], [ym + wb - L, zTop + 1], [ym - wb + L, zTop + 1], [ym - wb + L, zS + L]]);
+        body = body.subtract(extrudeX(groove, xa - 1, xb + 1).intersect(Manifold.union(plans)));
 
         // the top face, all of it visible: where the name goes
         const tagCS = rect(xb - xa + 4, 2 * htop, (xa + xb) / 2, ym).intersect(inset(rw + gap + u));
@@ -1656,26 +1606,21 @@ function createEngine(wasm) {
           }
         }
       }
-      if (hangRing && !hangRing.isEmpty() && p.nameRail && TAG_FILL.has(p.shape) && tagZTop > T) body = body.add(hangRing.extrude(tagZTop));
-      if (p.bevel > 0) {
-        const zTop = body.boundingBox().max[2], cT = Math.min(lz(p.bevel), lzDown(T * 0.8)), cR = zTop - T > LH ? Math.min(lz(p.bevel), lzDown((zTop - T) * 0.8)) : 0;
-        body = body.intersect(bevelEnvelope(sh.cs, T, zTop, cT, cR, (h) => (dyn ? 3 : Math.max(1, Math.round(h / LH)))));
-      }
       // With raised letters the one-color base is the body and the letters merged. Merging them is slow on outlines with many
       // points (cloud, scallop), and only the one-color download needs it, so the page merges them then (unionMeshes).
       let labels = null, nameText = null;
       if (raised) {
         if (labelsCS) labels = labelsCS.extrude(Lh).translate([0, 0, T]);
-        if (nameCS) nameText = nameCS.extrude(Ln).translate([0, 0, T]);
+        if (nameCS) nameText = nameCS.extrude(Ln).translate([0, 0, z1]);
       } else {
         if (labelsCS) body = body.subtract(labelsCS.extrude(engr + 1).translate([0, 0, T - engr]));
-        if (nameCS) body = body.subtract(nameCS.extrude(engrN + 1).translate([0, 0, T - engrN]));
+        if (nameCS) body = body.subtract(nameCS.extrude(engrN + 1).translate([0, 0, z1 - engrN]));
       }
       // the top of the base (plate, rails and letters) inside a box, for the hooks and feet that clip over it
       const topIn = (bx) => Math.max(T, ...[body, labels, nameText].filter(Boolean).map((m) => m.intersect(bx).boundingBox().max[2]).filter(Number.isFinite));
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? T + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? z1 + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1795,7 +1740,7 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: z1, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, plateW: W, plateH: H, auto,
         },
       };
@@ -2908,7 +2853,15 @@ function downloadZip() {
   saveBlob(zipBlob(zfiles), `office-status-slider_${Math.round(i.W)}x${Math.round(i.H)}.zip`);
 }
 // height of the tallest raised text on the base
-const topText = (i) => Math.max(result.parts.labels ? i.Lh : 0, result.parts.nameText ? i.Ln : 0);
+// Two colors on one nozzle: the heights to swap to the text color and back. The status labels stand on the track floor (Z = T),
+// a name printed on the plate on the top face (Z = zName); where both start at the same height they share one swap.
+const swaps = (i) => {
+  const out = [];
+  if (result.parts.labels) out.push([i.T, i.T + i.Lh]);
+  if (result.parts.nameText) { const a = i.zName ?? i.T, b = a + i.Ln, same = out.find(([x]) => Math.abs(x - a) < 1e-6); if (same) same[1] = Math.max(same[1], b); else out.push([a, b]); }
+  return out;
+};
+const swapText = (i, mono = (v) => v) => swaps(i).map(([a, b]) => `swap to the text color on the first layer above Z = ${mono(a.toFixed(2) + ' mm')} (the ${mono((a + layerFine()).toFixed(2) + ' mm')} layer) and back on the first layer above Z = ${mono(b.toFixed(2) + ' mm')}`).join('; then ');
 function readmeText() {
   const i = result.info;
   const lines = [
@@ -2927,8 +2880,8 @@ function readmeText() {
     result.parts.hooks.length ? '- cubicle_hook_left / cubicle_hook_right: printed on their side.' : null,
     '',
     'Two colors on a single nozzle',
-    i.raised ? `- Swap to the label color on the first layer above Z = ${i.T.toFixed(2)} mm (the ${(i.T + layerFine()).toFixed(2)} mm layer with ${layerFine()} mm layers), and swap back on the first layer above Z = ${(i.T + topText(i)).toFixed(2)} mm.${result.parts.nameText && result.parts.labels ? ' The status labels and the name share that color this way; for two text colors use a multi-color printer.' : ''}` : '- Not needed: labels are engraved.',
-    i.raised ? '- The rails start at the same height, so their bottom edge gets a thin stripe of the label color.' : null,
+    i.raised && swaps(i).length ? `- With ${layerFine()} mm layers: ${swapText(i)}.${result.parts.nameText && result.parts.labels ? ' The status labels and the name share that color this way; for two text colors use a multi-color printer.' : ''}` : '- Not needed: the letters are engraved.',
+    i.raised && swaps(i).length ? '- The sides of the plate are printed at those heights too, so they pick up a thin stripe of the text color.' : null,
     i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
     'Assembly',
@@ -3525,7 +3478,7 @@ function renderExport() {
   const steps = [
     `<b>Print</b> every part as exported. They are already oriented for printing and need no supports${result.parts.slider ? '; the frame prints face-down' : ''}.`,
     i.raised
-      ? `<b>Two colors, one nozzle:</b> swap filament on the first layer above <span class="mono">Z ${i.T.toFixed(2)} mm</span> (the <span class="mono">${(i.T + layerFine()).toFixed(2)} mm</span> layer at ${layerFine()} mm layer height) and swap back above <span class="mono">${(i.T + topText(i)).toFixed(2)} mm</span>. The rails' bottom edge picks up a thin stripe of the label color. With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
+      ? `<b>Two colors, one nozzle</b> (${layerFine()} mm layers): ${swapText(i, (v) => `<span class="mono">${v}</span>`)}. The sides of the plate pick up a thin stripe of the text color at those heights. With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
