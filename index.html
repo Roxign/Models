@@ -954,7 +954,7 @@ function createEngine(wasm) {
         const mb = clamp(H * 0.13, 6, 10), ph = mb * 0.46, pw = ph * 1.4, pitch = pw * 1.85, n = Math.max(2, Math.floor((W - 6) / pitch));
         const outer = rrect(W, H, 2.5), holes = [];
         for (let i = 0; i < n; i++) for (const sy of [-1, 1]) holes.push(rrect(pw, ph, ph * 0.28, (i - (n - 1) / 2) * pitch, sy * (H / 2 - mb / 2)));
-        return { cs: outer.subtract(union(holes)), outer, body: [-H / 2 + mb, H / 2 - mb] };
+        return { cs: outer.subtract(union(holes)), outer, body: [-H / 2 + mb, H / 2 - mb], edgeTop: H / 2 };
       },
     },
     // Clipboard, for planners: a board with a clip at the top centre (raised, with a slot to hang it by); the track stays
@@ -965,7 +965,7 @@ function createEngine(wasm) {
         const board = rrect(W, top + H / 2, 4, 0, (top - H / 2) / 2);
         const tab = rrect(cw * 0.7, ch + 4, 3, 0, H / 2 - (ch + 4) / 2);
         const slot = rrect(cw * 0.3, Math.max(2.4, ch * 0.28), Math.max(1.2, ch * 0.14), 0, H / 2 - ch * 0.38);
-        return { cs: union([board, tab]).subtract(slot), outer: union([board, tab]), body: [-H / 2, top - ch * 0.5], clip: { cw, ch, top, slot } };
+        return { cs: union([board, tab]).subtract(slot), outer: union([board, tab]), body: [-H / 2, top - ch * 0.5], clip: { cw, ch, top, slot }, edgeTop: top };
       },
     },
     // Spiral notebook, for planners: a row of punched holes along the top of the cover, each with a ring looping up over its
@@ -982,7 +982,7 @@ function createEngine(wasm) {
           inners.push(cap(a, b, hw));
         }
         const outer = union([cover, ...outers]);
-        return { cs: outer.subtract(union(inners)), outer, body: [-H / 2, top - hb] };
+        return { cs: outer.subtract(union(inners)), outer, body: [-H / 2, top - hb], edgeTop: top };
       },
     },
     arrow: {
@@ -1157,19 +1157,30 @@ function createEngine(wasm) {
     const htag = zoneH / 2 - tagRw(p) - c;
     return { ym: (h0 + h1) / 2, htag, wb: htag + c };
   }
+  // How tall the block is (the rails' top), worked out the way build() does
+  function blockTop(p) {
+    const LH = p.layerH || 0.2, q = (v, n = 1) => (p.dyn ? v : Math.max(n, Math.round(v / LH - 1e-6)) * LH), T = q(p.thick ?? 2, 2), u = q(p.tagT ?? 1.6, 2);
+    return Math.max(p.statusOn === false ? T : T + q(p.railH ?? 3.6), p.nameRail ? T + Math.max(q(p.tagRailH ?? u), u) + q(0.8) : T);
+  }
+  // The solid strip between the plate's edge and the nearest opening, at the top face: the track's rail (6 mm), the name tag's
+  // rail and holder, or a printed name's margin. Feet and hooks may cover it.
+  const solidEdge = (p, nameThere) => (nameThere ? (p.nameRail ? tagRw(p) + tagHold(p) : Math.max(0, p.namePad ?? 1)) : 6);
   function vLayout(p, sh, H, hh) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
-    // Desk stand: the feet hold the sign's bottom edge, footGrip up its face (longer along the face when it leans). They may sit on
-    // the solid rail below the track (6 mm wide) but keep footClear from the track's opening; leaning forward, the frame standing
-    // proud of the face comes that much lower too.
+    const named = !!((p.header || '').trim() || p.nameRail);
+    // Desk stand: the feet hold footGrip up the sign's front face (more along the face when it leans) and keep footClear from
+    // the nearest opening; leaning forward, the frame standing proud of the face comes lower too. So the sign grows only by
+    // what that leaves of the solid rail under the track.
     if (p.mount === 'stand') {
-      const ta = Math.min(60, Math.abs(p.tilt ?? 15)) * D2R, fwd = (p.tilt ?? 15) < 0 ? (Math.max(0, p.proud ?? 0.8) + 0.4) * Math.tan(ta) : 0;
-      b0 = Math.max(b0, sh.body[0] + Math.max(0, (p.footGrip ?? 7.5) / Math.cos(ta) + Math.max(0, p.footClear ?? 0.5) + fwd - (p.statusOn === false ? (p.nameRail ? tagRw(p) : 0) : 6)));
+      const a = clamp(p.tilt ?? 15, -60, 60) * D2R, ca = Math.cos(a), sa = Math.sin(a), g = p.footGrip ?? 7.5;
+      const cov = Math.max(g, (sa < 0 ? -sa * blockTop(p) : 0) + 1.5) / ca + (sa < 0 ? (Math.max(0, p.proud ?? 0.8) + 0.4) * Math.tan(-a) : 0);
+      b0 = Math.max(b0, sh.body[0] + Math.max(0, cov + Math.max(0, p.footClear ?? 0.5) - solidEdge(p, p.statusOn === false && named)));
     }
-    // the cubicle hooks clip over the plate's top edge: keep the top 11 mm clear (shapes with a crown keep it free instead)
+    // Cubicle hooks: the clip covers 7.5 mm of the front face below the top edge (edgeTop on shapes with something above it)
+    // and keeps hookClear from the nearest opening. Shapes with a crown keep the hooks up there instead.
     const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
-    if (hooked && !sh.crown) b1 = Math.min(b1, sh.body[1] - 11);
+    if (hooked && !sh.crown) b1 = Math.min(b1, (sh.edgeTop ?? sh.body[1]) - Math.max(0, 7.5 + Math.max(0, p.hookClear ?? 0.5) - solidEdge(p, named)));
     let hdrZone = null;
     if (p.statusOn === false) {
       const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2;
@@ -1287,14 +1298,14 @@ function createEngine(wasm) {
         W = Math.max(floorW, W + 2 * s + 0.1);
       }
       const s = short(W);
-      if (s > 0) W += 2 * s + 1;
+      if (s > 0) W += 2 * s + 0.2;
       return W;
     };
     let W = 200, H = findH(W);
     W = findW(H);
     H = findH(W);
     W = findW(H);
-    return { W: Math.min(1500, Math.ceil(W)), H: Math.min(600, Math.ceil(H)), hh };
+    return { W: Math.min(1500, Math.ceil(W * 10) / 10), H: Math.min(600, Math.ceil(H * 10) / 10), hh };
   }
 
   // Smallest plate for a sign with only a name: tall enough for the name band, long enough for the name.
@@ -1325,7 +1336,7 @@ function createEngine(wasm) {
     };
     let W = 160, H = findH(W);
     W = findW(H); H = findH(W); W = findW(H);
-    return { W: Math.min(1500, Math.ceil(W)), H: Math.min(600, Math.ceil(H)), hh };
+    return { W: Math.min(1500, Math.ceil(W * 10) / 10), H: Math.min(600, Math.ceil(H * 10) / 10), hh };
   }
 
   // Bevel for the final merged body: a stepped envelope, intersected with the body, that shrinks the outline by up to cT
@@ -1679,12 +1690,13 @@ function createEngine(wasm) {
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
           // the foot clips over the full thickness of the base there, footGrip up from the sign's lowest corner
           const zc = topIn(Manifold.cube([fl + 1, 12, 400]).translate([xf - fl / 2 - 0.5, ybL - 1, -1]));
-          const yBack = (ybL - ybG) * ca + floor + lift0, hF = lz(Math.min(yBack, yBack + sa * zc) + (p.footGrip ?? 7.5));
+          const yBack = (ybL - ybG) * ca + floor + lift0, yFront = yBack + sa * zc, hF = lzDown(Math.max(yFront + (p.footGrip ?? 7.5), Math.max(yBack, yFront) + 1.5));
           // The sign's back and front faces where its bottom edge meets the foot, and how far they move back (or forward, leaning
           // forward) by the top of the foot. The reach is measured from the outermost of those, so each foot keeps a whole wall in
           // front of the sign and behind it all the way up.
-          const zB0 = -(ybL - ybG) * sa, zF0 = zB0 + zc * ca, dz = (p.footGrip ?? 7.5) * sa / Math.max(0.5, ca);
-          const zFront = Math.max(zF0, zF0 - dz) + gF + ff, zBack = Math.min(zB0, zB0 - dz) - gF - fbk;
+          // (each face moves by its own height in the foot times the lean's tangent)
+          const tA = sa / Math.max(0.5, ca), zB0 = -(ybL - ybG) * sa, zF0 = zB0 + zc * ca;
+          const zFront = Math.max(zF0, zF0 - (hF - yFront) * tA) + gF + ff, zBack = Math.min(zB0, zB0 - (hF - yBack) * tA) - gF - fbk;
           let foot = extrudeY(rrect(fl, zFront - zBack, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot(zc));
           if (biteF >= 0.005) {
             const y = ybL + 0.5 * (p.footGrip ?? 7.5) / Math.max(0.5, ca), root = (z) => rect(2 * rrF, 0.02, y, z);
@@ -1984,7 +1996,7 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.4, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookClear: 0.5, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.4, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
@@ -2033,6 +2045,7 @@ const SLIDERS = {
   hookDrop: { label: 'Sign top below the top of the panel', min: -100, max: 300, step: 1, out: mm(0) },
   hookGap: { label: 'Gap between hook and sign', min: 0.05, max: 1, step: 0.05, out: mm(2) },
   hookBite: { label: 'Hook bite into the sign', min: 0, max: 0.6, step: 0.01, out: mm(2) },
+  hookClear: { label: 'Space between hooks and track', min: 0, max: 10, step: 0.1, out: mm() },
   hookW: { label: 'Hook width', min: 10, max: 80, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 50, step: 0.5, out: mm() },
   marginH: { label: 'Side margin', min: 0, max: 50, step: 0.5, out: mm() },
@@ -2143,6 +2156,7 @@ const SECTIONS = [
       { slider: 'railDrop', when: 'cubrail' },
       { slider: 'hookDrop', when: 'cubicle' },
       { slider: 'hookW', when: 'hooked' },
+      { slider: 'hookClear', when: 'hooked' },
       { seg: 'hookN', label: 'Hooks', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], when: 'hooked' },
       { slider: 'hookGap', when: 'hooked' },
       { slider: 'hookBite', when: 'hooked' },
