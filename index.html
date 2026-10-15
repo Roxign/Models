@@ -1161,8 +1161,12 @@ function createEngine(wasm) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
     // Desk stand: the feet hold the sign's bottom edge, footGrip up its face (longer along the face when it leans). They may sit on
-    // the solid rail below the track (6 mm wide) but keep 1 mm clear of the track's opening.
-    if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + Math.max(0, (p.footGrip ?? 7.5) / Math.cos(Math.min(60, Math.abs(p.tilt ?? 15)) * D2R) + 1 - (p.statusOn === false ? (p.nameRail ? tagRw(p) : 0) : 6)));
+    // the solid rail below the track (6 mm wide) but keep footClear from the track's opening; leaning forward, the frame standing
+    // proud of the face comes that much lower too.
+    if (p.mount === 'stand') {
+      const ta = Math.min(60, Math.abs(p.tilt ?? 15)) * D2R, fwd = (p.tilt ?? 15) < 0 ? (Math.max(0, p.proud ?? 0.8) + 0.4) * Math.tan(ta) : 0;
+      b0 = Math.max(b0, sh.body[0] + Math.max(0, (p.footGrip ?? 7.5) / Math.cos(ta) + Math.max(0, p.footClear ?? 0.5) + fwd - (p.statusOn === false ? (p.nameRail ? tagRw(p) : 0) : 6)));
+    }
     // the cubicle hooks clip over the plate's top edge: keep the top 11 mm clear (shapes with a crown keep it free instead)
     const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
     if (hooked && !sh.crown) b1 = Math.min(b1, sh.body[1] - 11);
@@ -1354,6 +1358,8 @@ function createEngine(wasm) {
   }
 
   const fmtMm = (v) => String(Math.round(v * 10) / 10);
+  // n positions spread evenly from -half to half (one in the middle)
+  const spread = (n, half) => (n <= 1 ? [0] : Array.from({ length: n }, (_, i) => -half + (2 * half * i) / (n - 1)));
   function build(p, font) {
     try {
       const warnings = [];
@@ -1493,8 +1499,9 @@ function createEngine(wasm) {
       const hookAt = [];
       if (p.mount === 'cubicle' || p.mount === 'cubrail') {
         const hw = lz(p.hookW ?? 10), xh = Math.max(hw, Math.min(W * 0.3, (statusOn ? X : X0) * 0.8));
-        for (const sx of [-1, 1]) {
-          const xf = sx * xh, strip = rect(hw, H * 3, xf, 0).intersect(sh.cs);
+        if ((p.hookN ?? 2) > 1 && (2 * xh) / ((p.hookN ?? 2) - 1) < hw + 1) warnings.push('The hooks overlap each other. Use fewer or narrower hooks, or a wider sign.');
+        for (const xf of spread(p.hookN ?? 2, xh)) {
+          const strip = rect(hw, H * 3, xf, 0).intersect(sh.cs);
           hookAt.push({ xf, hw, yT: strip.isEmpty() ? ob.max[1] : strip.bounds().max[1] });
         }
       }
@@ -1661,14 +1668,13 @@ function createEngine(wasm) {
         // the sign's lowest corner sits on the foot's floor: the back one leaning back, the front one leaning forward
         const lift0 = Math.max(0, -sa * z1), ty = floor - ybG * ca + lift0, tz = ybG * sa;
         const M = [1, 0, 0, 0, 0, ca, -sa, 0, 0, sa, ca, 0, 0, ty, tz, 1];
-        // gF: the gap between the foot and the sign all round the slot; biteF: how far two ridges in the slot press into the sign
-        // on each face (0 leaves them off), half way up the grip, like the cubicle hooks'
-        const gF = Math.max(0.02, p.footGap ?? 0.2), biteF = Math.max(0, p.footBite ?? 0.05), rrF = Math.max(0.8, 2 * NZ);
+        // gF: the gap between the foot and the sign all round the slot
+        const gF = Math.max(0.02, p.footGap ?? 0.2), biteF = Math.max(0, p.footBite ?? 0), rrF = Math.max(0.8, 2 * NZ);
         const slotCS = (sh.outer || sh.cs).offset(gF, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 2 * gF).translate([0, 0, -gF]).transform(M);
         // ff, fbk: how far each foot reaches in front of and behind the sign (never less than a solid wall)
         const fl = p.footW ?? 22, ff = Math.max(lw(1.6), p.footF ?? 12), fbk = Math.max(lw(1.6), p.footB ?? 38);
-        for (const sx of [-1, 1]) {
-          const xf = sx * Math.min(W * 0.28, X * 0.75);
+        if ((p.footN ?? 2) > 1 && (2 * Math.min(W * 0.28, X * 0.75)) / ((p.footN ?? 2) - 1) < fl + 1) warnings.push('The feet overlap each other. Use fewer or narrower feet, or a wider sign.');
+        for (const xf of spread(p.footN ?? 2, Math.min(W * 0.28, X * 0.75))) {
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
           // the foot clips over the full thickness of the base there, footGrip up from the sign's lowest corner
@@ -1893,26 +1899,31 @@ const withBreak = (t) => {
 };
 // A preset is a whole design: its statuses and a look to go with them (shape, typeface, layout and colors). The name, the
 // mounting, the size and the printer settings stay as they are.
-const look = (shape, font, [colBase, colLabel, colSlider], extra = {}) => ({ shape, font, layout: 'stack', relief: 'raised', uniform: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel, ...extra });
+// name: off, on the plate or on a slide-in tag, with its letter height; the rest of the Name tab takes the usual values. The name
+// you typed stays.
+const look = (shape, font, [colBase, colLabel, colSlider], name = 'off', hcap = 20, extra = {}) => ({
+  shape, font, layout: 'stack', relief: 'raised', uniform: true, reliefH: 0.4, statusOn: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel,
+  nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, ...extra,
+});
 const PRESETS_RAW = [
-  { name: 'Office classic', look: look('rail', 'sans', ['#2E3237', '#F3F1EA', '#F06A28']), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
-  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#F2F2EE', '#1F2A44', '#2F6BFF']), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
-  { name: 'Deep work', look: look('pixel', 'mono', ['#14181D', '#A6E3A1', '#3FB950']), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
-  { name: 'Studio', look: look('banner', 'bebas', ['#1A1B1E', '#F3F1EA', '#E5383B']), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
-  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#EEF3F4', '#17363C', '#1F9E89']), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
-  { name: 'Meeting room', look: look('rounded', 'inter', ['#1F3B2F', '#EDE6D6', '#E8B73A']), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
-  { name: 'Classroom', look: look('arch', 'fredoka', ['#2F4A3A', '#F4F1E6', '#E8B73A']), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
-  { name: 'Clinic', look: look('pill', 'poppins', ['#F5F9F9', '#0F5C63', '#2BB3A3']), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
-  { name: 'Home office', look: look('cat', 'fredoka', ['#F3E9DC', '#4A3426', '#D9822B']), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
-  { name: 'Simple three', look: look('lozenge', 'inter', ['#F2F2EE', '#1F2A44', '#2F6BFF']), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: 'Mood', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541']), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
-  { name: '繁體中文', look: look('rounded', 'sans', ['#2E3237', '#F3F1EA', '#F06A28']), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
+  { name: 'Office classic', look: look('rail', 'sans', ['#2E3237', '#F3F1EA', '#F06A28'], 'tag', 20), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
+  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#F2F2EE', '#1F2A44', '#2F6BFF'], 'tag', 18), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
+  { name: 'Deep work', look: look('pixel', 'mono', ['#14181D', '#A6E3A1', '#3FB950'], 'plate', 16), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
+  { name: 'Studio', look: look('banner', 'bebas', ['#1A1B1E', '#F3F1EA', '#E5383B'], 'plate', 18), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#EEF3F4', '#17363C', '#1F9E89'], 'tag', 18), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
+  { name: 'Meeting room', look: look('rounded', 'inter', ['#1F3B2F', '#EDE6D6', '#E8B73A'], 'plate', 18), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
+  { name: 'Classroom', look: look('arch', 'fredoka', ['#2F4A3A', '#F4F1E6', '#E8B73A'], 'plate', 18), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
+  { name: 'Clinic', look: look('pill', 'poppins', ['#F5F9F9', '#0F5C63', '#2BB3A3'], 'tag', 18), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
+  { name: 'Home office', look: look('cat', 'fredoka', ['#F3E9DC', '#4A3426', '#D9822B'], 'plate', 16), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
+  { name: 'Simple three', look: look('lozenge', 'inter', ['#F2F2EE', '#1F2A44', '#2F6BFF'], 'off', 20), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
+  { name: 'Mood', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541'], 'plate', 14), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
+  { name: '繁體中文', look: look('rounded', 'sans', ['#2E3237', '#F3F1EA', '#F06A28'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
-  { name: '剪輯師', look: look('film', 'oswald', ['#1C1E24', '#F4F1EA', '#F5B700']), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
-  { name: '企劃', look: look('notebook', 'poppins', ['#F4EFE6', '#24324F', '#E8573F']), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
+  { name: '剪輯師', look: look('film', 'oswald', ['#1C1E24', '#F4F1EA', '#F5B700'], 'tag', 20), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
+  { name: '企劃', look: look('notebook', 'poppins', ['#F4EFE6', '#24324F', '#E8573F'], 'tag', 20), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
   // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
-  { name: '心情', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541']), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
-  { name: '日本語', look: look('scallop', 'serif', ['#F4EFE6', '#2B2B2B', '#C0392B']), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
+  { name: '心情', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541'], 'plate', 14), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
+  { name: '日本語', look: look('scallop', 'serif', ['#F4EFE6', '#2B2B2B', '#C0392B'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
@@ -1970,12 +1981,12 @@ const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
   current: 0, view: 'assembled', page: 'shape', showDims: false,
   shape: 'rail', sizeMode: 'auto', cap: 5, width: 200, height: 72, thick: 2, bed: 256,
-  layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
+  layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.4, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footBite: 0.05, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
-  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
+  colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.4, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
 
 // Every slider, described once: label, range and how its value reads.
@@ -2005,7 +2016,7 @@ const SLIDERS = {
   footB: { label: 'Foot reach behind the sign', min: 2, max: 250, step: 1, out: mm(0) },
   footGrip: { label: 'Foot grip height', min: 3, max: 20, step: 0.5, out: mm() },
   footGap: { label: 'Gap between foot and sign', min: 0.05, max: 1, step: 0.05, out: mm(2) },
-  footBite: { label: 'Foot bite into the sign', min: 0, max: 0.6, step: 0.01, out: mm(2) },
+  footClear: { label: 'Space between feet and track', min: 0, max: 10, step: 0.1, out: mm() },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
   namePad: { label: 'Name margin', min: -3, max: 20, step: 0.2, out: mm() },
@@ -2068,7 +2079,7 @@ const SHAPE_DEFAULTS = {
 const CHOICES = {
   sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard', 'notebook'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], footN: [1, 2, 3, 4], hookN: [1, 2, 3, 4], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -2118,8 +2129,9 @@ const SECTIONS = [
       { slider: 'footB', when: 'stand' },
       { slider: 'footGrip', when: 'stand' },
       { slider: 'footGap', when: 'stand' },
-      { slider: 'footBite', when: 'stand' },
-      { hint: 'Gap: the clearance between each foot and the sign all round its slot. Bite: two ridges in the slot, half way up the grip, press this far into the sign on each face; a deeper bite holds tighter, and 0 leaves the ridges off.', when: 'stand' },
+      { slider: 'footClear', when: 'stand' },
+      { seg: 'footN', label: 'Feet', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], when: 'stand' },
+      { hint: 'Gap: the clearance between each foot and the sign all round its slot. Space: how close the top of the feet comes to the status track; the feet may cover the solid rail under the track, so a small space keeps the sign short.', when: 'stand' },
       { slider: 'hangHole', when: 'hang' },
       { seg: 'hangN', label: 'Loops', options: [[1, 'One'], [2, 'Two']], when: 'hang' },
       { slider: 'cubP', when: 'cubicle' },
@@ -2131,6 +2143,7 @@ const SECTIONS = [
       { slider: 'railDrop', when: 'cubrail' },
       { slider: 'hookDrop', when: 'cubicle' },
       { slider: 'hookW', when: 'hooked' },
+      { seg: 'hookN', label: 'Hooks', options: [[1, '1'], [2, '2'], [3, '3'], [4, '4']], when: 'hooked' },
       { slider: 'hookGap', when: 'hooked' },
       { slider: 'hookBite', when: 'hooked' },
       { hint: 'Gap: the clearance between the hook and the sign all round inside the clip. Bite: two ridges inside the clip press this far into the sign on each face; a deeper bite makes a wider contact strip and a tighter hold, and 0 leaves the ridges off.', when: 'hooked' },
@@ -2812,8 +2825,9 @@ function exportFiles() {
       add('tagText', 'name_tag_text', 'Name tag text (multi-color)', parts.tagText, centre(parts.tagText.pos, ref));
     }
   }
-  parts.hooks.forEach((f, i) => add('hook' + i, `cubicle_hook_${i ? 'right' : 'left'}`, `Cubicle hook, ${i ? 'right' : 'left'}`, f, centre(printPositions(f, PRINT_XF.hook()))));
-  parts.feet.forEach((f, i) => add('foot' + i, `desk_foot_${i ? 'right' : 'left'}`, `Desk foot, ${i ? 'right' : 'left'}`, f, centre(printPositions(f, PRINT_XF.foot()))));
+  const which = (i, n) => (n === 2 ? (i ? 'right' : 'left') : n === 1 ? '' : String(i + 1));
+  parts.hooks.forEach((f, i, a) => add('hook' + i, `cubicle_hook${which(i, a.length) ? '_' + which(i, a.length) : ''}`, `Cubicle hook${which(i, a.length) ? ', ' + which(i, a.length) : ''}`, f, centre(printPositions(f, PRINT_XF.hook()))));
+  parts.feet.forEach((f, i, a) => add('foot' + i, `desk_foot${which(i, a.length) ? '_' + which(i, a.length) : ''}`, `Desk foot${which(i, a.length) ? ', ' + which(i, a.length) : ''}`, f, centre(printPositions(f, PRINT_XF.foot()))));
   return files;
 }
 function downloadOne(f) { saveBlob(new Blob([stlBlob(f.pos, f.mesh.idx, f.name)], { type: 'model/stl' }), f.name); }
