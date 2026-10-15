@@ -211,6 +211,15 @@ body.dragging-card { user-select: none; cursor: grabbing; }
 .set-pop .set-group:first-child { padding-top: 2px; }
 .set-pop button { width: 100%; height: 36px; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 8px; font-family: var(--font-display); font-stretch: 85%; font-weight: 650; font-size: 13px; text-align: left; }
 .set-pop button svg { width: 20px; height: 20px; flex: none; }
+.icon-pop { display: block; width: min(336px, calc(100vw - 24px)); max-height: min(64vh, 440px); overflow-y: auto; }
+.icon-pop .set-group { padding: 8px 4px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.icon-pop .set-group:first-child { padding-top: 0; }
+.icon-pop .ic-grid { display: grid; grid-template-columns: repeat(auto-fill, 44px); gap: 4px; }
+.icon-pop button { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink); }
+.icon-pop button:hover { background: var(--soft); }
+.icon-pop button[aria-pressed="true"] { border-color: var(--labels); background: var(--labels-soft); }
+.icon-pop button svg { width: 24px; height: 24px; fill: currentColor; }
+.icon-pop .none-label { font-size: 11px; color: var(--muted); }
 
 /* settings: one card per part of the sign, each with its own color */
 .panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
@@ -481,6 +490,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
 <div class="popover shape-pop" id="shapePop" role="listbox" aria-label="Shape" hidden><div class="shape-grid" id="shapeGrid"></div></div>
 
 <div class="popover set-pop" id="setPopover" role="listbox" aria-label="Ready-made statuses" hidden></div>
+<div class="popover icon-pop" id="iconPopover" role="dialog" aria-label="Choose an icon" hidden></div>
 
 
 <script type="module">
@@ -579,6 +589,11 @@ function createEngine(wasm) {
   const extrudeY = (cs, h) => cs.extrude(h).transform([1, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 1]);
 
   // ---------- icons: drawn in a box of size s centred on the origin ----------
+  // a cloud for the weather icons, k times the usual size, centred at (x, y) in units of the icon box
+  const weatherCloud = (s, x, y, k) => union([
+    circle(0.15 * k * s, (x - 0.16 * k) * s, (y - 0.02 * k) * s), circle(0.2 * k * s, (x + 0.02 * k) * s, (y + 0.06 * k) * s), circle(0.13 * k * s, (x + 0.2 * k) * s, (y - 0.03 * k) * s),
+    rrect(0.62 * k * s, 0.2 * k * s, 0.1 * k * s, x * s, (y - 0.06 * k) * s),
+  ]);
   const ICONS = {
     check: { label: 'Check', make: (s, w, P) => union([ring(s / 2 - w / 2, w), stroke([P(-0.21, 0.0), P(-0.06, -0.15), P(0.22, 0.15)], w * 1.15)]) },
     people: {
@@ -786,6 +801,92 @@ function createEngine(wasm) {
         const strip = rrect(0.96 * s, 0.34 * s, 0.05 * s, 0, 0.3 * s).subtract(union([-0.3, 0, 0.3].map((x) => rrect(0.2 * s, 0.16 * s, 0.03 * s, x * s, 0.3 * s))));
         return union([outer.subtract(inner), fill, strip]);
       },
+    },
+    // rendering, CPU at full load: a chip with pins on every side and a rising bar graph on it
+    cpu: {
+      label: 'CPU load', make: (s, w, P) => {
+        const body = rrect(0.62 * s, 0.62 * s, 0.08 * s);
+        const pins = [];
+        for (const t of [-0.17, 0, 0.17]) pins.push(stroke([P(t, 0.31), P(t, 0.46)], w * 0.85), stroke([P(t, -0.31), P(t, -0.46)], w * 0.85), stroke([P(0.31, t), P(0.46, t)], w * 0.85), stroke([P(-0.31, t), P(-0.46, t)], w * 0.85));
+        const bw = Math.max(0.09 * s, w * 0.8), gap = 0.05 * s;
+        const bars = [[-1, 0.12], [0, 0.22], [1, 0.32]].map(([k, h]) => rect(bw, h * s, k * (bw + gap), (-0.17 + h / 2) * s));
+        return union([body.subtract(body.offset(-w, 'Round', 2, 16)), ...pins, ...bars]);
+      },
+    },
+    // weather: sun, sun behind a cloud, cloud, rain, thunderstorm, snowflake, typhoon
+    sun: {
+      label: 'Sunny', make: (s, w, P) => union([circle(0.2 * s), ...[0, 45, 90, 135, 180, 225, 270, 315].map((a) => stroke([P(0.31 * Math.cos(a * D2R), 0.31 * Math.sin(a * D2R)), P(0.45 * Math.cos(a * D2R), 0.45 * Math.sin(a * D2R))], w))]),
+    },
+    sunCloud: {
+      label: 'Partly cloudy', make: (s, w, P) => {
+        const cl = weatherCloud(s, 0.1, -0.12, 0.9);
+        const sunny = union([circle(0.15 * s, -0.16 * s, 0.16 * s), ...[90, 135, 180, 225, 45].map((a) => stroke([P(-0.16 + 0.23 * Math.cos(a * D2R), 0.16 + 0.23 * Math.sin(a * D2R)), P(-0.16 + 0.33 * Math.cos(a * D2R), 0.16 + 0.33 * Math.sin(a * D2R))], w * 0.9))]);
+        return union([sunny.subtract(cl.offset(w * 0.8, 'Round', 2, 16)), cl]);
+      },
+    },
+    cloudy: { label: 'Cloudy', make: (s, w, P) => weatherCloud(s, 0, -0.04, 1.45) },
+    rain: {
+      label: 'Rain', make: (s, w, P) => union([weatherCloud(s, 0, 0.14, 1.25), ...[-0.2, 0, 0.2].map((x) => stroke([P(x + 0.05, -0.16), P(x - 0.05, -0.44)], w))]),
+    },
+    storm: {
+      label: 'Thunderstorm', make: (s, w, P) => {
+        const cl = weatherCloud(s, 0, 0.14, 1.25), bolt = poly([P(0.04, -0.06), P(-0.14, -0.3), P(-0.02, -0.3), P(-0.08, -0.48), P(0.14, -0.2), P(0.02, -0.2), P(0.1, -0.06)]);
+        return union([cl.subtract(bolt.offset(w * 0.7, 'Round', 2, 12)), bolt]);
+      },
+    },
+    snow: {
+      label: 'Snow', make: (s, w, P) => {
+        const arms = [];
+        for (const a of [90, 150, 210, 270, 330, 30]) {
+          const c = Math.cos(a * D2R), sn = Math.sin(a * D2R), e = [0.44 * c, 0.44 * sn], m = [0.27 * c, 0.27 * sn];
+          arms.push(stroke([P(0, 0), P(...e)], w));
+          for (const da of [-45, 45]) { const b = (a + 180 + da) * D2R; arms.push(stroke([P(...m), P(m[0] + 0.12 * Math.cos(b - Math.PI), m[1] + 0.12 * Math.sin(b - Math.PI))], w * 0.85)); }
+        }
+        return union(arms);
+      },
+    },
+    typhoon: {
+      label: 'Typhoon', make: (s, w, P) => union([ring(0.15 * s, w * 1.1), stroke(arc(0.15 * s, 0, 0.3 * s, 180, 15), w * 1.1), stroke(arc(-0.15 * s, 0, 0.3 * s, 0, -165), w * 1.1)]),
+    },
+    // business, from good to bad: coins (with an old square-holed coin), a rising chart, a cat, a sparrow, the wind
+    coins: {
+      label: 'Money rolling in', make: (s, w, P) => {
+        const gap = Math.max(0.4, w * 0.45), stack = [];
+        for (const y of [-0.38, -0.25, -0.12]) stack.push(rrect(0.5 * s, 0.13 * s - gap, 0.06 * s, -0.17 * s, y * s));
+        const coin = circle(0.24 * s, 0.2 * s, 0.2 * s).subtract(rect(0.11 * s, 0.11 * s, 0.2 * s, 0.2 * s));
+        return union([union(stack).subtract(circle(0.24 * s + gap, 0.2 * s, 0.2 * s)), coin]);
+      },
+    },
+    chartUp: {
+      label: 'Business up', make: (s, w, P) => union([
+        stroke([P(-0.44, 0.42), P(-0.44, -0.44), P(0.44, -0.44)], w),
+        stroke([P(-0.3, -0.26), P(-0.08, -0.04), P(0.06, -0.16), P(0.3, 0.14)], w * 1.1),
+        poly([P(0.42, 0.3), P(0.16, 0.22), P(0.36, 0.04)]),
+      ]),
+    },
+    catFace: {
+      label: 'A few customers', make: (s, w, P) => {
+        const head = union([CrossSection.circle(1, 64).scale([0.4 * s, 0.33 * s]).translate([0, -0.08 * s]), poly([P(-0.38, 0.06), P(-0.34, 0.44), P(-0.08, 0.22)]), poly([P(0.38, 0.06), P(0.34, 0.44), P(0.08, 0.22)])]);
+        const eye = Math.max(0.06 * s, w * 0.6);
+        return head.subtract(union([circle(eye, -0.15 * s, -0.02 * s), circle(eye, 0.15 * s, -0.02 * s), poly([P(-0.06, -0.14), P(0.06, -0.14), P(0, -0.21)])]));
+      },
+    },
+    bird: {
+      label: 'Deserted', make: (s, w, P) => {
+        const body = CrossSection.circle(1, 64).scale([0.28 * s, 0.19 * s]).translate([-0.02 * s, -0.04 * s]);
+        return union([
+          body, circle(0.14 * s, 0.22 * s, 0.12 * s).subtract(circle(Math.max(0.035 * s, w * 0.45), 0.26 * s, 0.15 * s)),
+          poly([P(0.33, 0.16), P(0.47, 0.1), P(0.33, 0.06)]), poly([P(-0.24, 0.0), P(-0.48, 0.14), P(-0.44, -0.06), P(-0.22, -0.12)]),
+          stroke([P(-0.04, -0.2), P(-0.06, -0.42)], w * 0.8), stroke([P(0.08, -0.2), P(0.1, -0.42)], w * 0.8), stroke([P(-0.3, -0.44), P(0.3, -0.44)], w * 0.8),
+        ]);
+      },
+    },
+    wind: {
+      label: 'Living on air', make: (s, w, P) => union([
+        stroke([P(-0.42, 0.16), P(0.14, 0.16), ...arc(0.14 * s, 0.29 * s, 0.13 * s, -90, 170).map(([x, y]) => [x, y])], w),
+        stroke([P(-0.46, -0.02), P(0.28, -0.02), ...arc(0.28 * s, -0.15 * s, 0.13 * s, 90, -170).map(([x, y]) => [x, y])], w),
+        stroke([P(-0.34, -0.22), P(0.02, -0.22)], w),
+      ]),
     },
     // reviewing: a screen with a play button, on a stand
     play: {
@@ -1660,7 +1761,7 @@ function createEngine(wasm) {
       // The plate's second color, the way HueForge colors a print: the plate stops flat at the top of the block and the second
       // color is stacked on it in steps of one layer, so a single filament swap at the block's top prints it. Where the stack is
       // thin the plate color shows through (more so in a translucent, high-TD filament), so the steps shade from one color into
-      // the other: all of them everywhere (Top layer), more towards the right (Gradient) or towards the outline (Edge glow), or
+      // the other: all of them everywhere (Top layer), one layer everywhere and more towards the right (Gradient) or towards the outline (Edge glow), or
       // on the shape's own details. A name printed on the plate sits on top of the steps.
       let accent = null, accentShade = null;
       if (accOn) {
@@ -1669,8 +1770,9 @@ function createEngine(wasm) {
         for (let j = 0; j < accK; j++) {
           let pl = null;
           if (accMode === 'top') pl = top;
-          else if (accMode === 'gradient') { const x0 = ob.min[0] + (w * (j + 1)) / (accK + 1); pl = top.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0)); }
-          else if (accMode === 'edge') { const D = clamp(Math.min(W, H) * 0.3, 4, 20); pl = top.intersect(sh.cs.subtract(sh.cs.offset(-(D * (accK - j)) / accK, 'Round', 2, 32))); }
+          // never less than one layer anywhere: the first step covers the whole top, the rest build the shading
+          else if (accMode === 'gradient') { if (j === 0) pl = top; else { const x0 = ob.min[0] + (w * j) / accK; pl = top.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0)); } }
+          else if (accMode === 'edge') { const D = clamp(Math.min(W, H) * 0.3, 4, 20); pl = j === 0 ? top : top.intersect(sh.cs.subtract(sh.cs.offset(-(D * (accK - j)) / (accK - 1), 'Round', 2, 32))); }
           else if (accMode === 'details' && detail) pl = top.intersect(detail);
           // under a printed name and on raised features the steps are full height
           const extra = [raisedExtra, nameCS && !nameCS.isEmpty() ? nameCS.offset(0.4, 'Round', 2, 12).intersect(sh.cs) : null].filter(Boolean);
@@ -2005,10 +2107,19 @@ const PRESETS_RAW = [
   { name: 'Mood', look: look('cloud', 'fredoka', ['#0056B8', '#FFFFFF', '#FEC600'], 'off', 14, { accentMode: 'gradient', colAccent: '#FEC600' }), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
   { name: '繁體中文', sample: '王小明', look: look('rounded', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
-  { name: '剪輯師', look: look('film', 'oswald', ['#000000', '#FFFFFF', '#FEC600'], 'off', 20, { accentMode: 'details', colAccent: '#A6A9AA' }), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
+  { name: '剪輯師', look: look('film', 'oswald', ['#000000', '#FFFFFF', '#FEC600'], 'off', 20, { accentMode: 'details', colAccent: '#A6A9AA' }), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'cpu'], ['審片中', 'play'], ['趕片中', 'fire']] },
   { name: '企劃', look: look('glasses', 'poppins', ['#FFFFFF', '#0A2989', '#FF6A13'], 'off', 20, { accentMode: 'details', colAccent: '#0A2989', accentLayers: 3 }), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
   // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
   { name: '心情', look: look('cloud', 'fredoka', ['#0056B8', '#FFFFFF', '#FEC600'], 'off', 14, { accentMode: 'gradient', colAccent: '#FEC600' }), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
+  // the days of the week, text only (which day you are in, which day it is); remove the days you don't need
+  { name: 'Days of the week', look: look('rounded', 'montserrat', ['#FFFFFF', '#000000', '#0056B8'], 'off', 20, { layout: 'text' }), list: [['MON', 'none'], ['TUE', 'none'], ['WED', 'none'], ['THU', 'none'], ['FRI', 'none'], ['SAT', 'none'], ['SUN', 'none']] },
+  { name: '星期', look: look('rounded', 'sans', ['#FFFFFF', '#000000', '#0056B8'], 'off', 20, { layout: 'text' }), list: [['週一', 'none'], ['週二', 'none'], ['週三', 'none'], ['週四', 'none'], ['週五', 'none'], ['週六', 'none'], ['週日', 'none']] },
+  // the weather: a sky-blue plate clearing to white
+  { name: 'Weather', look: look('rounded', 'fredoka', ['#0086D6', '#FFFFFF', '#FEC600'], 'off', 20, { accentMode: 'gradient', colAccent: '#FFFFFF' }), list: [['SUNNY', 'sun'], ['PARTLY CLOUDY', 'sunCloud'], ['CLOUDY', 'cloudy'], ['RAINY', 'rain'], ['STORMY', 'storm'], ['SNOWY', 'snow']] },
+  { name: '天氣', look: look('rounded', 'fredoka', ['#0086D6', '#FFFFFF', '#FEC600'], 'off', 20, { accentMode: 'gradient', colAccent: '#FFFFFF' }), list: [['晴天', 'sun'], ['多雲', 'sunCloud'], ['陰天', 'cloudy'], ['下雨', 'rain'], ['雷雨', 'storm'], ['颱風', 'typhoon']] },
+  // a shop's business, from booming to dead, in everyday Taiwanese sayings: money rolling in, a queue out the door, business
+  // booming, getting by, only a few cats about, deserted enough to net sparrows at the door, drinking the northwest wind
+  { name: '生意', sample: '阿明柑仔店', look: look('banner', 'sans', ['#C12E1F', '#E4BD68', '#000000'], 'plate', 18), list: [['財源|滾滾', 'coins'], ['大排|長龍', 'people'], ['生意|興隆', 'chartUp'], ['還過|得去', 'faceOk'], ['小貓|兩三隻', 'catFace'], ['門可|羅雀', 'bird'], ['喝西|北風', 'wind']] },
   { name: '日本語', sample: '山田 太郎', look: look('scallop', 'serif', ['#FFFFFF', '#000000', '#C12E1F'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, sample: p.sample || '', look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
@@ -2028,20 +2139,25 @@ const EXTRA_STATUSES = [
   ['ON VACATION', 'palm'], ['ON HOLIDAY', 'palm'],
   ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
-  ['EDITING', 'scissors'], ['CUTTING', 'scissors'], ['COLOR GRADING', 'palette'], ['RENDERING', 'render'], ['EXPORTING', 'render'],
+  ['EDITING', 'scissors'], ['CUTTING', 'scissors'], ['COLOR GRADING', 'palette'], ['RENDERING', 'cpu'], ['CPU AT 100%', 'cpu'], ['EXPORTING', 'render'],
   ['REVIEWING', 'play'], ['SCREENING', 'play'], ['ON DEADLINE', 'fire'], ['CRUNCH TIME', 'fire'],
   ['BRAINSTORMING', 'bulb'], ['THINKING', 'bulb'], ['WRITING', 'pen'], ['SCRIPTWRITING', 'pen'], ['PRESENTING', 'present'], ['PITCHING', 'present'],
   ['LOCATION SCOUTING', 'pin'],
+  ['MONEY ROLLING IN', 'coins'], ['QUEUE OUT THE DOOR', 'people'], ['BUSINESS IS BOOMING', 'chartUp'], ['GETTING BY', 'faceOk'], ['A FEW CUSTOMERS', 'catFace'], ['DESERTED', 'bird'], ['LIVING ON AIR', 'wind'],
+  ['SUNNY', 'sun'], ['PARTLY CLOUDY', 'sunCloud'], ['CLOUDY', 'cloudy'], ['RAINY', 'rain'], ['STORMY', 'storm'], ['SNOWY', 'snow'], ['TYPHOON', 'typhoon'],
 ];
 // Icons by how available the person is, most available first; the ready-made list follows this order under these headings.
 const AVAILABILITY = [
   { name: 'Available', icons: ['check', 'pin'] },
-  { name: 'In, but busy', icons: ['code', 'scissors', 'palette', 'render', 'play', 'bulb', 'pen', 'present', 'flask', 'target', 'hourglass', 'headset', 'people', 'mic', 'fire', 'dnd'] },
+  { name: 'In, but busy', icons: ['code', 'scissors', 'palette', 'cpu', 'render', 'play', 'bulb', 'pen', 'present', 'flask', 'target', 'hourglass', 'headset', 'people', 'mic', 'fire', 'dnd'] },
   { name: 'Stepped away', icons: ['cup', 'forkknife', 'clock', 'exit'] },
   { name: 'Out today', icons: ['car', 'factory', 'house'] },
   { name: 'Away', icons: ['briefcase', 'plane', 'palm'] },
   { name: 'Off', icons: ['thermo', 'moon'] },
   { name: 'Mood', icons: ['faceGreat', 'faceGood', 'faceOk', 'faceMeh', 'faceBad', 'faceAwful'] },
+  { name: 'Weather', icons: ['sun', 'sunCloud', 'cloudy', 'rain', 'storm', 'snow', 'typhoon'] },
+  { name: 'Business', icons: ['coins', 'chartUp', 'catFace', 'bird', 'wind'] },
+  { name: 'Days', icons: [] },
 ];
 const STATUS_SETS = (() => {
   const seen = new Set(), all = [];
@@ -2051,7 +2167,7 @@ const STATUS_SETS = (() => {
   }
   // most available first: in and free, in but busy, stepped away, out for the day, away, off; a few texts mean something
   // other than their icon's group
-  const rank = AVAILABILITY.flatMap((g) => g.icons), OVERRIDE = { 'OFFICE|HOURS': 'Available', 'LAB|CLOSED': 'Off', 'LOCATION|SCOUTING': 'Out today' };
+  const rank = AVAILABILITY.flatMap((g) => g.icons), OVERRIDE = { 'QUEUE OUT|THE DOOR': 'Business', 'GETTING|BY': 'Business', 'OFFICE|HOURS': 'Available', 'LAB|CLOSED': 'Off', 'LOCATION|SCOUTING': 'Out today', MON: 'Days', TUE: 'Days', WED: 'Days', THU: 'Days', FRI: 'Days', SAT: 'Days', SUN: 'Days' };
   const groupOf = (x) => OVERRIDE[x.text] || (AVAILABILITY.find((g) => g.icons.includes(x.icon)) || { name: 'Off' }).name;
   const key = (x) => AVAILABILITY.findIndex((g) => g.name === groupOf(x)) * 100 + (rank.includes(x.icon) ? rank.indexOf(x.icon) : 99);
   return all.map((x, i) => ({ ...x, i })).sort((a, b) => key(a) - key(b) || a.i - b.i).map((x) => ({ text: x.text, icon: x.icon, group: groupOf(x) }));
@@ -3190,7 +3306,7 @@ function renderStatuses(focusTarget) {
     card.dataset.uid = uidOf(st);
     card.innerHTML = `
       <div class="st-row">
-        <button type="button" class="pick" data-role="show" data-idx="${i}" title="Show on the sign">${svgIcon(st.icon)}</button>
+        <button type="button" class="pick" data-role="show" data-idx="${i}" title="Change the icon (and show this status on the sign)" aria-haspopup="dialog">${svgIcon(st.icon)}</button>
         <div class="combo"><input type="text" id="status-text-${i}" data-role="text" data-idx="${i}" maxlength="${MAX_TEXT}" autocomplete="off" aria-label="Text for status ${i + 1}"><button type="button" data-role="sets" data-idx="${i}" aria-label="Pick a ready-made status" title="Pick a ready-made status" aria-haspopup="listbox">${TOOL_SVG.sets}</button></div>
       </div>
       <div class="st-tools">
@@ -3212,7 +3328,7 @@ function renderStatuses(focusTarget) {
 }
 function labelCard(card, st, i) {
   const name = statusName(st, i);
-  card.querySelector('[data-role="show"]').setAttribute('aria-label', `Show ${name} on the sign`);
+  card.querySelector('[data-role="show"]').setAttribute('aria-label', `${name}: icon ${(engine && engine.icons[st.icon]) || 'none'}. Change the icon`);
 }
 function markCurrent(idx) {
   $$('#statusCards .st-card').forEach((c, i) => {
@@ -3283,7 +3399,7 @@ cardsEl.addEventListener('click', (e) => {
   if (suppressClick) return;
   if (!b) { if (card) setCurrent(+card.dataset.idx); return; }
   const role = b.dataset.role, i = +b.dataset.idx, s = state.statuses;
-  if (role === 'show') { setCurrent(i); return; }
+  if (role === 'show') { setCurrent(i); openIconPicker(b, i); return; }
   if (role === 'sets') { setCurrent(i); openSetPicker(b, i); return; }
   let focusTo = null;
   if (role === 'left' && i > 0) {
@@ -3368,6 +3484,49 @@ setPop.addEventListener('keydown', (e) => {
 });
 document.addEventListener('pointerdown', (e) => { if (!setPop.hidden && !setPop.contains(e.target) && !(setFor && setFor.btn.contains(e.target))) closeSetPicker(false); });
 window.addEventListener('resize', () => closeSetPicker(false));
+
+// The icon grid: every icon, grouped like the ready-made statuses (most available first), and no icon.
+const iconPop = $('#iconPopover');
+let iconFor = null;
+function openIconPicker(btn, idx) {
+  iconFor = { btn, idx };
+  const cur = state.statuses[idx].icon, seen = new Set();
+  const groups = AVAILABILITY.map((g) => ({ name: g.name, icons: g.icons.filter((k) => engine.icons[k] && !seen.has(k) && seen.add(k)) })).filter((g) => g.icons.length);
+  const rest = Object.keys(engine.icons).filter((k) => !seen.has(k));
+  if (rest.length) groups.push({ name: 'More', icons: rest });
+  const btnOf = (k, label, inner) => `<button type="button" data-icon="${k}" title="${label}" aria-label="${label}" aria-pressed="${k === cur}">${inner}</button>`;
+  iconPop.innerHTML = groups.map((g) => `<div class="set-group">${g.name}</div><div class="ic-grid">${g.icons.map((k) => btnOf(k, engine.icons[k], svgIcon(k))).join('')}</div>`).join('')
+    + `<div class="set-group">None</div><div class="ic-grid">${btnOf('none', 'No icon', '<span class="none-label">none</span>')}</div>`;
+  iconPop.hidden = false;
+  const r = btn.getBoundingClientRect(), pw = iconPop.offsetWidth, ph = iconPop.offsetHeight;
+  iconPop.style.left = Math.min(window.innerWidth - pw - 12, Math.max(12, r.left)) + 'px';
+  iconPop.style.top = (r.bottom + 6 + ph > window.innerHeight - 12 ? Math.max(12, r.top - ph - 6) : r.bottom + 6) + 'px';
+  (iconPop.querySelector('[aria-pressed="true"]') || iconPop.querySelector('button')).focus();
+}
+function closeIconPicker(refocus) {
+  if (iconPop.hidden) return;
+  iconPop.hidden = true;
+  if (refocus && iconFor) iconFor.btn.focus();
+  iconFor = null;
+}
+iconPop.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !iconFor) return;
+  const idx = iconFor.idx;
+  state.statuses[idx].icon = b.dataset.icon;
+  closeIconPicker(false);
+  renderStatuses({ role: 'show', idx });
+  changed();
+});
+iconPop.addEventListener('keydown', (e) => {
+  const btns = $$('button', iconPop), i = btns.indexOf(document.activeElement);
+  const cols = Math.max(1, Math.round((iconPop.querySelector('.ic-grid')?.clientWidth || 300) / 48));
+  const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: cols, ArrowUp: -cols }[e.key];
+  if (step && i >= 0) { e.preventDefault(); btns[Math.max(0, Math.min(btns.length - 1, i + step))].focus(); }
+  if (e.key === 'Escape') closeIconPicker(true);
+});
+document.addEventListener('pointerdown', (e) => { if (!iconPop.hidden && !iconPop.contains(e.target) && !(iconFor && iconFor.btn.contains(e.target))) closeIconPicker(false); });
+window.addEventListener('resize', () => closeIconPicker(false));
 
 function renderPresets() {
   const sel = $('#presetSel');
