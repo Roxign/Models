@@ -968,6 +968,23 @@ function createEngine(wasm) {
         return { cs: union([board, tab]).subtract(slot), outer: union([board, tab]), body: [-H / 2, top - ch * 0.5], clip: { cw, ch, top, slot } };
       },
     },
+    // Spiral notebook, for planners: a row of punched holes along the top of the cover, each with a ring looping up over its
+    // top edge; the track stays below the binding.
+    notebook: {
+      label: 'Notebook', make: (W, H) => {
+        const rh = clamp(H * 0.075, 3.5, 5.5), top = H / 2 - rh, hb = clamp(H * 0.14, 7, 11);
+        const cover = rrect(W, top + H / 2, 3, 0, (top - H / 2) / 2);
+        const hw = clamp(H * 0.05, 2.4, 3.4), t = 1.6, pitch = hw * 2.7, n = Math.max(3, Math.floor((W - 14) / pitch)), yH = top - hb * 0.45;
+        const outers = [], inners = [];
+        for (let i = 0; i < n; i++) {
+          const x = (i - (n - 1) / 2) * pitch, a = [x, yH], b = [x, H / 2 - (hw + 2 * t) / 2];
+          outers.push(cap(a, b, hw + 2 * t));
+          inners.push(cap(a, b, hw));
+        }
+        const outer = union([cover, ...outers]);
+        return { cs: outer.subtract(union(inners)), outer, body: [-H / 2, top - hb] };
+      },
+    },
     arrow: {
       label: 'Arrow', make: (W, H) => {
         const d = Math.min(H * 0.5, W * 0.18);
@@ -1143,7 +1160,9 @@ function createEngine(wasm) {
   function vLayout(p, sh, H, hh) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
-    if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + 11);
+    // Desk stand: the feet hold the sign's bottom edge, footGrip up its face (longer along the face when it leans). They may sit on
+    // the solid rail below the track (6 mm wide) but keep 1 mm clear of the track's opening.
+    if (p.mount === 'stand') b0 = Math.max(b0, sh.body[0] + Math.max(0, (p.footGrip ?? 7.5) / Math.cos(Math.min(60, Math.abs(p.tilt ?? 15)) * D2R) + 1 - (p.statusOn === false ? (p.nameRail ? tagRw(p) : 0) : 6)));
     // the cubicle hooks clip over the plate's top edge: keep the top 11 mm clear (shapes with a crown keep it free instead)
     const hooked = p.mount === 'cubicle' || p.mount === 'cubrail';
     if (hooked && !sh.crown) b1 = Math.min(b1, sh.body[1] - 11);
@@ -1647,7 +1666,7 @@ function createEngine(wasm) {
           const xf = sx * Math.min(W * 0.28, X * 0.75);
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
-          const hF = lz((ybL - ybG) * ca + floor + 7.5);
+          const hF = lz((ybL - ybG) * ca + floor + (p.footGrip ?? 7.5));
           // the foot clips over the plate, or plate and rail where a rail runs out to the bottom edge
           const zc = topIn(Manifold.cube([fl + 1, 12, 400]).translate([xf - fl / 2 - 0.5, ybL - 1, -1]));
           const zMid = -(ybL - ybG) * sa + T * ca / 2;
@@ -1874,7 +1893,7 @@ const PRESETS_RAW = [
   { name: '繁體中文', look: look('rounded', 'sans', ['#2E3237', '#F3F1EA', '#F06A28']), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
   { name: '剪輯師', look: look('film', 'oswald', ['#1C1E24', '#F4F1EA', '#F5B700']), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
-  { name: '企劃', look: look('clipboard', 'poppins', ['#D2A86E', '#2B2622', '#E8573F']), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
+  { name: '企劃', look: look('notebook', 'poppins', ['#F4EFE6', '#24324F', '#E8573F']), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
   // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
   { name: '心情', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541']), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
   { name: '日本語', look: look('scallop', 'serif', ['#F4EFE6', '#2B2B2B', '#C0392B']), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
@@ -1938,7 +1957,7 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
@@ -1968,6 +1987,7 @@ const SLIDERS = {
   footW: { label: 'Foot width', min: 10, max: 100, step: 1, out: mm(0) },
   footF: { label: 'Foot extension, forward', min: 0, max: 120, step: 1, out: mm(0) },
   footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
+  footGrip: { label: 'Foot grip height', min: 3, max: 20, step: 0.5, out: mm() },
   hangHole: { label: 'Loop hole diameter', min: 4, max: 40, step: 0.5, out: mm() },
   bevel: { label: 'Bevel size', min: 0, max: 6, step: 0.1, layers: true, signed: true, out: mm() },
   namePad: { label: 'Name margin', min: -3, max: 20, step: 0.2, out: mm() },
@@ -1991,7 +2011,7 @@ const SLIDERS = {
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { footGrip: 2, hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -2028,7 +2048,7 @@ const SHAPE_DEFAULTS = {
   honeycomb: { marginV: 16, marginH: 12 },
 };
 const CHOICES = {
-  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard'],
+  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard', 'notebook'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
   mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
@@ -2037,7 +2057,7 @@ const MOUNT_HINTS = {
   magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
-  stand: 'Two slotted feet print separately and hold the sign upright on a desk.',
+  stand: 'Two slotted feet print separately and hold the sign upright on a desk. Foot grip height is how far up the sign they hold; the sign only grows by what the feet cover beyond the rail under the track.',
   cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is. A negative drop hangs the sign higher than the panel.',
   cubrail: 'For a C-shaped rail: each hook ends in a thin tab. Hold the sign up a little, push the tabs into the slot and let go; the tabs drop behind the lower lip. It slides along the rail. Measure the slot and the hollow behind it.',
 };
@@ -2078,6 +2098,7 @@ const SECTIONS = [
       { slider: 'footW', when: 'stand' },
       { slider: 'footF', when: 'stand' },
       { slider: 'footB', when: 'stand' },
+      { slider: 'footGrip', when: 'stand' },
       { slider: 'hangHole', when: 'hang' },
       { seg: 'hangN', label: 'Loops', options: [[1, 'One'], [2, 'Two']], when: 'hang' },
       { slider: 'cubP', when: 'cubicle' },
@@ -3206,7 +3227,7 @@ function renderPresets() {
 function renderShapes() {
   const grid = $('#shapeGrid');
   grid.innerHTML = '';
-  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard'];
+  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard', 'notebook'];
   for (const [k, label] of Object.entries(engine.shapes).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
