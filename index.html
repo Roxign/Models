@@ -458,7 +458,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <h2 id="statusesTitle"><span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg></span>Statuses</h2>
         <p class="hint">Click one to show it on the sign. Press <span class="mono">Enter</span> or type <span class="mono">|</span> for a line break.</p>
         <div class="st-actions">
-          <select id="presetSel" aria-label="Load a preset design: its statuses and its look" title="Replaces the statuses and the look (shape, colors, typeface and layout). Your name, mounting, size and printer settings stay."><option value="">Load a preset…</option></select>
+          <select id="presetSel" aria-label="Load a preset design: its statuses, its look and its name" title="Replaces the statuses, the look (shape, colors, typeface and layout) and the name settings. Your mounting, size and printer settings stay."><option value="">Load a preset…</option></select>
           <button class="btn small" id="addStatus" type="button">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Add
@@ -2085,10 +2085,10 @@ const withBreak = (t) => {
   }
   return best.t;
 };
-// A preset is a whole design: its statuses and a look to go with them (shape, typeface, layout and colors). The name, the
-// mounting, the size and the printer settings stay as they are.
-// name: off, on the plate or on a slide-in tag, with its letter height; the rest of the Name tab takes the usual values. The name
-// you typed stays.
+// A preset is a whole design: its statuses, a look to go with them (shape, typeface, layout and colors) and its name settings,
+// name text included. The mounting, the size and the printer settings stay as they are.
+// name: off, on the plate or on a slide-in tag, with its letter height; the rest of the Name tab takes the usual values, and the
+// name text becomes the preset's sample (or nothing).
 const look = (shape, font, [colBase, colLabel, colSlider], name = 'off', hcap = 20, extra = {}) => ({
   shape, font, layout: 'stack', relief: 'raised', uniform: true, reliefH: 0.4, statusOn: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel,
   nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, accentMode: 'off', accentLayers: 0, accentTD: 0, colAccent: colSlider, ...extra,
@@ -3543,9 +3543,8 @@ function renderPresets() {
     state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
     state.current = 0;
     if (p.look) Object.assign(state, SHAPE_NEUTRAL, SHAPE_DEFAULTS[p.look.shape] || {}, p.look);
-    // a sample name where the preset suits one; a name you typed stays (only an empty name or another preset's sample changes)
-    const samples = new Set(PRESETS.map((x) => x.sample).filter(Boolean));
-    if (!(state.header || '').trim() || samples.has(state.header)) state.header = p.sample;
+    // the preset decides the name too: its sample where it suits one, none otherwise
+    state.header = p.sample || '';
     renderStatuses();
     if (engine) renderShapes();
     syncControls();
