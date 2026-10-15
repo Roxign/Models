@@ -447,7 +447,7 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
         <h2 id="statusesTitle"><span class="sec-tag" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg></span>Statuses</h2>
         <p class="hint">Click one to show it on the sign. Press <span class="mono">Enter</span> or type <span class="mono">|</span> for a line break.</p>
         <div class="st-actions">
-          <select id="presetSel" aria-label="Replace the statuses with a preset set"><option value="">Load a preset…</option></select>
+          <select id="presetSel" aria-label="Load a preset design: its statuses and its look" title="Replaces the statuses and the look (shape, colors, typeface and layout). Your name, mounting, size and printer settings stay."><option value="">Load a preset…</option></select>
           <button class="btn small" id="addStatus" type="button">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
             Add
@@ -757,6 +757,122 @@ function createEngine(wasm) {
           ...[0.3, 0.16, 0.02].map((y) => stroke([P(0.17, y), P(0.33, y)], w * 0.9)),
         ]);
       },
+    },
+    // editing: open scissors, finger rings below and tapered blades crossing above
+    scissors: {
+      label: 'Editing', make: (s, w, P) => {
+        const blade = (a, b) => CrossSection.hull([circle(w * 0.8, a[0], a[1], 20), circle(w * 0.42, b[0], b[1], 16)]);
+        return union([
+          ring(0.12 * s, w, -0.22 * s, -0.32 * s), ring(0.12 * s, w, 0.22 * s, -0.32 * s),
+          blade(P(-0.13, -0.2), P(0.25, 0.46)), blade(P(0.13, -0.2), P(-0.25, 0.46)),
+        ]);
+      },
+    },
+    // color grading: an artist's palette with a thumb hole and four paint wells
+    palette: {
+      label: 'Color grading', make: (s, w, P) => {
+        const body = CrossSection.circle(1, 72).scale([0.48 * s, 0.4 * s]).subtract(circle(0.15 * s, 0.4 * s, -0.3 * s, 40));
+        const hr = Math.max(0.07 * s, w * 0.7);
+        return body.subtract(union([circle(0.085 * s, 0.17 * s, -0.17 * s, 32), ...[[-0.25, 0.04], [-0.1, 0.22], [0.12, 0.22], [-0.2, -0.2]].map(([x, y]) => circle(hr, x * s, y * s, 32))]));
+      },
+    },
+    // rendering: a progress bar, two thirds full, with the frames of a film strip above it
+    render: {
+      label: 'Rendering', make: (s, w, P) => {
+        const outer = rrect(0.96 * s, 0.42 * s, 0.12 * s, 0, -0.24 * s), inner = outer.offset(-w, 'Round', 2, 16);
+        const fill = inner.offset(-Math.max(0.45, w * 0.4), 'Round', 2, 16).intersect(rect(0.62 * s, s, -0.17 * s, 0));
+        const strip = rrect(0.96 * s, 0.34 * s, 0.05 * s, 0, 0.3 * s).subtract(union([-0.3, 0, 0.3].map((x) => rrect(0.2 * s, 0.16 * s, 0.03 * s, x * s, 0.3 * s))));
+        return union([outer.subtract(inner), fill, strip]);
+      },
+    },
+    // reviewing: a screen with a play button, on a stand
+    play: {
+      label: 'Reviewing', make: (s, w, P) => {
+        const scr = rrect(0.96 * s, 0.7 * s, 0.08 * s, 0, 0.1 * s);
+        return union([
+          scr.subtract(scr.offset(-w, 'Round', 2, 16)),
+          poly([P(-0.1, 0.27), P(-0.1, -0.07), P(0.2, 0.1)]),
+          stroke([P(0, -0.25), P(0, -0.44)], w), stroke([P(-0.2, -0.45), P(0.2, -0.45)], w * 1.1),
+        ]);
+      },
+    },
+    // deadline: a flame with an inner tongue cut out
+    fire: {
+      label: 'Deadline', make: (s, w, P) => {
+        const outer = union([
+          CrossSection.hull([circle(0.32 * s, 0, -0.14 * s, 48), circle(0.03 * s, 0.06 * s, 0.47 * s, 12)]),
+          CrossSection.hull([circle(0.16 * s, -0.18 * s, -0.2 * s, 32), circle(0.02 * s, -0.33 * s, 0.2 * s, 12)]),
+        ]);
+        return outer.subtract(CrossSection.hull([circle(0.15 * s, 0, -0.25 * s, 32), circle(0.02 * s, 0.03 * s, 0.1 * s, 12)]));
+      },
+    },
+    // brainstorming: a light bulb with rays
+    bulb: {
+      label: 'Idea', make: (s, w, P) => union([
+        ring(0.22 * s, w, 0, 0.1 * s),
+        stroke([P(-0.12, -0.08), P(-0.12, -0.27)], w), stroke([P(0.12, -0.08), P(0.12, -0.27)], w),
+        stroke([P(-0.14, -0.29), P(0.14, -0.29)], w), stroke([P(-0.1, -0.42), P(0.1, -0.42)], w),
+        ...[0, 45, 90, 135, 180].map((a) => stroke([P(0.35 * Math.cos(a * D2R), 0.1 + 0.35 * Math.sin(a * D2R)), P(0.45 * Math.cos(a * D2R), 0.1 + 0.45 * Math.sin(a * D2R))], w * 0.9)),
+      ]),
+    },
+    // writing: a pencil at an angle
+    pen: {
+      label: 'Writing', make: (s, w, P) => {
+        const band = Math.max(0.4, w * 0.45);
+        const pencil = union([rrect(0.2 * s, 0.6 * s, 0.03 * s, 0, 0.08 * s), poly([P(-0.1, -0.22), P(0.1, -0.22), P(0, -0.44)])])
+          .subtract(union([rect(s, band, 0, -0.2 * s), rect(s, band, 0, 0.27 * s)]));
+        return union([pencil.rotate(-40).translate([0.04 * s, 0.04 * s]), stroke([P(-0.46, -0.46), P(-0.12, -0.46)], w * 0.9)]);
+      },
+    },
+    // presenting: a board with a rising bar chart, on an easel
+    present: {
+      label: 'Presenting', make: (s, w, P) => {
+        const board = rrect(0.92 * s, 0.58 * s, 0.05 * s, 0, 0.14 * s);
+        return union([
+          board.subtract(board.offset(-w, 'Round', 2, 16)),
+          ...[[-0.22, 0.12], [0, 0.22], [0.22, 0.32]].map(([x, h]) => rect(0.13 * s, h * s, x * s, (-0.06 + h / 2) * s)),
+          stroke([P(-0.24, -0.46), P(0, -0.15), P(0.24, -0.46)], w),
+        ]);
+      },
+    },
+    // moods, from good to bad: a face in a ring, its eyes and mouth changing
+    faceGreat: {
+      label: 'Mood: great', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w),
+        stroke(arc(-0.16 * s, 0.08 * s, 0.08 * s, 0, 180), w), stroke(arc(0.16 * s, 0.08 * s, 0.08 * s, 0, 180), w),
+        circle(0.25 * s, 0, -0.04 * s).intersect(rect(s, 0.3 * s, 0, -0.19 * s)),
+      ]),
+    },
+    faceGood: {
+      label: 'Mood: good', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w), circle(Math.max(0.065 * s, w * 0.75), -0.16 * s, 0.12 * s), circle(Math.max(0.065 * s, w * 0.75), 0.16 * s, 0.12 * s),
+        stroke(arc(0, 0.04 * s, 0.24 * s, 210, 330), w),
+      ]),
+    },
+    faceOk: {
+      label: 'Mood: okay', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w), circle(Math.max(0.065 * s, w * 0.75), -0.16 * s, 0.12 * s), circle(Math.max(0.065 * s, w * 0.75), 0.16 * s, 0.12 * s),
+        stroke([P(-0.17, -0.17), P(0.17, -0.17)], w),
+      ]),
+    },
+    faceMeh: {
+      label: 'Mood: so-so', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w), stroke([P(-0.24, 0.1), P(-0.08, 0.1)], w), stroke([P(0.08, 0.1), P(0.24, 0.1)], w),
+        stroke([P(-0.17, -0.2), P(0.17, -0.12)], w),
+      ]),
+    },
+    faceBad: {
+      label: 'Mood: bad', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w), circle(Math.max(0.065 * s, w * 0.75), -0.16 * s, 0.1 * s), circle(Math.max(0.065 * s, w * 0.75), 0.16 * s, 0.1 * s),
+        stroke(arc(0, -0.38 * s, 0.22 * s, 35, 145), w),
+      ]),
+    },
+    faceAwful: {
+      label: 'Mood: awful', make: (s, w, P) => union([
+        ring(s / 2 - w / 2, w), circle(Math.max(0.065 * s, w * 0.75), -0.16 * s, 0.06 * s), circle(Math.max(0.065 * s, w * 0.75), 0.16 * s, 0.06 * s),
+        stroke([P(-0.27, 0.25), P(-0.08, 0.16)], w), stroke([P(0.27, 0.25), P(0.08, 0.16)], w),
+        stroke(arc(0, -0.42 * s, 0.24 * s, 40, 140), w),
+      ]),
     },
   };
   let minLine = 0.8; // set per build: the thinnest line worth drawing, two nozzle widths
@@ -1578,15 +1694,21 @@ function createEngine(wasm) {
         const R2 = (y0, y1, z0, z1) => rect(Math.max(0.01, Math.abs(y1 - y0)), Math.max(0.01, Math.abs(z1 - z0)), (y0 + y1) / 2, (z0 + z1) / 2);
         // the clip wraps the full thickness under it: the plate, or plate and rail where the name tag's rail runs to the top edge
         const zAt = (xf, yT) => Math.max(T, base.intersect(Manifold.cube([hw + 1, clipH + 1.5, 400]).translate([xf - hw / 2 - 0.5, yT - clipH - 0.5, -1])).boundingBox().max[2]);
-        const slotCS = sh.cs.offset(0.2, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 0.4).translate([0, 0, -0.2]);
+        // gp: the gap between the hook and the sign, all round inside the clip
+        const gp = Math.max(0.02, p.hookGap ?? 0.2);
+        const slotCS = sh.cs.offset(gp, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 2 * gp).translate([0, 0, -gp]);
         for (const h of hookAt) h.zc = zAt(h.xf, h.yT);
-        // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each reaches past the 0.2 mm
-        // clearance into the sign by half the squeeze, so the clip pinches the plate and the hook does not wobble or slide.
-        const squeeze = Math.max(0, p.hookGrip ?? 0.1), rr = Math.max(0.8, 2 * NZ);
+        // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each crosses the gap and bites
+        // into the sign by bite, so the clip pinches the plate and the hook does not wobble or slide; the deeper the bite, the
+        // wider the strip where hook and sign touch. 0 leaves the ridges off.
+        const bite = Math.max(0, p.hookBite ?? (p.hookGrip ?? 0.1) / 2), rr = Math.max(0.8, 2 * NZ);
         const gripRidges = (xf, yT, zc) => {
-          if (squeeze < 0.01) return Manifold.union([]);
-          const e = squeeze / 2, y = yT - 4;
-          return extrudeX(union([circle(rr, y, zc + rr - e, 24), circle(rr, y, -rr + e, 24)]), xf - hw / 2 + 1, xf + hw / 2 - 1);
+          if (bite < 0.005) return Manifold.union([]);
+          const y = yT - 4, root = (z) => rect(2 * rr, 0.02, y, z);
+          return extrudeX(union([
+            CrossSection.hull([circle(rr, y, zc - bite + rr, 24), root(zc + gp + 0.05)]),
+            CrossSection.hull([circle(rr, y, bite - rr, 24), root(-gp - 0.05)]),
+          ]), xf - hw / 2 + 1, xf + hw / 2 - 1);
         };
         // both hooks hang from the same panel top (or rail slot), set by the higher of the two clip points
         const yP = Math.max(...hookAt.map((h) => h.yT)) + drop, yU = yP + g / 2, yPanel = yP;
@@ -1602,7 +1724,7 @@ function createEngine(wasm) {
           if (flag < 2 * NZ - 0.01) warnings.push(`The tab that goes into the rail is only ${fmtMm(flag)} mm thick, less than two ${NZ} mm nozzle lines. Print the hooks with a finer nozzle, or check the hollow depth.`);
           for (const { xf, yT, zc } of hookAt) {
             const body2 = union([
-              R2(yT - clipH, yT + 0.2 + t, -t, zc + 0.2 + lipF), // clip around the plate's top edge
+              R2(yT - clipH, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge
               R2(yT, ft + 1.5, -t, 0), // front leg, up the face of the rail
             ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
             // neck through the slot and the tab behind the lips: sharp corners, so nothing rubs on the lips
@@ -1613,7 +1735,7 @@ function createEngine(wasm) {
         }
         for (const { xf, yT, zc } of cub ? hookAt : []) {
           const prof = union([
-            R2(yT - clipH, yT + 0.2 + t, -t, zc + 0.2 + lipF), // clip around the plate's top edge (the plate is cut out of it below)
+            R2(yT - clipH, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge (the plate is cut out of it below)
             R2(yT, yU + t, -t, 0), // front leg, between the plate and the panel
             R2(yU, yU + t, zBk - t, 0), // over the top
             R2(yP - back, yU + t, zBk - t, zBk), // down the back
@@ -1750,21 +1872,30 @@ const withBreak = (t) => {
   }
   return best.t;
 };
+// A preset is a whole design: its statuses and a look to go with them (shape, typeface, layout and colors). The name, the
+// mounting, the size and the printer settings stay as they are.
+const look = (shape, font, [colBase, colLabel, colSlider], extra = {}) => ({ shape, font, layout: 'stack', relief: 'raised', uniform: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel, ...extra });
 const PRESETS_RAW = [
-  { name: 'Office classic', list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
-  { name: 'Hybrid team', list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
-  { name: 'Deep work', list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
-  { name: 'Studio', list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
-  { name: 'Research lab', list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
-  { name: 'Meeting room', list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
-  { name: 'Classroom', list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
-  { name: 'Clinic', list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
-  { name: 'Home office', list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
-  { name: 'Simple three', list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: '繁體中文', list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
-  { name: '日本語', list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
+  { name: 'Office classic', look: look('rail', 'sans', ['#2E3237', '#F3F1EA', '#F06A28']), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
+  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#F2F2EE', '#1F2A44', '#2F6BFF']), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
+  { name: 'Deep work', look: look('pixel', 'mono', ['#14181D', '#A6E3A1', '#3FB950']), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
+  { name: 'Studio', look: look('banner', 'bebas', ['#1A1B1E', '#F3F1EA', '#E5383B']), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#EEF3F4', '#17363C', '#1F9E89']), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
+  { name: 'Meeting room', look: look('rounded', 'inter', ['#1F3B2F', '#EDE6D6', '#E8B73A']), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
+  { name: 'Classroom', look: look('arch', 'fredoka', ['#2F4A3A', '#F4F1E6', '#E8B73A']), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
+  { name: 'Clinic', look: look('pill', 'poppins', ['#F5F9F9', '#0F5C63', '#2BB3A3']), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
+  { name: 'Home office', look: look('cat', 'fredoka', ['#F3E9DC', '#4A3426', '#D9822B']), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
+  { name: 'Simple three', look: look('lozenge', 'inter', ['#F2F2EE', '#1F2A44', '#2F6BFF']), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
+  { name: 'Mood', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541']), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
+  { name: '繁體中文', look: look('rounded', 'sans', ['#2E3237', '#F3F1EA', '#F06A28']), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
+  // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
+  { name: '剪輯師', look: look('ticket', 'oswald', ['#1C1E24', '#F4F1EA', '#F5B700']), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
+  { name: '企劃', look: look('speech', 'poppins', ['#FFF4E3', '#2D2A32', '#FF7A59']), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
+  // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
+  { name: '心情', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541']), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
+  { name: '日本語', look: look('scallop', 'serif', ['#F4EFE6', '#2B2B2B', '#C0392B']), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
-const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
+const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
   ['OPEN', 'check'], ['COME IN', 'check'], ['PLEASE KNOCK', 'check'], ['WELCOME', 'check'], ['IN THE OFFICE', 'pin'],
   ['STEP OUT', 'exit'], ['ON SITE', 'pin'], ['IN CLASS', 'people'], ['TEAM MEETING', 'people'], ['WITH A VISITOR', 'people'], ['INTERVIEW', 'people'],
@@ -1781,15 +1912,20 @@ const EXTRA_STATUSES = [
   ['ON VACATION', 'palm'], ['ON HOLIDAY', 'palm'],
   ['OUT SICK', 'thermo'], ['SICK LEAVE', 'thermo'], ['OFFLINE', 'moon'], ['AWAY', 'moon'], ['OFF TODAY', 'moon'],
   ['CODING', 'code'], ['IN REVIEW', 'code'], ['RECORDING', 'mic'], ['ON AIR', 'mic'], ['PODCAST', 'mic'],
+  ['EDITING', 'scissors'], ['CUTTING', 'scissors'], ['COLOR GRADING', 'palette'], ['RENDERING', 'render'], ['EXPORTING', 'render'],
+  ['REVIEWING', 'play'], ['SCREENING', 'play'], ['ON DEADLINE', 'fire'], ['CRUNCH TIME', 'fire'],
+  ['BRAINSTORMING', 'bulb'], ['THINKING', 'bulb'], ['WRITING', 'pen'], ['SCRIPTWRITING', 'pen'], ['PRESENTING', 'present'], ['PITCHING', 'present'],
+  ['LOCATION SCOUTING', 'pin'],
 ];
 // Icons by how available the person is, most available first; the ready-made list follows this order under these headings.
 const AVAILABILITY = [
   { name: 'Available', icons: ['check', 'pin'] },
-  { name: 'In, but busy', icons: ['code', 'flask', 'target', 'hourglass', 'headset', 'people', 'mic', 'dnd'] },
+  { name: 'In, but busy', icons: ['code', 'scissors', 'palette', 'render', 'play', 'bulb', 'pen', 'present', 'flask', 'target', 'hourglass', 'headset', 'people', 'mic', 'fire', 'dnd'] },
   { name: 'Stepped away', icons: ['cup', 'forkknife', 'clock', 'exit'] },
   { name: 'Out today', icons: ['car', 'factory', 'house'] },
   { name: 'Away', icons: ['briefcase', 'plane', 'palm'] },
   { name: 'Off', icons: ['thermo', 'moon'] },
+  { name: 'Mood', icons: ['faceGreat', 'faceGood', 'faceOk', 'faceMeh', 'faceBad', 'faceAwful'] },
 ];
 const STATUS_SETS = (() => {
   const seen = new Set(), all = [];
@@ -1799,7 +1935,7 @@ const STATUS_SETS = (() => {
   }
   // most available first: in and free, in but busy, stepped away, out for the day, away, off; a few texts mean something
   // other than their icon's group
-  const rank = AVAILABILITY.flatMap((g) => g.icons), OVERRIDE = { 'OFFICE|HOURS': 'Available', 'LAB|CLOSED': 'Off' };
+  const rank = AVAILABILITY.flatMap((g) => g.icons), OVERRIDE = { 'OFFICE|HOURS': 'Available', 'LAB|CLOSED': 'Off', 'LOCATION|SCOUTING': 'Out today' };
   const groupOf = (x) => OVERRIDE[x.text] || (AVAILABILITY.find((g) => g.icons.includes(x.icon)) || { name: 'Off' }).name;
   const key = (x) => AVAILABILITY.findIndex((g) => g.name === groupOf(x)) * 100 + (rank.includes(x.icon) ? rank.indexOf(x.icon) : 99);
   return all.map((x, i) => ({ ...x, i })).sort((a, b) => key(a) - key(b) || a.i - b.i).map((x) => ({ text: x.text, icon: x.icon, group: groupOf(x) }));
@@ -1818,7 +1954,7 @@ const DEFAULTS = {
   layout: 'stack', font: 'sans', uniform: true, relief: 'raised', reliefH: 0.8, header: '',
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
-  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGrip: 0.1, hangHole: 10, hangN: 1, tape: false,
+  mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
   statusOn: true, nameMode: 'off', tagT: 1.6,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.8, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
@@ -1862,7 +1998,8 @@ const SLIDERS = {
   railCav: { label: 'Hollow depth behind the lips', min: 0.4, max: 20, step: 0.1, out: mm() },
   railDrop: { label: 'Sign top below the rail slot', min: -100, max: 300, step: 1, out: mm(0) },
   hookDrop: { label: 'Sign top below the top of the panel', min: -100, max: 300, step: 1, out: mm(0) },
-  hookGrip: { label: 'Clip squeeze on the sign', min: 0, max: 1.5, step: 0.05, out: mm(2) },
+  hookGap: { label: 'Gap between hook and sign', min: 0.05, max: 1, step: 0.05, out: mm(2) },
+  hookBite: { label: 'Hook bite into the sign', min: 0, max: 0.6, step: 0.01, out: mm(2) },
   hookW: { label: 'Hook width', min: 10, max: 80, step: 1, layers: true, out: mm() },
   marginV: { label: 'Top & bottom margin', min: 0, max: 50, step: 0.5, out: mm() },
   marginH: { label: 'Side margin', min: 0, max: 50, step: 0.5, out: mm() },
@@ -1870,7 +2007,7 @@ const SLIDERS = {
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -1968,7 +2105,9 @@ const SECTIONS = [
       { slider: 'railDrop', when: 'cubrail' },
       { slider: 'hookDrop', when: 'cubicle' },
       { slider: 'hookW', when: 'hooked' },
-      { slider: 'hookGrip', when: 'hooked' },
+      { slider: 'hookGap', when: 'hooked' },
+      { slider: 'hookBite', when: 'hooked' },
+      { hint: 'Gap: the clearance between the hook and the sign all round inside the clip. Bite: two ridges inside the clip press this far into the sign on each face; a deeper bite makes a wider contact strip and a tighter hold, and 0 leaves the ridges off.', when: 'hooked' },
       { check: 'tape', label: 'Recess for a tape pad', title: 'Cuts a shallow recess in the back so a double-sided tape pad sits flush', when: 'none' },
     ] },
   ] },
@@ -2036,6 +2175,8 @@ function sanitize(s) {
   if (typeof s.dyn === 'boolean') out.dyn = s.dyn;
   normalizePrinter(out);
   if (s.tagRailH == null && Number.isFinite(+s.tagT)) s = { ...s, tagRailH: +s.tagT };
+  // designs saved with the old clip squeeze (both faces together) bite half of it on each face
+  if (s.hookBite == null && Number.isFinite(+s.hookGrip)) s = { ...s, hookBite: +s.hookGrip / 2 };
   for (const k of Object.keys(SLIDERS)) out[k] = freeClamp(k, Number.isFinite(+s[k]) ? +s[k] : out[k], out);
   if (s.chamfer === true && s.bevel == null) out.bevel = 1.2;
   if (Number.isFinite(+s.footD) && s.footF == null && s.footB == null) { out.footF = Math.round(+s.footD * 0.42); out.footB = Math.round(+s.footD * 0.58); }
@@ -3054,7 +3195,11 @@ function renderPresets() {
     if (!p) return;
     state.statuses = p.list.map(([text, icon]) => ({ text, icon }));
     state.current = 0;
+    if (p.look) Object.assign(state, SHAPE_NEUTRAL, SHAPE_DEFAULTS[p.look.shape] || {}, p.look);
     renderStatuses();
+    if (engine) renderShapes();
+    syncControls();
+    applyColors();
     changed();
   });
 }
