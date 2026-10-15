@@ -428,12 +428,14 @@ dialog::backdrop { background: rgba(10, 12, 16, 0.5); }
       </div>
       <div class="pal-pop" id="palPop" hidden>
         <strong>Preview colors</strong>
+        <datalist id="filamentColors"><option value="#000000"></option><option value="#ffffff"></option><option value="#d1d3d5"></option><option value="#8e9089"></option><option value="#545454"></option><option value="#a6a9aa"></option><option value="#f7e6de"></option><option value="#c12e1f"></option><option value="#ff6a13"></option><option value="#fec600"></option><option value="#f4ee2a"></option><option value="#e4bd68"></option><option value="#3f8e43"></option><option value="#00ae42"></option><option value="#00b1b7"></option><option value="#0086d6"></option><option value="#0056b8"></option><option value="#0a2989"></option><option value="#5b6579"></option><option value="#f55a74"></option><option value="#9d432c"></option><option value="#6f5034"></option><option value="#9d2235"></option><option value="#5e43b7"></option><option value="#ec008c"></option></datalist>
         <div class="pal-colors">
-          <label class="color-row">Plate<input type="color" id="colBase" data-key="colBase"></label>
-          <label class="color-row" data-when="status">Status lettering<input type="color" id="colLabel" data-key="colLabel"></label>
-          <label class="color-row" data-when="status">Frame<input type="color" id="colSlider" data-key="colSlider"></label>
-          <label class="color-row" data-when="name">Name text<input type="color" id="colName" data-key="colName"></label>
-          <label class="color-row" data-when="tag">Name tag<input type="color" id="colTag" data-key="colTag"></label>
+          <label class="color-row">Plate<input type="color" id="colBase" data-key="colBase" list="filamentColors"></label>
+          <label class="color-row" data-when="accent">Plate accent<input type="color" id="colAccent" data-key="colAccent" list="filamentColors"></label>
+          <label class="color-row" data-when="status">Status lettering<input type="color" id="colLabel" data-key="colLabel" list="filamentColors"></label>
+          <label class="color-row" data-when="status">Frame<input type="color" id="colSlider" data-key="colSlider" list="filamentColors"></label>
+          <label class="color-row" data-when="name">Name text<input type="color" id="colName" data-key="colName" list="filamentColors"></label>
+          <label class="color-row" data-when="tag">Name tag<input type="color" id="colTag" data-key="colTag" list="filamentColors"></label>
         </div>
         <div class="palette-row" id="palettes"></div>
         <p class="hint">Colors only change the preview and the 3MF; STL files have no color.</p>
@@ -954,18 +956,27 @@ function createEngine(wasm) {
         const mb = clamp(H * 0.13, 6, 10), ph = mb * 0.46, pw = ph * 1.4, pitch = pw * 1.85, n = Math.max(2, Math.floor((W - 6) / pitch));
         const outer = rrect(W, H, 2.5), holes = [];
         for (let i = 0; i < n; i++) for (const sy of [-1, 1]) holes.push(rrect(pw, ph, ph * 0.28, (i - (n - 1) / 2) * pitch, sy * (H / 2 - mb / 2)));
-        return { cs: outer.subtract(union(holes)), outer, body: [-H / 2 + mb, H / 2 - mb], edgeTop: H / 2 };
+        return { cs: outer.subtract(union(holes)), outer, body: [-H / 2 + mb, H / 2 - mb], edgeTop: H / 2, detail: { cs: union([rect(W + 2, mb, 0, H / 2 - mb / 2), rect(W + 2, mb, 0, -H / 2 + mb / 2)]) } };
       },
     },
-    // Clipboard, for planners: a board with a clip at the top centre (raised, with a slot to hang it by); the track stays
-    // below the clip.
-    clipboard: {
-      label: 'Clipboard', make: (W, H) => {
-        const ch = clamp(H * 0.2, 10, 16), top = H / 2 - ch * 0.55, cw = Math.min(W * 0.34, 76);
-        const board = rrect(W, top + H / 2, 4, 0, (top - H / 2) / 2);
-        const tab = rrect(cw * 0.7, ch + 4, 3, 0, H / 2 - (ch + 4) / 2);
-        const slot = rrect(cw * 0.3, Math.max(2.4, ch * 0.28), Math.max(1.2, ch * 0.14), 0, H / 2 - ch * 0.38);
-        return { cs: union([board, tab]).subtract(slot), outer: union([board, tab]), body: [-H / 2, top - ch * 0.5], clip: { cw, ch, top, slot }, edgeTop: top };
+    // Glasses, for planners: two wayfarer lenses side by side, the bridge between them carrying the track, a nose notch below it
+    // and hinge stubs at the outer top corners. The lenses are set one layer into the top face, so the rims stand proud of them
+    // (detail: the lenses, for a second color).
+    glasses: {
+      label: 'Glasses', make: (W, H) => {
+        const arm = clamp(W * 0.025, 3, 6), ov = Math.min(W * 0.03, 6), lw = W / 2 - arm + ov, r = clamp(H * 0.24, 3, 18);
+        const noseH = clamp(H * 0.15, 4, 12), dip = clamp(H * 0.05, 1.2, 3.5), rim = clamp(H * 0.07, 2.4, 5), bv = clamp(W * 0.04, 5, 10);
+        const lens = (sx) => {
+          const xo = sx * (W / 2 - arm), xi = xo - sx * lw; // outer and inner (nose side) edges at the top
+          return poly(sx > 0 ? [[xi, H / 2], [xo, H / 2], [xo - lw * 0.05, -H / 2], [xi + lw * 0.16, -H / 2]] : [[xo, H / 2], [xi, H / 2], [xi - lw * 0.16, -H / 2], [xo + lw * 0.05, -H / 2]])
+            .offset(-r, 'Round', 2, 48).offset(r, 'Round', 2, 48);
+        };
+        const lenses = [lens(-1), lens(1)];
+        const bridge = rect(2 * r + 2 * ov, H / 2 - dip - (-H / 2 + noseH), 0, (H / 2 - dip + (-H / 2 + noseH)) / 2);
+        const hinges = [-1, 1].map((sx) => rrect(arm * 2.2, H * 0.14, 1, sx * (W / 2 - arm * 1.1), H / 2 - H * 0.1));
+        const cs = union([...lenses, bridge, ...hinges]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24);
+        const lensIn = union(lenses.map((l) => l.offset(-rim, 'Round', 2, 32))).subtract(rect(bv, 2 * H, 0, 0));
+        return { cs, body: [-H / 2 + noseH, H / 2 - dip], edgeTop: H / 2, lenses: lensIn };
       },
     },
     // Spiral notebook, for planners: a row of punched holes along the top of the cover, each with a ring looping up over its
@@ -982,7 +993,7 @@ function createEngine(wasm) {
           inners.push(cap(a, b, hw));
         }
         const outer = union([cover, ...outers]);
-        return { cs: outer.subtract(union(inners)), outer, body: [-H / 2, top - hb], edgeTop: top };
+        return { cs: outer.subtract(union(inners)), outer, body: [-H / 2, top - hb], edgeTop: top, detail: { cs: union(outers).subtract(union(inners)), full: true } };
       },
     },
     arrow: {
@@ -1164,7 +1175,9 @@ function createEngine(wasm) {
   }
   // The solid strip between the plate's edge and the nearest opening, at the top face: the track's rail (6 mm), the name tag's
   // rail and holder, or a printed name's margin. Feet and hooks may cover it.
-  const solidEdge = (p, nameThere) => (nameThere ? (p.nameRail ? tagRw(p) + tagHold(p) : Math.max(0, p.namePad ?? 1)) : 6);
+  // the rail between the track and the plate's edge, at the top face (it is d = 2 mm narrower at the floor, under the dovetail)
+  const railWOf = (p) => Math.max(p.railW ?? 4, 2 + 4 * (p.nozzle || 0.4));
+  const solidEdge = (p, nameThere) => (nameThere ? (p.nameRail ? tagRw(p) + tagHold(p) : Math.max(0, p.namePad ?? 1)) : railWOf(p));
   function vLayout(p, sh, H, hh) {
     const vm = p.marginV ?? Math.max(3, H * 0.05);
     let b0 = sh.body[0] + vm, b1 = sh.body[1] - vm;
@@ -1196,7 +1209,7 @@ function createEngine(wasm) {
         if (p.nameRail) { b1 -= z - tagRw(p); shared = true; } else b1 -= z + 1;
       }
     }
-    const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2, yR = hrTot - 6;
+    const hrTot = (b1 - b0) / 2, yc = (b0 + b1) / 2, yR = hrTot - railWOf(p);
     return { hrTot, yc, yR, wh: 2 * (yR - p.tol - p.frame), hdrZone, shared, clear: p.marginH ?? 1.5 };
   }
   // Half-length of the widest span centred on x = 0, from y0 to y1, that stays inside cs (0 if none fits).
@@ -1390,7 +1403,7 @@ function createEngine(wasm) {
       const Lh = raised ? lz(p.reliefH) : 0, engr = raised ? 0 : Math.min(lz(p.reliefH), T - lz(1));
       // the name has its own thickness (raised) or depth (engraved)
       const Ln = raised ? lz(p.nameReliefH ?? p.reliefH) : 0, engrN = raised ? 0 : Math.min(lz(p.nameReliefH ?? p.reliefH), T - lz(1));
-      const Rh = lz(p.railH), d = lz(2.0), Rw = 6, pad = p.pad ?? 2.4, fbx = p.frame, play = 0.6, proudIn = dyn ? (p.proud ?? 0.8) : Math.round((p.proud ?? 0.8) / LH) * LH;
+      const Rh = lz(p.railH), d = lz(2.0), Rw = railWOf(p), pad = p.pad ?? 2.4, fbx = p.frame, play = 0.6, proudIn = dyn ? (p.proud ?? 0.8) : Math.round((p.proud ?? 0.8) / LH) * LH;
       const statusOn = p.statusOn !== false;
       if (!statusOn && !p.nameRail && !(p.header || '').trim()) throw new UserError('Type a name on the Name tab, or turn the status track back on.');
       const sh = SHAPES[p.shape].make(W, H);
@@ -1470,6 +1483,9 @@ function createEngine(wasm) {
       const z1 = Math.max(statusOn ? T + Rh : T, p.nameRail ? zTag : T);
       const fillRails = !KEEP_RAILS.has(p.shape), mh = p.marginH ?? 0;
       const edge = hErode(sh.cs, mh);
+      // a second plate color on the top layers: accK layers deep (accDep); the shape's details for that color, if it has any
+      const accMode = p.accentMode || 'off', accK = Math.max(1, Math.round(p.accentLayers ?? 3)), accL = dyn ? 0.2 : LH, accDep = accK * accL;
+      let detail = sh.detail ? { cs: sh.detail.cs, from: sh.detail.full ? -1 : z1 - accDep } : null;
       const xa = ob.min[0] - 1, xb = ob.max[0] + 1;
       let body = sh.cs.extrude(z1);
       if (p.bevel > 0) {
@@ -1525,16 +1541,13 @@ function createEngine(wasm) {
         else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
         for (const h of hookAt) bead = bead.subtract(rect(h.hw + 3, 14, h.xf, h.yT - 6));
         body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
+        detail = { cs: bead, from: z1 - 0.01 };
       }
-      if (p.shape === 'clipboard' && sh.clip) {
-        // the clip: a raised plate across the top of the board and up the tab, with a rounded bar along its lower edge
-        const { cw, ch, top, slot } = sh.clip, hC = lz(1.6), yB = top - ch * 0.45;
-        const plateCS = union([rrect(cw, top - yB + 2, 2.5, 0, (top + yB + 2) / 2), rrect(cw * 0.7, ch, 3, 0, top + ch / 2)]).intersect(sh.cs).subtract(slot.offset(0.8, 'Round', 2, 16));
-        // two rivets on the clip
-        const rivets = union([-1, 1].map((sx) => circle(Math.max(1.1, ch * 0.09), sx * cw * 0.38, top + ch * 0.05, 24))).intersect(plateCS);
-        const bar = rrect(cw * 1.08, Math.max(2.2, ch * 0.22), 1.1, 0, yB + Math.max(1.1, ch * 0.11));
-        body = body.add(plateCS.extrude(hC + 0.02).translate([0, 0, z1 - 0.02])).add(bar.intersect(sh.cs).extrude(hC + lz(1) + 0.02).translate([0, 0, z1 - 0.02]));
-        if (rivets && !rivets.isEmpty()) body = body.add(rivets.extrude(hC + lz(0.6) + 0.02).translate([0, 0, z1 - 0.02]));
+      if (sh.lenses) {
+        // glasses: the lenses one layer below the rims
+        const rec = lz(0.2);
+        body = body.subtract(sh.lenses.extrude(rec + 1).translate([0, 0, z1 - rec]));
+        detail = { cs: sh.lenses, from: z1 - rec - accDep };
       }
       if (p.shape === 'honeycomb') {
         const R = 2.6, Rx = R * Math.cos(30 * D2R), m = 2.5, g = 2, sp0 = Math.sqrt(3) * R + lw(1.2);
@@ -1643,6 +1656,38 @@ function createEngine(wasm) {
           }
         }
       }
+      // The plate's second color: the top layers (Top layer), more of them towards the right (Gradient) or towards the outline
+      // (Edge glow), or the shape's own details. In a translucent filament the thin layers let the plate color show through, so
+      // the steps read as a gradient from one color into the other.
+      let accent = null, accentShade = null;
+      if (accMode !== 'off') {
+        const up = z1 + 60, cs = sh.cs, layers = [], plans = []; // plans[j]: where layer j (from the top) has the accent color
+        const slab = (plan, a, b) => (plan && !plan.isEmpty() ? plan.extrude(b - a).translate([0, 0, a]) : null);
+        const layerZ = (j) => [z1 - (j + 1) * accL, j ? z1 - j * accL : up]; // layer j from the top; the top one takes everything above
+        if (accMode === 'top') layers.push(slab(cs, z1 - accDep, up));
+        else if (accMode === 'gradient') {
+          const w = ob.max[0] - ob.min[0], hgt = ob.max[1] - ob.min[1] + 2, ym0 = (ob.min[1] + ob.max[1]) / 2;
+          // none at the left end, one layer more every (width / (k + 1)), all k at the right end
+          for (let j = 0; j < accK; j++) { const x0 = ob.min[0] + (w * (j + 1)) / (accK + 1); plans.push(cs.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0))); layers.push(slab(plans[j], ...layerZ(j))); }
+        } else if (accMode === 'edge') {
+          const D = clamp(Math.min(W, H) * 0.3, 4, 20);
+          for (let j = 0; j < accK; j++) { plans.push(cs.subtract(cs.offset(-(D * (accK - j)) / accK, 'Round', 2, 32))); layers.push(slab(plans[j], ...layerZ(j))); }
+        } else if (accMode === 'details') {
+          if (detail) layers.push(slab(detail.cs, detail.from, up));
+          else warnings.push('This shape has no details for the second color. Pick another plate accent.');
+        }
+        const vol = layers.filter(Boolean).length ? Manifold.union(layers.filter(Boolean)) : null;
+        if (vol) { const a = body.intersect(vol); if (!a.isEmpty()) { accent = a; body = body.subtract(vol); } }
+        // for the preview: the accent split by how many layers deep it is there (a translucent filament shows the plate through)
+        if (accent && plans.length) {
+          accentShade = [];
+          for (let i = 1; i <= plans.length; i++) {
+            const zone = i < plans.length ? plans[i - 1].subtract(plans[i]) : plans[i - 1];
+            const piece = zone.isEmpty() ? null : accent.intersect(zone.extrude(up + 2).translate([0, 0, -1]));
+            if (piece && !piece.isEmpty()) accentShade.push({ level: i, of: plans.length, mesh: meshData(piece) });
+          }
+        }
+      }
       // With raised letters the one-color base is the body and the letters merged. Merging them is slow on outlines with many
       // points (cloud, scallop), and only the one-color download needs it, so the page merges them then (unionMeshes).
       let labels = null, nameText = null;
@@ -1654,10 +1699,10 @@ function createEngine(wasm) {
         if (nameCS) body = body.subtract(nameCS.extrude(engrN + 1).translate([0, 0, z1 - engrN]));
       }
       // the top of the base (plate, rails and letters) inside a box, for the hooks and feet that clip over it
-      const topIn = (bx) => Math.max(T, ...[body, labels, nameText].filter(Boolean).map((m) => m.intersect(bx).boundingBox().max[2]).filter(Number.isFinite));
+      const topIn = (bx) => Math.max(T, ...[body, accent, labels, nameText].filter(Boolean).map((m) => m.intersect(bx).boundingBox().max[2]).filter(Number.isFinite));
 
       // frame slider: dovetail tongue at the bottom, window in the middle
-      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], T + Lh, nameText ? z1 + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
+      const proud = Math.max(proudIn, T + d + 0.6 - z1), ztS = z1 + proud, zb = ztS - lzDown(ztS - T - tol), zt = statusOn ? ztS : Math.max(body.boundingBox().max[2], accent ? accent.boundingBox().max[2] : 0, T + Lh, nameText ? z1 + Ln : 0, tagAll ? tagAll.boundingBox().max[2] : 0);
       let slider = null;
       if (statusOn) {
         const yS = yR - tol, tY = yR + d - tol * (1 + Math.SQRT2), zK = T + d - tol * (Math.SQRT2 - 1);
@@ -1722,19 +1767,28 @@ function createEngine(wasm) {
         const drop = cub ? (p.hookDrop ?? 5) : (p.railDrop ?? 5), hw = lz(p.hookW ?? 10), zBk = -t - g - P;
         const R2 = (y0, y1, z0, z1) => rect(Math.max(0.01, Math.abs(y1 - y0)), Math.max(0.01, Math.abs(z1 - z0)), (y0 + y1) / 2, (z0 + z1) / 2);
         // the clip wraps the full thickness under it: the plate, or plate and rail where the name tag's rail runs to the top edge
-        const zAt = (xf, yT) => topIn(Manifold.cube([hw + 1, clipH + 1.5, 400]).translate([xf - hw / 2 - 0.5, yT - clipH - 0.5, -1]));
+        const zAt = (xf, yT, cl) => topIn(Manifold.cube([hw + 1, cl + 1.5, 400]).translate([xf - hw / 2 - 0.5, yT - cl - 0.5, -1]));
+        // Each clip covers up to clipH of the front face, but stops hookClear short of the topmost opening below it (the tag's
+        // channel, a printed name or the track), so a hook that lands on a lower stretch of the top edge gets a shorter clip.
+        let yOpen = statusOn ? yc + yR : -Infinity;
+        if (p.nameRail && hdrZone) { const td = tagDims(p, hdrZone); yOpen = td.ym + td.wb - holdH; } else if (headerText && hdrZone) yOpen = hdrZone[1] - Math.max(0, p.namePad ?? 1);
+        for (const h of hookAt) {
+          const room = h.yT - yOpen - Math.max(0, p.hookClear ?? 0.5);
+          if (room < 3) warnings.push('A hook lands where the top edge is too close to the track to grip much. Use fewer hooks, a smaller space, or a taller sign.');
+          h.cl = Math.max(2, Math.min(clipH, room));
+        }
         // gp: the gap between the hook and the sign, all round inside the clip
         const gp = Math.max(0.02, p.hookGap ?? 0.2);
         // (the outline without its holes, so a clip slides over a row of holes rather than catching in them)
         const slotCS = (sh.outer || sh.cs).offset(gp, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 2 * gp).translate([0, 0, -gp]);
-        for (const h of hookAt) h.zc = zAt(h.xf, h.yT);
+        for (const h of hookAt) h.zc = zAt(h.xf, h.yT, h.cl);
         // Two round ridges inside the clip, one on each face, 4 mm below the sign's top edge. Each crosses the gap and bites
         // into the sign by bite, so the clip pinches the plate and the hook does not wobble or slide; the deeper the bite, the
         // wider the strip where hook and sign touch. 0 leaves the ridges off.
         const bite = Math.max(0, p.hookBite ?? (p.hookGrip ?? 0.1) / 2), rr = Math.max(0.8, 2 * NZ);
-        const gripRidges = (xf, yT, zc) => {
+        const gripRidges = (xf, yT, zc, cl) => {
           if (bite < 0.005) return Manifold.union([]);
-          const y = yT - 4, root = (z) => rect(2 * rr, 0.02, y, z);
+          const y = yT - Math.min(4, cl - 1.2), root = (z) => rect(2 * rr, 0.02, y, z);
           return extrudeX(union([
             CrossSection.hull([circle(rr, y, zc - bite + rr, 24), root(zc + gp + 0.05)]),
             CrossSection.hull([circle(rr, y, bite - rr, 24), root(-gp - 0.05)]),
@@ -1752,25 +1806,25 @@ function createEngine(wasm) {
           if (open - 2 * cy < ext + 1) throw new UserError('The rail slot is too short for its hollow. Check the slot height and how far the hollow reaches past it.');
           if (flag < 0.3) throw new UserError('The hollow behind the rail lips is too shallow for a tab. Check the hollow depth.');
           if (flag < 2 * NZ - 0.01) warnings.push(`The tab that goes into the rail is only ${fmtMm(flag)} mm thick, less than two ${NZ} mm nozzle lines. Print the hooks with a finer nozzle, or check the hollow depth.`);
-          for (const { xf, yT, zc } of hookAt) {
+          for (const { xf, yT, zc, cl } of hookAt) {
             const body2 = union([
-              R2(yT - clipH, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge
+              R2(yT - cl, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge
               R2(yT, ft + 1.5, -t, 0), // front leg, up the face of the rail
             ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
             // neck through the slot and the tab behind the lips: sharp corners, so nothing rubs on the lips
             const prof = union([body2, R2(yo + cy, ft, zLipB - cz - 0.01, -t + 0.01), R2(fb, ft, zCavB + cz, zLipB - cz)]);
-            hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc)));
+            hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc, cl)));
           }
           hookEnv = { kind: 'cubrail', yc, open, ext, lipD, cav, zF, yTop: yc + open / 2 + ext };
         }
-        for (const { xf, yT, zc } of cub ? hookAt : []) {
+        for (const { xf, yT, zc, cl } of cub ? hookAt : []) {
           const prof = union([
-            R2(yT - clipH, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge (the plate is cut out of it below)
+            R2(yT - cl, yT + gp + t, -t, zc + gp + lipF), // clip around the plate's top edge (the plate is cut out of it below)
             R2(yT, yU + t, -t, 0), // front leg, between the plate and the panel
             R2(yU, yU + t, zBk - t, 0), // over the top
             R2(yP - back, yU + t, zBk - t, zBk), // down the back
           ]).offset(1.5, 'Round', 2, 24).offset(-1.5, 'Round', 2, 24).offset(-0.6, 'Round', 2, 16).offset(0.6, 'Round', 2, 16);
-          hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc)));
+          hooks.push(extrudeX(prof, xf - hw / 2, xf + hw / 2).subtract(slot(zc)).add(gripRidges(xf, yT, zc, cl)));
         }
         if (cub) hookEnv = { kind: 'cubicle', yTop: yPanel, zFront: -t - g / 2, zBack: zBk + g / 2 };
       }
@@ -1781,7 +1835,9 @@ function createEngine(wasm) {
 
       const out = {
         parts: {
-          base: raised && (labels || nameText) ? null : meshData(body),
+          base: accent || (raised && (labels || nameText)) ? null : meshData(body),
+          accent: accent ? meshData(accent) : null,
+          accentShade,
           body: meshData(body),
           labels: labels ? meshData(labels) : null,
           nameText: nameText ? meshData(nameText) : null,
@@ -1793,7 +1849,7 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: z1, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: z1, accentMode: accent ? accMode : 'off', accentZ: z1 - accDep, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, plateW: W, plateH: H, auto,
         },
       };
@@ -1915,27 +1971,27 @@ const withBreak = (t) => {
 // you typed stays.
 const look = (shape, font, [colBase, colLabel, colSlider], name = 'off', hcap = 20, extra = {}) => ({
   shape, font, layout: 'stack', relief: 'raised', uniform: true, reliefH: 0.4, statusOn: true, colBase, colLabel, colSlider, colTag: colSlider, colName: colLabel,
-  nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, ...extra,
+  nameMode: name, hcap, namePad: 1, nameReliefH: 0.4, tagT: 1.6, tagTol: 0.25, tagRailH: 1.6, accentMode: 'off', accentLayers: 3, colAccent: colSlider, ...extra,
 });
 const PRESETS_RAW = [
-  { name: 'Office classic', look: look('rail', 'sans', ['#2E3237', '#F3F1EA', '#F06A28'], 'tag', 20), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
-  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#F2F2EE', '#1F2A44', '#2F6BFF'], 'tag', 18), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
-  { name: 'Deep work', look: look('pixel', 'mono', ['#14181D', '#A6E3A1', '#3FB950'], 'plate', 16), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
-  { name: 'Studio', look: look('banner', 'bebas', ['#1A1B1E', '#F3F1EA', '#E5383B'], 'plate', 18), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
-  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#EEF3F4', '#17363C', '#1F9E89'], 'tag', 18), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
-  { name: 'Meeting room', look: look('rounded', 'inter', ['#1F3B2F', '#EDE6D6', '#E8B73A'], 'plate', 18), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
-  { name: 'Classroom', look: look('arch', 'fredoka', ['#2F4A3A', '#F4F1E6', '#E8B73A'], 'plate', 18), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
-  { name: 'Clinic', look: look('pill', 'poppins', ['#F5F9F9', '#0F5C63', '#2BB3A3'], 'tag', 18), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
-  { name: 'Home office', look: look('cat', 'fredoka', ['#F3E9DC', '#4A3426', '#D9822B'], 'plate', 16), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
-  { name: 'Simple three', look: look('lozenge', 'inter', ['#F2F2EE', '#1F2A44', '#2F6BFF'], 'off', 20), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
-  { name: 'Mood', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541'], 'plate', 14), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
-  { name: '繁體中文', look: look('rounded', 'sans', ['#2E3237', '#F3F1EA', '#F06A28'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
+  { name: 'Office classic', look: look('rail', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['AVAILABLE', 'check'], ['IN A MEETING', 'people'], ['ON A CALL', 'headset'], ['DO NOT DISTURB', 'dnd']] },
+  { name: 'Hybrid team', look: look('pill', 'montserrat', ['#FFFFFF', '#0A2989', '#0056B8'], 'tag', 18, { accentMode: 'gradient' }), list: [['IN THE OFFICE', 'pin'], ['WORKING REMOTELY', 'house'], ['IN A MEETING', 'people'], ['AT LUNCH', 'forkknife'], ['OUT OF OFFICE', 'plane']] },
+  { name: 'Deep work', look: look('pixel', 'mono', ['#000000', '#00AE42', '#00AE42'], 'plate', 16, { accentMode: 'gradient' }), list: [['COME IN', 'check'], ['FOCUS TIME', 'target'], ['HEADS DOWN', 'code'], ['BACK SOON', 'clock']] },
+  { name: 'Studio', look: look('banner', 'bebas', ['#000000', '#FFFFFF', '#C12E1F'], 'plate', 18, { accentMode: 'edge' }), list: [['AVAILABLE', 'check'], ['RECORDING', 'mic'], ['ON A CALL', 'headset'], ['COFFEE BREAK', 'cup']] },
+  { name: 'Research lab', look: look('honeycomb', 'roboto', ['#FFFFFF', '#545454', '#00B1B7'], 'tag', 18, { accentMode: 'edge' }), list: [['IN THE LAB', 'flask'], ['EXPERIMENT RUNNING', 'flask'], ['LAB MEETING', 'people'], ['ON A CALL', 'headset'], ['AWAY', 'moon']] },
+  { name: 'Meeting room', look: look('rounded', 'inter', ['#3F8E43', '#FFFFFF', '#FEC600'], 'plate', 18), list: [['FREE', 'check'], ['BOOKED', 'people'], ['IN USE', 'dnd'], ['CLEANING', 'hourglass']] },
+  { name: 'Classroom', look: look('arch', 'fredoka', ['#3F8E43', '#FFFFFF', '#F4EE2A'], 'plate', 18), list: [['OPEN', 'check'], ['IN CLASS', 'people'], ['OFFICE HOURS', 'clock'], ['EXAM IN PROGRESS', 'dnd'], ['CLOSED', 'moon']] },
+  { name: 'Clinic', look: look('pill', 'poppins', ['#FFFFFF', '#5B6579', '#00B1B7'], 'tag', 18), list: [['WALK IN', 'check'], ['WITH A PATIENT', 'people'], ['PLEASE WAIT', 'hourglass'], ['CLOSED', 'dnd']] },
+  { name: 'Home office', look: look('cat', 'fredoka', ['#F7E6DE', '#6F5034', '#FF6A13'], 'plate', 16), list: [['AVAILABLE', 'check'], ['ON A CALL', 'headset'], ['FOCUS', 'target'], ['LUNCH', 'forkknife'], ['BREAK', 'cup']] },
+  { name: 'Simple three', look: look('lozenge', 'inter', ['#FFFFFF', '#000000', '#0056B8'], 'off', 20), list: [['FREE', 'check'], ['BUSY', 'hourglass'], ['AWAY', 'moon']] },
+  { name: 'Mood', look: look('cloud', 'fredoka', ['#FFFFFF', '#545454', '#FEC600'], 'plate', 14, { accentMode: 'gradient', colAccent: '#F55A74' }), list: [['GREAT', 'faceGreat'], ['GOOD', 'faceGood'], ['OKAY', 'faceOk'], ['SO-SO', 'faceMeh'], ['BAD', 'faceBad'], ['AWFUL', 'faceAwful']] },
+  { name: '繁體中文', look: look('rounded', 'sans', ['#000000', '#FFFFFF', '#FF6A13'], 'tag', 20), list: [['有空', 'check'], ['開會中', 'people'], ['暫離', 'exit'], ['實驗室', 'flask'], ['遠辦', 'house'], ['出差中', 'briefcase'], ['休假中', 'palm'], ['病假中', 'thermo']] },
   // video production: the editor's day runs from cutting to grading to the render queue; the planner's from ideas to pitch
-  { name: '剪輯師', look: look('film', 'oswald', ['#1C1E24', '#F4F1EA', '#F5B700'], 'tag', 20), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
-  { name: '企劃', look: look('notebook', 'poppins', ['#F4EFE6', '#24324F', '#E8573F'], 'tag', 20), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
+  { name: '剪輯師', look: look('film', 'oswald', ['#000000', '#FFFFFF', '#FEC600'], 'tag', 20, { accentMode: 'details', colAccent: '#A6A9AA' }), list: [['有空', 'check'], ['剪輯中', 'scissors'], ['調色中', 'palette'], ['算圖中', 'render'], ['審片中', 'play'], ['趕片中', 'fire']] },
+  { name: '企劃', look: look('glasses', 'poppins', ['#0A2989', '#FFFFFF', '#FF6A13'], 'tag', 20, { accentMode: 'details', colAccent: '#0086D6', accentLayers: 2 }), list: [['有空', 'check'], ['發想中', 'bulb'], ['寫腳本', 'pen'], ['開會中', 'people'], ['提案中', 'present'], ['勘景中', 'pin']] },
   // the mood set in Taiwanese everyday words, from great to falling apart (厭世: fed up with the world)
-  { name: '心情', look: look('cloud', 'fredoka', ['#FDF3E1', '#3A2E2A', '#F2A541'], 'plate', 14), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
-  { name: '日本語', look: look('scallop', 'serif', ['#F4EFE6', '#2B2B2B', '#C0392B'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
+  { name: '心情', look: look('cloud', 'fredoka', ['#FFFFFF', '#545454', '#FEC600'], 'plate', 14, { accentMode: 'gradient', colAccent: '#F55A74' }), list: [['超開心', 'faceGreat'], ['心情好', 'faceGood'], ['還可以', 'faceOk'], ['普普', 'faceMeh'], ['厭世', 'faceBad'], ['崩潰', 'faceAwful']] },
+  { name: '日本語', look: look('scallop', 'serif', ['#FFFFFF', '#000000', '#C12E1F'], 'tag', 20), list: [['在席', 'check'], ['会議中', 'people'], ['電話中', 'headset'], ['外出中', 'plane']] },
 ];
 const PRESETS = PRESETS_RAW.map((p) => ({ name: p.name, look: p.look, list: p.list.map(([t, i]) => [withBreak(t), i]) }));
 const EXTRA_STATUSES = [
@@ -1982,12 +2038,25 @@ const STATUS_SETS = (() => {
   const key = (x) => AVAILABILITY.findIndex((g) => g.name === groupOf(x)) * 100 + (rank.includes(x.icon) ? rank.indexOf(x.icon) : 99);
   return all.map((x, i) => ({ ...x, i })).sort((a, b) => key(a) - key(b) || a.i - b.i).map((x) => ({ text: x.text, icon: x.icon, group: groupOf(x) }));
 })();
+// Common PLA colors (the usual basic range of the big filament brands); presets and palettes use only these, at most four per
+// sign, and the color pickers suggest them.
+const FILAMENT_COLORS = [['Black', '#000000'], ['White', '#FFFFFF'], ['Light Gray', '#D1D3D5'], ['Gray', '#8E9089'], ['Dark Gray', '#545454'], ['Silver', '#A6A9AA'],
+  ['Beige', '#F7E6DE'], ['Red', '#C12E1F'], ['Dark Red', '#9D2235'], ['Orange', '#FF6A13'], ['Sunflower Yellow', '#FEC600'], ['Yellow', '#F4EE2A'], ['Gold', '#E4BD68'],
+  ['Green', '#00AE42'], ['Dark Green', '#3F8E43'], ['Turquoise', '#00B1B7'], ['Cyan', '#0086D6'], ['Cobalt Blue', '#0056B8'], ['Navy Blue', '#0A2989'],
+  ['Blue Grey', '#5B6579'], ['Purple', '#5E43B7'], ['Pink', '#F55A74'], ['Magenta', '#EC008C'], ['Brown', '#9D432C'], ['Cocoa Brown', '#6F5034']];
+// the nearest common filament color's name, or the hex code when none is close
+function filamentName(hex) {
+  const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)), [r, g, b] = rgb(hex);
+  let best = null;
+  for (const [n, h] of FILAMENT_COLORS) { const [r2, g2, b2] = rgb(h), d = Math.hypot(r - r2, g - g2, b - b2); if (!best || d < best.d) best = { n, d }; }
+  return best.d < 40 ? best.n : hex.toUpperCase();
+}
 const PALETTES = [
-  { name: 'Charcoal & orange', base: '#2E3237', label: '#F3F1EA', slider: '#F06A28' },
-  { name: 'White & blue', base: '#F2F2EE', label: '#1F2A44', slider: '#2F6BFF' },
-  { name: 'Forest', base: '#1F3B2F', label: '#EDE6D6', slider: '#E8B73A' },
-  { name: 'Matte black', base: '#1A1B1E', label: '#D9DDE2', slider: '#7A8088' },
-  { name: 'Brass', base: '#B5893A', label: '#2A1E10', slider: '#6E4A1F' },
+  { name: 'Black & orange', base: '#000000', label: '#FFFFFF', slider: '#FF6A13' },
+  { name: 'White & blue', base: '#FFFFFF', label: '#0A2989', slider: '#0056B8' },
+  { name: 'Forest', base: '#3F8E43', label: '#FFFFFF', slider: '#FEC600' },
+  { name: 'Black & gray', base: '#000000', label: '#D1D3D5', slider: '#8E9089' },
+  { name: 'Gold', base: '#E4BD68', label: '#6F5034', slider: '#9D432C' },
 ];
 const DEFAULTS = {
   statuses: PRESETS[0].list.map(([text, icon]) => ({ text, icon })),
@@ -1997,7 +2066,7 @@ const DEFAULTS = {
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 7.5, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookClear: 0.5, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
-  statusOn: true, nameMode: 'off', tagT: 1.6,
+  statusOn: true, nameMode: 'off', tagT: 1.6, accentMode: 'off', accentLayers: 3, colAccent: '#0086D6', railW: 4,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.4, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
 
@@ -2014,6 +2083,8 @@ const SLIDERS = {
   nameReliefH: { label: 'Name text thickness', min: 0.4, max: 4, step: 0.1, layers: true, out: mm() },
   frame: { label: 'Frame bars', min: 3, max: 15, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 15, step: 0.5, out: mm() },
+  accentLayers: { label: 'Second color depth', min: 1, max: 10, step: 1, out: (v) => `${v} layer${v > 1 ? 's' : ''}` },
+  railW: { label: 'Rail width beside the track', min: 3, max: 12, step: 0.2, nozzleMin: 9, out: mm() },
   railH: { label: 'Rail height', min: 2.4, max: 10, step: 0.5, layers: true, out: mm() },
   tagTol: { label: 'Tag slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
   tol: { label: 'Slide clearance', min: 0.1, max: 1, step: 0.05, nozzleMin: 0.45, out: mm(2) },
@@ -2053,7 +2124,7 @@ const SLIDERS = {
 };
 // The text box accepts anything from the floor up to 4x the slider's end; the slider only limits the bar.
 // lowest typed value per setting (0 when not listed); the ones below zero have a meaning (see their sliders)
-const FLOORS = { footGap: 0.02, footGrip: 2, hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
+const FLOORS = { accentLayers: 1, footGap: 0.02, footGrip: 2, hookGap: 0.02, namePad: -10, pad: -10, tilt: -45, proud: -3, railDrop: -200, hookDrop: -200, cap: 0.5, hcap: 0.5, width: 20, height: 20, thick: 0.4, reliefH: 0.1, frame: 0.5, railH: 0.4, magD: 1, magH: 0.2, screwD: 1, hangHole: 2, tagT: 0.2, tagRailH: 0.2, footW: 5, footF: 2, footB: 2 };
 // Layer height is typed freely. Unless Dynamic is on, heights that are built from layers step in whole layers.
 const rnd = (v) => Math.round(v * 1000) / 1000;
 const layerRange = (n) => ({ lo: rnd(n * 0.25), hi: rnd(n * 0.75) });
@@ -2086,13 +2157,13 @@ const BEDS = [180, 220, 250, 256, 300, 350]; // print bed widths in the Machine 
 const SHAPE_NEUTRAL = { thick: 2, marginV: 0, marginH: 0 };
 const SHAPE_DEFAULTS = {
   rail: { thick: 2, marginV: 0, marginH: 0 },
-  classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#B5893A', colLabel: '#2A1E10', colSlider: '#6E4A1F', colTag: '#6E4A1F', colName: '#2A1E10' },
+  classic: { marginV: 7, marginH: 7, font: 'lora', colBase: '#E4BD68', colLabel: '#6F5034', colSlider: '#9D432C', colTag: '#9D432C', colName: '#6F5034' },
   honeycomb: { marginV: 16, marginH: 12 },
 };
 const CHOICES = {
-  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard', 'notebook'],
+  sizeMode: ['auto', 'manual'], shape: ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'notebook', 'glasses'],
   layout: ['stack', 'side', 'text', 'icon'], font: Object.keys(FONT_FAMILIES), relief: ['raised', 'engraved'],
-  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], footN: [1, 2, 3, 4], hookN: [1, 2, 3, 4], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
+  mount: ['none', 'magnet', 'screw', 'stand', 'hang', 'cubicle', 'cubrail'], magN: [2, 4], hangN: [1, 2], accentMode: ['off', 'top', 'gradient', 'edge', 'details'], footN: [1, 2, 3, 4], hookN: [1, 2, 3, 4], bed: BEDS, view: ['assembled', 'print'], page: ['shape', 'plate', 'labels', 'name'], nameMode: ['off', 'plate', 'tag'],
 };
 const MOUNT_HINTS = {
   none: 'Flat back for double-sided tape or Command strips.',
@@ -2108,6 +2179,7 @@ const WHEN = {
   manual: (s) => s.sizeMode !== 'auto',
   magnet: (s) => s.mount === 'magnet',
   stand: (s) => s.mount === 'stand',
+  accent: (s) => !!s.accentMode && s.accentMode !== 'off',
   name: (s) => s.nameMode !== 'off',
   tag: (s) => s.nameMode === 'tag',
   status: (s) => !!s.statusOn,
@@ -2177,6 +2249,11 @@ const SECTIONS = [
       { slider: 'marginH' },
       { slider: 'thick' },
     ] },
+    { group: 'Second color', items: [
+      { seg: 'accentMode', label: 'Plate accent', options: [['off', 'Off'], ['top', 'Top layer'], ['gradient', 'Gradient'], ['edge', 'Edge glow'], ['details', 'Shape details']] },
+      { slider: 'accentLayers', when: 'accent' },
+      { hint: 'A second plate color on the top layers. In a translucent filament the thin layers let the plate color show through, so a gradient or an edge glow shades from one color into the other. Shape details color the shape\'s own features: the glasses\' lenses, the notebook\'s rings, the film strip\'s edges, the Classic bead. Top layer prints with one filament swap; the others need a multi-color printer (AMS, MMU). Keep the whole sign to four colors.', when: 'accent' },
+    ] },
   ] },
   { title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
     { check: 'statusOn', label: 'Status track and sliding frame', title: 'The row of statuses with the frame that slides along it. Turn it off for a sign with only a name.' },
@@ -2200,6 +2277,7 @@ const SECTIONS = [
     ] },
     { group: 'Track', when: 'status', items: [
       { slider: 'railH' },
+      { slider: 'railW' },
       { slider: 'tol' },
       { hint: 'Clearance is the gap in the dovetail. 0.25 mm suits most well-tuned printers; add 0.05 if the frame binds.' },
     ] },
@@ -2238,7 +2316,7 @@ function sanitize(s) {
   if (s.nameMode == null) out.nameMode = s.nameRail ? 'tag' : (typeof s.header === 'string' && s.header.trim() ? 'plate' : 'off');
   if (!out.statusOn && out.nameMode === 'off') out.statusOn = true;
   if (typeof s.header === 'string') out.header = s.header.slice(0, MAX_TEXT);
-  for (const k of ['colBase', 'colLabel', 'colSlider', 'colTag', 'colName']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
+  for (const k of ['colBase', 'colLabel', 'colSlider', 'colTag', 'colName', 'colAccent']) if (/^#[0-9a-f]{6}$/i.test(s[k] || '')) out[k] = s[k];
   // designs from before the name had its own color and thickness take the status lettering's
   if (!/^#[0-9a-f]{6}$/i.test(s.colName || '')) out.colName = out.colLabel;
   if (!Number.isFinite(+s.nameReliefH)) out.nameReliefH = out.reliefH;
@@ -2308,8 +2386,11 @@ const mats = {
   slider: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }),
   tag: new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }),
   name: new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }),
+  accent: new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0 }),
 };
 const shadowMat = new THREE.ShadowMaterial({ opacity: 0.2 });
+// the accent's thickness steps in the preview, each shaded as that many translucent layers over the plate color
+let shadeMats = [];
 const wall = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), shadowMat);
 wall.receiveShadow = true;
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), shadowMat);
@@ -2441,6 +2522,11 @@ function updateScene(res, refit) {
   clearGroup(signGroup); clearGroup(feetGroup); clearGroup(printGroup);
 
   signGroup.add(makeMesh(geometryFrom(parts.body), mats.base));
+  shadeMats = [];
+  if (parts.accentShade && parts.accentShade.length) {
+    for (const sh of parts.accentShade) { const m = mats.accent.clone(); m.userData.level = sh.level; shadeMats.push(m); signGroup.add(makeMesh(geometryFrom(sh.mesh), m)); }
+    applyColors();
+  } else if (parts.accent) signGroup.add(makeMesh(geometryFrom(parts.accent), mats.accent));
   if (parts.labels) signGroup.add(makeMesh(geometryFrom(parts.labels), mats.label));
   if (parts.nameText) signGroup.add(makeMesh(geometryFrom(parts.nameText), mats.name));
   // the name tag moves as one piece; it keeps how far it was pulled out across rebuilds
@@ -2494,7 +2580,7 @@ function updateScene(res, refit) {
   const bed = state.bed, bedD = bed === 250 ? 210 : bed;
   // overlays: extra parts that share the main part's coordinates (labels and name on the base, text on the tag)
   const mk = (mesh, mat, xf, overlays = []) => ({ mesh, mat, xf, overlays: overlays.filter((o) => o[0]) });
-  const rows = [[mk(parts.body, mats.base, null, [[parts.labels, mats.label], [parts.nameText, mats.name]])]];
+  const rows = [[mk(parts.body, mats.base, null, [[parts.accent, mats.accent], [parts.labels, mats.label], [parts.nameText, mats.name]])]];
   if (parts.tag) rows.push([parts.tagBody ? mk(parts.tagBody, mats.tag, null, [[parts.tagText, mats.name]]) : mk(parts.tag, mats.tag, null)]);
   const small = [...(parts.slider ? [mk(parts.slider, mats.slider, PRINT_XF.slider(info))] : []), ...parts.feet.map((x) => mk(x, mats.base, PRINT_XF.foot())), ...parts.hooks.map((x) => mk(x, mats.base, PRINT_XF.hook()))];
   if (small.length) rows.push(small);
@@ -2819,14 +2905,15 @@ function exportFiles() {
   if (parts.base) add('base', 'base_one-color', 'Base, one color', parts.base, centre(parts.base.pos, baseRef));
   else {
     // body and raised letters, merged into one solid the first time a download asks for it
-    const merged = () => parts.base || (parts.base = engine.unionMeshes([parts.body, parts.labels, parts.nameText]));
+    const merged = () => parts.base || (parts.base = engine.unionMeshes([parts.body, parts.accent, parts.labels, parts.nameText]));
     let pos = null;
-    const top = Math.max(...[parts.body, parts.labels, parts.nameText].filter(Boolean).map((m) => m.max[2]));
+    const top = Math.max(...[parts.body, parts.accent, parts.labels, parts.nameText].filter(Boolean).map((m) => m.max[2]));
     files.push({ key: 'base', name: `status-slider_${tag}_base_one-color.stl`, label: 'Base, one color', get mesh() { return merged(); }, get pos() { return pos || (pos = centre(merged().pos, baseRef)); },
-      approx: { size: [parts.body.max[0] - parts.body.min[0], parts.body.max[1] - parts.body.min[1], top - parts.body.min[2]], vol: [parts.body, parts.labels, parts.nameText].reduce((v, m) => v + (m ? m.vol : 0), 0) } });
+      approx: { size: [parts.body.max[0] - parts.body.min[0], parts.body.max[1] - parts.body.min[1], top - parts.body.min[2]], vol: [parts.body, parts.accent, parts.labels, parts.nameText].reduce((v, m) => v + (m ? m.vol : 0), 0) } });
   }
-  if (parts.labels || parts.nameText) {
+  if (parts.labels || parts.nameText || parts.accent) {
     add('body', 'base_body', 'Base body (multi-color)', parts.body, centre(parts.body.pos, baseRef));
+    if (parts.accent) add('accent', 'base_accent', 'Plate accent (multi-color)', parts.accent, centre(parts.accent.pos, baseRef));
     if (parts.labels) add('labels', 'base_labels', 'Status labels (multi-color)', parts.labels, centre(parts.labels.pos, baseRef));
     if (parts.nameText) add('nameText', 'base_name', 'Name text (multi-color)', parts.nameText, centre(parts.nameText.pos, baseRef));
   }
@@ -2851,7 +2938,7 @@ function download3mf() {
   if (!files.length) return;
   const by = Object.fromEntries(files.map((x) => [x.key, x]));
   const mats = MAT_LIST();
-  const baseParts = by.body ? [['Base body', by.body, 0], ...(by.labels ? [['Status labels', by.labels, 1]] : []), ...(by.nameText ? [['Name text', by.nameText, 4]] : [])] : [['Base', by.base, 0]];
+  const baseParts = by.body ? [['Base body', by.body, 0], ...(by.accent ? [['Plate accent', by.accent, 5]] : []), ...(by.labels ? [['Status labels', by.labels, 1]] : []), ...(by.nameText ? [['Name text', by.nameText, 4]] : [])] : [['Base', by.base, 0]];
   const groups = [{ name: 'Base', parts: baseParts },
     ...(by.slider ? [{ name: 'Frame', parts: [['Frame', by.slider, 2]] }] : []),
     ...(by.tag ? [{ name: 'Name tag', parts: by.tagBody ? [['Name tag body', by.tagBody, 3], ['Name tag text', by.tagText, 4]] : [['Name tag', by.tag, 3]] }] : []),
@@ -2952,6 +3039,7 @@ function readmeText() {
     'Two colors on a single nozzle',
     i.raised && swaps(i).length ? `- With ${layerFine()} mm layers: ${swapText(i)}.${result.parts.nameText && result.parts.labels ? ' The status labels and the name share that color this way; for two text colors use a multi-color printer.' : ''}` : '- Not needed: the letters are engraved.',
     i.raised && swaps(i).length ? '- The sides of the plate are printed at those heights too, so they pick up a thin stripe of the text color.' : null,
+    i.accentMode === 'top' ? `- Plate accent: swap to the accent color on the first layer above Z = ${i.accentZ.toFixed(2)} mm and keep it to the top (or load base_accent with the body).` : i.accentMode !== 'off' ? '- Plate accent: its color changes within layers, so load base_body and base_accent together as one object on a multi-color printer (AMS, MMU).' : null,
     i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
     'Assembly',
@@ -3276,7 +3364,7 @@ function renderPresets() {
 function renderShapes() {
   const grid = $('#shapeGrid');
   grid.innerHTML = '';
-  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'clipboard', 'notebook'];
+  const order = ['rail', 'rounded', 'pill', 'classic', 'honeycomb', 'arrow', 'lozenge', 'banner', 'pixel', 'cat', 'ticket', 'cloud', 'speech', 'scallop', 'wave', 'arch', 'film', 'notebook', 'glasses'];
   for (const [k, label] of Object.entries(engine.shapes).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'shape-tile'; b.dataset.shape = k;
@@ -3344,7 +3432,7 @@ function renderPalettes() {
 }
 
 // Controls bound with data-key read and write state[key].
-const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider', 'colTag', 'colName']);
+const COLOR_KEYS = new Set(['colBase', 'colLabel', 'colSlider', 'colTag', 'colName', 'colAccent']);
 function syncControls() {
   const fitOn = state.sizeMode === 'auto';
   $('#fit').checked = fitOn;
@@ -3389,7 +3477,7 @@ function setKey(k, raw, free) {
     for (const sk of Object.keys(SLIDERS)) state[sk] = freeClamp(sk, state[sk]);
   }
   syncControls();
-  if (COLOR_KEYS.has(k)) { applyColors(); saveState(); return; }
+  if (COLOR_KEYS.has(k)) { applyColors(); saveState(); if (result) updateReadout(); return; }
   if (k === 'bed') { if (result) { updateReadout(); updateScene(result, state.view === 'print'); } saveState(); return; }
   changed();
 }
@@ -3484,6 +3572,9 @@ function applyColors() {
   mats.slider.color.set(state.colSlider);
   mats.tag.color.set(state.colTag);
   mats.name.color.set(state.colName);
+  mats.accent.color.set(state.colAccent);
+  // about 40% of the plate color is hidden by each translucent layer
+  for (const m of shadeMats) m.color.set(state.colBase).lerp(new THREE.Color(state.colAccent), 1 - Math.pow(0.6, m.userData.level));
   requestRender();
 }
 function setBuildState(kind, text) {
@@ -3514,6 +3605,8 @@ function updateReadout() {
   chip.title = `Plate ${fmt(i.W)} × ${fmt(i.H)} mm: ${fitsBed ? 'fits' : 'too big for'} the ${bedW} × ${bedD} mm bed of the machine picked at the top`;
   const warns = [...i.warnings];
   if (!state.dyn) { const { lo, hi } = layerRange(state.nozzle); if (state.layerH < lo - 1e-6 || state.layerH > hi + 1e-6) warns.push(`A ${state.layerH} mm layer is outside the usual ${lo}–${hi} mm for a ${state.nozzle} mm nozzle (25–75% of its width). Turn on Dynamic to skip this check.`); }
+  const nColors = new Set(usedMats(result.parts).map((m) => MAT_LIST()[m][1].toUpperCase())).size;
+  if (nColors > 4) warns.push(`This design uses ${nColors} filament colors. Most multi-color printers hold four: give some parts the same color (the name tag the frame's, the name the lettering's).`);
   if (textMissing.length) warns.unshift(`These characters have no printable outline here and were skipped: ${[...new Set(textMissing)].join(' ')}. Arabic and Indic scripts need text shaping, which this page does not do.`);
   $('#warnings').innerHTML = '';
   for (const w of warns) { const li = document.createElement('li'); li.textContent = w; $('#warnings').appendChild(li); }
@@ -3524,11 +3617,13 @@ function updateReadout() {
 }
 
 // the 3MF's materials, in slot-numbering order
-const MAT_LIST = () => [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag], ['Name text', state.colName]];
+const MAT_LIST = () => [['Plate', state.colBase], ['Labels', state.colLabel], ['Frame', state.colSlider], ['Name tag', state.colTag], ['Name text', state.colName], ['Plate accent', state.colAccent]];
+// the materials a design uses (indices into MAT_LIST)
+const usedMats = (P) => [0, ...(P.labels ? [1] : []), ...(P.slider ? [2] : []), ...(P.tag ? [3] : []), ...(P.nameText || P.tagText ? [4] : []), ...(P.accent ? [5] : [])];
 function renderExport() {
   // which filament goes in which slot when the 3MF is opened in Bambu Studio or Orca Slicer
-  const P = result.parts, used = [0, ...(P.labels ? [1] : []), ...(P.slider ? [2] : []), ...(P.tag ? [3] : []), ...(P.nameText || P.tagText ? [4] : [])];
-  $('#slotList').innerHTML = 'Filament slots in the 3MF: ' + filamentSlots(MAT_LIST(), used).map(([n, c, names]) => `<b>${n}</b> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};border:1px solid var(--line);vertical-align:-1px"></span> ${names.join(' + ')}`).join(' · ') + '. Set your filaments in that order, or pick a slot per part in the slicer.';
+  const P = result.parts, used = [0, ...(P.labels ? [1] : []), ...(P.slider ? [2] : []), ...(P.tag ? [3] : []), ...(P.nameText || P.tagText ? [4] : []), ...(P.accent ? [5] : [])];
+  $('#slotList').innerHTML = 'Filament slots in the 3MF: ' + filamentSlots(MAT_LIST(), used).map(([n, c, names]) => `<b>${n}</b> <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${c};border:1px solid var(--line);vertical-align:-1px"></span> ${filamentName(c)}: ${names.join(' + ')}`).join(' · ') + '. Set your filaments in that order, or pick a slot per part in the slicer.';
   const ul = $('#partsList');
   ul.innerHTML = '';
   for (const f of exportFiles()) {
@@ -3550,6 +3645,7 @@ function renderExport() {
     i.raised
       ? `<b>Two colors, one nozzle</b> (${layerFine()} mm layers): ${swapText(i, (v) => `<span class="mono">${v}</span>`)}. The sides of the plate pick up a thin stripe of the text color at those heights. With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
+    i.accentMode === 'top' ? `<b>Plate accent:</b> swap to the accent color on the first layer above <span class="mono">Z ${i.accentZ.toFixed(2)} mm</span> and keep it to the top, or load <i>plate accent</i> with the base body.` : i.accentMode && i.accentMode !== 'off' ? '<b>Plate accent:</b> its color changes within layers, so print the base on a multi-color printer (AMS, MMU) with <i>base body</i> and <i>plate accent</i> loaded together. A translucent accent filament gives the smoothest gradient.' : null,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     result.parts.slider ? `<b>Assemble:</b> slide the frame into the track from the right end, the open end. Nothing holds it there but the fit of the dovetail, so don't push it past the last status.` : null,
