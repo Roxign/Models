@@ -1658,23 +1658,28 @@ function createEngine(wasm) {
       if (p.mount === 'stand') {
         const a = p.tilt * D2R, ca = Math.cos(a), sa = Math.sin(a);
         const ybG = ob.min[1], floor = 2;
-        const ty = floor - ybG * ca, tz = ybG * sa;
+        // the sign's lowest corner sits on the foot's floor: the back one leaning back, the front one leaning forward
+        const lift0 = Math.max(0, -sa * z1), ty = floor - ybG * ca + lift0, tz = ybG * sa;
         const M = [1, 0, 0, 0, 0, ca, -sa, 0, 0, sa, ca, 0, 0, ty, tz, 1];
         // gF: the gap between the foot and the sign all round the slot; biteF: how far two ridges in the slot press into the sign
         // on each face (0 leaves them off), half way up the grip, like the cubicle hooks'
         const gF = Math.max(0.02, p.footGap ?? 0.2), biteF = Math.max(0, p.footBite ?? 0.05), rrF = Math.max(0.8, 2 * NZ);
         const slotCS = (sh.outer || sh.cs).offset(gF, 'Round', 2, 16), slot = (zc) => slotCS.extrude(zc + 2 * gF).translate([0, 0, -gF]).transform(M);
-        const fl = p.footW ?? 22, ff = p.footF ?? 12, fbk = p.footB ?? 38, fd = ff + fbk;
+        // ff, fbk: how far each foot reaches in front of and behind the sign (never less than a solid wall)
+        const fl = p.footW ?? 22, ff = Math.max(lw(1.6), p.footF ?? 12), fbk = Math.max(lw(1.6), p.footB ?? 38);
         for (const sx of [-1, 1]) {
           const xf = sx * Math.min(W * 0.28, X * 0.75);
           const strip = rect(fl, H * 3, xf, 0).intersect(sh.cs);
           const ybL = strip.isEmpty() ? ybG : strip.bounds().min[1];
-          const hF = lz((ybL - ybG) * ca + floor + (p.footGrip ?? 7.5));
-          // the foot clips over the full thickness of the base there
+          // the foot clips over the full thickness of the base there, footGrip up from the sign's lowest corner
           const zc = topIn(Manifold.cube([fl + 1, 12, 400]).translate([xf - fl / 2 - 0.5, ybL - 1, -1]));
-          const zMid = -(ybL - ybG) * sa + zc * ca / 2;
-          const zFront = zMid + ff, zBack = zMid - fbk;
-          let foot = extrudeY(rrect(fl, fd, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot(zc));
+          const yBack = (ybL - ybG) * ca + floor + lift0, hF = lz(Math.min(yBack, yBack + sa * zc) + (p.footGrip ?? 7.5));
+          // The sign's back and front faces where its bottom edge meets the foot, and how far they move back (or forward, leaning
+          // forward) by the top of the foot. The reach is measured from the outermost of those, so each foot keeps a whole wall in
+          // front of the sign and behind it all the way up.
+          const zB0 = -(ybL - ybG) * sa, zF0 = zB0 + zc * ca, dz = (p.footGrip ?? 7.5) * sa / Math.max(0.5, ca);
+          const zFront = Math.max(zF0, zF0 - dz) + gF + ff, zBack = Math.min(zB0, zB0 - dz) - gF - fbk;
+          let foot = extrudeY(rrect(fl, zFront - zBack, 4, xf, -(zFront + zBack) / 2), hF).subtract(slot(zc));
           if (biteF >= 0.005) {
             const y = ybL + 0.5 * (p.footGrip ?? 7.5) / Math.max(0.5, ca), root = (z) => rect(2 * rrF, 0.02, y, z);
             foot = foot.add(extrudeX(union([
@@ -1996,8 +2001,8 @@ const SLIDERS = {
   screwD: { label: 'Screw hole diameter', min: 2, max: 12, step: 0.2, out: mm() },
   screwHead: { label: 'Screw head diameter', min: 4, max: 24, step: 0.2, out: mm() },
   footW: { label: 'Foot width', min: 10, max: 100, step: 1, out: mm(0) },
-  footF: { label: 'Foot extension, forward', min: 0, max: 120, step: 1, out: mm(0) },
-  footB: { label: 'Foot extension, backward', min: 0, max: 250, step: 1, out: mm(0) },
+  footF: { label: 'Foot reach in front of the sign', min: 2, max: 120, step: 1, out: mm(0) },
+  footB: { label: 'Foot reach behind the sign', min: 2, max: 250, step: 1, out: mm(0) },
   footGrip: { label: 'Foot grip height', min: 3, max: 20, step: 0.5, out: mm() },
   footGap: { label: 'Gap between foot and sign', min: 0.05, max: 1, step: 0.05, out: mm(2) },
   footBite: { label: 'Foot bite into the sign', min: 0, max: 0.6, step: 0.01, out: mm(2) },
@@ -2070,7 +2075,7 @@ const MOUNT_HINTS = {
   magnet: 'Pockets on the back for round magnets; glue them in. Good for metal doors and whiteboards.',
   screw: 'Two countersunk holes at the ends for M4 or #8 screws.',
   hang: 'A loop above the plate with a hole for a hook, nail or door knob. Works with any shape.',
-  stand: 'Two slotted feet print separately and hold the sign upright on a desk. Foot grip height is how far up the sign they hold; the sign only grows by what the feet cover beyond the rail under the track.',
+  stand: 'Two slotted feet print separately and hold the sign upright on a desk. Each foot reaches the set distance in front of and behind the sign, measured from its faces, so it always keeps a wall on both sides. Foot grip height is how far up the sign they hold; the sign only grows by what the feet cover beyond the rail under the track.',
   cubicle: 'Two hooks clip onto the top edge of the sign and hang over the top of a cubicle panel, like an upside-down J. Measure how thick the panel is. A negative drop hangs the sign higher than the panel.',
   cubrail: 'For a C-shaped rail: each hook ends in a thin tab. Hold the sign up a little, push the tabs into the slot and let go; the tabs drop behind the lower lip. It slides along the rail. Measure the slot and the hollow behind it.',
 };
