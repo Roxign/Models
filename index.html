@@ -1581,14 +1581,15 @@ function createEngine(wasm) {
       const z1 = Math.max(statusOn ? T + Rh : T, p.nameRail ? zTag : T);
       const fillRails = !KEEP_RAILS.has(p.shape), mh = p.marginH ?? 0;
       const edge = hErode(sh.cs, mh);
-      // A second plate color in steps of one layer on top of the block (see below). accTD: the accent filament's transmission
-      // distance; accK steps, by default as many as it takes the accent to cover the plate color fully (a tenth of the TD).
-      const accMode = p.accentMode || 'off', accL = dyn ? 0.2 : LH, accTD = Math.max(0.1, p.accentTD ?? 4);
-      const accK = p.accentLayers > 0 ? Math.round(p.accentLayers) : clamp(Math.ceil((0.1 * accTD) / accL - 1e-6), 1, 20);
-      const accOn = accMode !== 'off', accTop = accOn ? z1 + accK * accL : z1;
+      // A second plate color in the top layers of the block (see below). accL: their layer height (the plate's, or a finer one of
+      // its own, set in the slicer as a height range); accTD: the accent filament's transmission distance; accK layers, by default
+      // as many as it takes the accent to cover the plate color fully (a tenth of the TD).
+      const accMode = p.accentMode || 'off', accL = p.accentLH > 0 ? Math.max(0.04, p.accentLH) : dyn ? 0.2 : LH, accTD = Math.max(0.1, p.accentTD ?? 4);
+      const accK = p.accentLayers > 0 ? Math.round(p.accentLayers) : clamp(Math.ceil((0.1 * accTD) / accL - 1e-6), 1, 30);
+      const accOn = accMode !== 'off', accTop = z1, accZ0 = z1 - accK * accL;
       // how much of the color below a stack of the accent t thick hides (AutoForge's model of HueForge's TD)
       const accCover = (t) => Math.min(1, Math.sqrt(t / (0.1 * accTD)));
-      let detail = sh.detail ? sh.detail.cs : null, raisedExtra = null;
+      let detail = sh.detail ? sh.detail.cs : null;
       const xa = ob.min[0] - 1, xb = ob.max[0] + 1;
       let body = sh.cs.extrude(z1);
       if (p.bevel > 0) {
@@ -1644,7 +1645,8 @@ function createEngine(wasm) {
         else if (hdrZone && headerText) bead = bead.subtract(rect(2 * X0 + 3, hdrZone[1] - hdrZone[0] + 1, 0, (hdrZone[0] + hdrZone[1]) / 2));
         for (const h of hookAt) bead = bead.subtract(rect(h.hw + 3, 14, h.xf, h.yT - 6));
         // with a second color the bead is made of it (anything raised above the block is), so one filament swap still does
-        if (accOn) { raisedExtra = bead; if (accMode === 'details') detail = bead; } else body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
+        body = body.add(bead.extrude(lz(0.8) + 0.02).translate([0, 0, z1 - 0.02]));
+        if (accMode === 'details') detail = bead;
       }
       if (sh.lenses) {
         // glasses: the lenses one layer below the rims
@@ -1758,36 +1760,34 @@ function createEngine(wasm) {
           }
         }
       }
-      // The plate's second color, the way HueForge colors a print: the plate stops flat at the top of the block and the second
-      // color is stacked on it in steps of one layer, so a single filament swap at the block's top prints it. Where the stack is
-      // thin the plate color shows through (more so in a translucent, high-TD filament), so the steps shade from one color into
-      // the other: all of them everywhere (Top layer), one layer everywhere and more towards the right (Gradient) or towards the outline (Edge glow), or
-      // on the shape's own details. A name printed on the plate sits on top of the steps.
+      // The plate's second color, colored the way HueForge colors a print, by thickness: it fills the top accK layers of the block
+      // where it is used, so the top face stays flat, and where it is thin the plate color below shows through (more so in a
+      // translucent, high-TD filament), so the steps shade from one color into the other. One layer of it covers the top
+      // everywhere, and more layers under that build the shading: all of them everywhere (Top layer), more towards the right
+      // (Gradient) or towards the outline (Edge glow), or only the shape's own details. Its layers mix both colors, so it prints
+      // on a multi-color printer.
       let accent = null, accentShade = null;
       if (accOn) {
-        const top = body.slice(z1 - 0.05), plans = []; // the block's top face; plans[j]: where step j (from the bottom) is printed
+        const top = body.slice(z1 - 0.05), plans = []; // the block's top face; plans[j]: where layer j (from the top) has the color
         const w = ob.max[0] - ob.min[0], hgt = ob.max[1] - ob.min[1] + 2, ym0 = (ob.min[1] + ob.max[1]) / 2;
         for (let j = 0; j < accK; j++) {
           let pl = null;
           if (accMode === 'top') pl = top;
-          // never less than one layer anywhere: the first step covers the whole top, the rest build the shading
           else if (accMode === 'gradient') { if (j === 0) pl = top; else { const x0 = ob.min[0] + (w * j) / accK; pl = top.intersect(rect(xb + 1 - x0, hgt, (x0 + xb + 1) / 2, ym0)); } }
           else if (accMode === 'edge') { const D = clamp(Math.min(W, H) * 0.3, 4, 20); pl = j === 0 ? top : top.intersect(sh.cs.subtract(sh.cs.offset(-(D * (accK - j)) / (accK - 1), 'Round', 2, 32))); }
           else if (accMode === 'details' && detail) pl = top.intersect(detail);
-          // under a printed name and on raised features the steps are full height
-          const extra = [raisedExtra, nameCS && !nameCS.isEmpty() ? nameCS.offset(0.4, 'Round', 2, 12).intersect(sh.cs) : null].filter(Boolean);
-          if (extra.length) pl = union([pl, ...extra].filter(Boolean));
           plans.push(pl && !pl.isEmpty() ? pl : null);
         }
         if (accMode === 'details' && !detail) warnings.push('This shape has no details for the second color. Pick another plate accent.');
-        const layers = plans.map((pl, j) => (pl ? pl.extrude(accL + (j < accK - 1 ? 0.001 : 0)).translate([0, 0, z1 + j * accL]) : null)).filter(Boolean);
-        if (layers.length) accent = Manifold.union(layers);
-        // for the preview: the steps by how many layers thick they are, each shaded by how much of the plate color it hides
+        // layer j runs from z1 - (j + 1) accL to z1 - j accL; the top one also takes anything raised above the block (the bead)
+        const slabs = plans.map((pl, j) => (pl ? pl.extrude(accL + (j ? 0.001 : (accMode === 'details' ? 60 : 0))).translate([0, 0, z1 - (j + 1) * accL]) : null)).filter(Boolean);
+        if (slabs.length) { const a = body.intersect(Manifold.union(slabs)); if (!a.isEmpty()) { accent = a; body = body.subtract(Manifold.union(slabs)); } }
+        // for the preview: the color by how many layers deep it is there, each shaded by how much of the plate color it hides
         if (accent) {
           accentShade = [];
           for (let i = 1; i <= accK; i++) {
             const zone = plans[i - 1] ? (i < accK && plans[i] ? plans[i - 1].subtract(plans[i]) : plans[i - 1]) : null;
-            const piece = zone && !zone.isEmpty() ? accent.intersect(zone.extrude(accTop - z1 + 2).translate([0, 0, z1 - 1])) : null;
+            const piece = zone && !zone.isEmpty() ? accent.intersect(zone.extrude(80).translate([0, 0, accZ0 - 1])) : null;
             if (piece && !piece.isEmpty()) accentShade.push({ level: i, cover: accCover(i * accL), mesh: meshData(piece) });
           }
         }
@@ -1969,7 +1969,7 @@ function createEngine(wasm) {
           hooks: hooks.map(meshData),
         },
         info: {
-          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: accTop, accentMode: accent ? accMode : 'off', accentZ: z1, accentTop: accTop, accentLayers: accK, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
+          W: ob.max[0] - ob.min[0], H: ob.max[1] - ob.min[1], ox0: ob.min[0], ox1: ob.max[0], oy0: ob.min[1], oy1: ob.max[1], T, Lh, Ln, zName: accTop, accentMode: accent ? accMode : 'off', accentZ: accZ0, accentTop: z1, accentLayers: accK, accentLH: accL, raised, zt, yc, ww, wh, Sx, cells, statusOn, tagTop: tagAll ? tagAll.boundingBox().max[2] : 0,
           capMin: Number.isFinite(capMin) ? capMin : null, hdrCap, tagT, stand, hookEnv, warnings, plateW: W, plateH: H, auto,
         },
       };
@@ -2209,7 +2209,7 @@ const DEFAULTS = {
   nozzle: 0.4, layerH: 0.2, dyn: false, hcap: 20,
   frame: 4.5, winR: 2, railH: 3.6, tol: 0.25, proud: 0.8, marginV: 0, marginH: 0, pad: 0, bevel: 0,
   mount: 'none', magD: 10, magH: 2, magN: 2, magInset: 14, screwD: 4.4, screwHead: 8.8, tilt: 15, footW: 22, footF: 12, footB: 38, footGrip: 12, footGap: 0.2, footClear: 0.5, footN: 2, cubP: 55, hookBack: 25, railOpen: 10, railLip: 1, railExt: 2, railCav: 1, railDrop: 5, hookDrop: 5, hookW: 10, hookN: 2, hookClear: 0.5, hookGap: 0.2, hookBite: 0.05, hangHole: 10, hangN: 1, tape: false,
-  statusOn: true, nameMode: 'off', tagT: 1.6, accentMode: 'off', accentLayers: 0, accentTD: 0, colAccent: '#0086D6', railW: 4,
+  statusOn: true, nameMode: 'off', tagT: 1.6, accentMode: 'off', accentLayers: 0, accentTD: 0, accentLH: 0, colAccent: '#0086D6', railW: 4,
   colBase: PALETTES[0].base, colLabel: PALETTES[0].label, colSlider: PALETTES[0].slider, colTag: PALETTES[0].slider, colName: PALETTES[0].label, nameReliefH: 0.4, namePad: 1, tagTol: 0.25, tagRailH: 1.6,
 };
 
@@ -2227,6 +2227,7 @@ const SLIDERS = {
   frame: { label: 'Frame bars', min: 3, max: 15, step: 0.5, nozzleMin: 4, out: mm() },
   winR: { label: 'Window corners', min: 0, max: 15, step: 0.5, out: mm() },
   accentLayers: { label: 'Second color steps', min: 0, max: 20, step: 1, out: (v) => (v > 0 ? `${v} layer${v > 1 ? 's' : ''}` : 'auto') },
+  accentLH: { label: 'Second color layer height', min: 0, max: 0.3, step: 0.01, out: (v) => (v > 0 ? `${v} mm` : 'as the plate') },
   accentTD: { label: 'Second color TD', min: 0, max: 30, step: 0.1, out: (v) => (v > 0 ? `${v} mm` : 'typical') },
   railW: { label: 'Rail width beside the track', min: 3, max: 12, step: 0.2, nozzleMin: 9, out: mm() },
   railH: { label: 'Rail height', min: 2.4, max: 10, step: 0.5, layers: true, out: mm() },
@@ -2396,8 +2397,9 @@ const SECTIONS = [
     { group: 'Second color', items: [
       { seg: 'accentMode', label: 'Plate accent', options: [['off', 'Off'], ['top', 'Top layer'], ['gradient', 'Gradient'], ['edge', 'Edge glow'], ['details', 'Shape details']] },
       { slider: 'accentTD', when: 'accent' },
+      { slider: 'accentLH', when: 'accent' },
       { slider: 'accentLayers', when: 'accent' },
-      { hint: 'Made the way HueForge colors a print: the second color is stacked on top of the plate in steps of one layer, so one filament swap prints it, and where the stack is thin the plate color shows through. TD (transmission distance) is how much light a filament lets through; it hides the color below it at about a tenth of its TD. Leave it at 0 for the typical value of the chosen color, or enter your filament\'s (HueForge lists them). Auto steps: as many layers as full cover takes, each a different shade; thinner layers give more of them. A lighter, more translucent color over a darker plate gives the longest gradient. Shape details: the glasses\' frame, the notebook\'s rings, the film strip\'s edges, the Classic bead.', when: 'accent' },
+      { hint: 'Made the way HueForge colors a print, by thickness: the second color fills the top layers of the plate (the top face stays flat), one layer everywhere and more where it is to be stronger; where it is thin the plate color shows through. Its layers hold both colors, so print it on a multi-color printer (AMS). A finer layer height for it (0.08 mm, say) gives more shades in the same depth: set it in the slicer as a height range (the print notes give the heights). TD (transmission distance) is how much light a filament lets through; it hides the color below it at about a tenth of its TD. Leave it at 0 for the typical value of the chosen color, or enter your filament\'s (HueForge lists them). Auto steps: as many layers as full cover takes, each a different shade; thinner layers give more of them. A lighter, more translucent color over a darker plate gives the longest gradient. Shape details: the glasses\' frame, the notebook\'s rings, the film strip\'s edges, the Classic bead.', when: 'accent' },
     ] },
   ] },
   { title: 'Status', hue: 'labels', glyph: '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', items: [
@@ -3160,7 +3162,6 @@ function downloadZip() {
 const swapEvents = (i) => {
   const P = result.parts, ev = [];
   if (P.labels) ev.push([i.T, state.colLabel, 'status lettering'], [i.T + i.Lh, state.colBase, 'plate']);
-  if (P.accent) ev.push([i.accentZ, state.colAccent, 'second color']);
   if (P.nameText) ev.push([i.zName, state.colName, 'name']);
   return ev.sort((a, b) => a[0] - b[0]).filter((e, k, a) => !(a[k + 1] && Math.abs(a[k + 1][0] - e[0]) < 1e-6));
 };
@@ -3186,6 +3187,7 @@ function readmeText() {
     'Two colors on a single nozzle',
     swaps(i).length ? `- With ${layerFine()} mm layers, start in the plate color, then: ${swapText(i)}.` : '- Not needed: one color.',
     result.parts.labels ? '- The sides of the plate are printed at the lettering heights too, so they pick up a thin stripe of that color.' : null,
+    result.parts.accent ? `- Second color: from Z = ${i.accentZ.toFixed(2)} mm to the top (${i.accentTop.toFixed(2)} mm) its ${i.accentLayers} layers hold both the plate color and the second color, so load base_body and base_accent together as one object on a multi-color printer (AMS).${Math.abs(i.accentLH - layerFine()) > 1e-6 ? ` Print those layers ${fmt(i.accentLH, 2)} mm thick: in Bambu Studio, right-click the object, Height range modifier, from ${i.accentZ.toFixed(2)} to ${i.accentTop.toFixed(2)} mm, layer height ${fmt(i.accentLH, 2)} mm.` : ''}` : null,
     i.raised && result.parts.tagText ? `- Name tag: swap on the first layer above Z = ${i.tagT.toFixed(2)} mm, or load name_tag_body and name_tag_text together.` : null,
     '',
     'Assembly',
@@ -3836,6 +3838,7 @@ function renderExport() {
     swaps(i).length
       ? `<b>Colors on one nozzle</b> (${layerFine()} mm layers): start in the plate color, then ${swapText(i, (v) => `<span class="mono">${v}</span>`)}.${result.parts.labels ? ' The sides of the plate pick up a thin stripe of the lettering color at its heights.' : ''} With an AMS or MMU, load <i>base body</i>${result.parts.labels ? ', <i>status labels</i>' : ''}${result.parts.nameText ? ' and <i>name text</i>' : ''} together as one object instead; then the status labels and the name can have different colors.`
       : `<b>Engraved labels</b> print in one color. Fill them with paint or a paint pen afterwards if you want contrast.`,
+    result.parts.accent ? `<b>Second color:</b> its ${i.accentLayers} layers, from <span class="mono">Z ${i.accentZ.toFixed(2)}</span> to <span class="mono">${i.accentTop.toFixed(2)} mm</span>, hold both plate colors, so print the base on a multi-color printer (AMS) with <i>base body</i> and <i>plate accent</i> loaded together.${Math.abs(i.accentLH - layerFine()) > 1e-6 ? ` Print those layers <span class="mono">${fmt(i.accentLH, 2)} mm</span> thick: in Bambu Studio right-click the object, <i>Height range modifier</i>, set the range to <span class="mono">${i.accentZ.toFixed(2)}–${i.accentTop.toFixed(2)} mm</span> and its layer height to <span class="mono">${fmt(i.accentLH, 2)} mm</span>.` : ''}` : null,
     state.dyn ? `<b>Dynamic layer height:</b> dimensions here are not tied to whole layers. Turn on adaptive (variable) layer height in your slicer, up to <span class="mono">${state.layerH} mm</span>, and make sure a layer boundary falls at <span class="mono">Z ${i.T.toFixed(2)} mm</span> where the label color starts.` : null,
     result.parts.tag ? `<b>Name tag:</b> slides into its rail from the right end, like the frame, until it stops at the left end. Change the name and download again to print a tag for someone else.${i.raised && result.parts.tagText ? ` For two colors on one nozzle, swap above <span class="mono">Z ${i.tagT.toFixed(2)} mm</span>.` : ''}` : null,
     result.parts.slider ? `<b>Assemble:</b> slide the frame into the track from the right end, the open end. Nothing holds it there but the fit of the dovetail, so don't push it past the last status.` : null,
